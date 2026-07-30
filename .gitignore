@@ -1,58 +1,79 @@
-/pretrained_models
-core/csrc/uncertainty_pnp/ceres/
-.DS_Store
-# output dir
-/data
-/datasets
-*.so.*
+/pretrained_models/
+/data/
+/datasets/
+/weights/
+/output/
+/outputs/
+/runs/
+/logs/
+/checkpoints/
+/wandb/
+/tensorboard/
+/local/
+/secrets/
+*.log
+*.ckpt
+*.pth
+*.pkl
+*.npy
+*.npz
+*.engine
+*.onnx
+*.tar
 *.tar.gz
+*.zip
+events.out.tfevents*
+
+# Native extensions, packaging, and caches
+core/csrc/uncertainty_pnp/ceres/
+*.so
+*.so.*
 *.egg-info*
-output
+build/
+dist/
+_ext/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# Local environments and credentials
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+conda-env/
+*.pem
+*.key
+credentials*
+
+# Editors and notebooks
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.example.json
+*.swn
+*.swo
+*.swp
+*~
+*.ipynb
+**/.ipynb_checkpoints/
+
+# Upstream/runtime artifacts
 YOLOX_outputs/
-instant_test_output
-inference_test_output
-
-
+instant_test_output/
+inference_test_output/
+detectron2.egg-info/
 *.ttf
 *.jpg
 *.png
 *subsitute.sh
 exclude-file.txt
 git-pipeline.txt
-# compilation and distribution
-__pycache__
-_ext
-*.pyc
-*.so
-detectron2.egg-info/
-build/
-dist/
 *dlaf*
-# pytorch/python/numpy formats
-*.pth
-*.pkl
-*.npy
-*.engine
-*.onnx
-events.out.tfevents*
+/models/
 
-# ipython/jupyter notebooks
-*.ipynb
-**/.ipynb_checkpoints/
-
-# Editor temporaries
-*.swn
-*.swo
-*.swp
-*~
-
-# Pycharm editor settings
-.idea
-
-# VSCode editor settings
-.vscode
-
-# project dirs
-/models
-
-#external/*
