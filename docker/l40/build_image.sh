@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
-chx_root="$(cd -- "${repo_root}/../../.." && pwd)"
+chx_root="$(cd -- "${repo_root}/../.." && pwd)"
 image="${IMAGE:-gdrnpp-stage3c1:torch220-cu121-sm89-v1}"
 commit="$(git -C "${repo_root}" rev-parse HEAD)"
 stamp="$(date +%Y%m%d_%H%M%S)"
