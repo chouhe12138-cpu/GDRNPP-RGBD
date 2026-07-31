@@ -153,6 +153,12 @@ SOLVER = dict(
     CHECKPOINT_PERIOD=5,
     CHECKPOINT_BY_EPOCH=True,
     MAX_TO_KEEP=5,
+    BEST_CHECKPOINT=dict(
+        ENABLED=False,
+        PRIMARY_METRIC="bop_ar",
+        SECONDARY_METRIC="add_s_0.1d",
+        PRIMARY_TIE_TOL=0.001,
+    ),
     # Gradient clipping -----------------------------------------
     CLIP_GRADIENTS=dict(
         ENABLED=False,

@@ -1,5 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import copy
+import math
 from typing import Any, Dict, List
 import logging
 import torch
@@ -22,7 +23,67 @@ __all__ = [
     "build_optimizer_d2",
     "build_lr_scheduler",
     "build_optimizer_with_params",
+    "accumulation_window_size",
+    "get_accumulation_steps",
+    "optimizer_updates_per_training",
+    "should_optimizer_step",
 ]
+
+
+def accumulation_window_size(
+    iteration: int,
+    accumulation_steps: int,
+    iterations_per_epoch: int,
+) -> int:
+    """Return the micro-batch count in the current epoch-local update window."""
+
+    accumulation_steps = int(accumulation_steps)
+    iterations_per_epoch = int(iterations_per_epoch)
+    if accumulation_steps <= 0 or iterations_per_epoch <= 0:
+        raise ValueError("accumulation_steps and iterations_per_epoch must be positive")
+    epoch_iteration = int(iteration) % iterations_per_epoch
+    window_start = (epoch_iteration // accumulation_steps) * accumulation_steps
+    return min(accumulation_steps, iterations_per_epoch - window_start)
+
+
+def get_accumulation_steps(reference_batch_size: int, batch_size: int) -> int:
+    """Return exact gradient-accumulation steps for a requested effective batch."""
+
+    batch_size = int(batch_size)
+    reference_batch_size = int(reference_batch_size)
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    if reference_batch_size <= 0:
+        reference_batch_size = batch_size
+    if reference_batch_size < batch_size or reference_batch_size % batch_size:
+        raise ValueError(
+            "REFERENCE_BS must be a positive multiple of IMS_PER_BATCH "
+            f"(got {reference_batch_size} and {batch_size})"
+        )
+    return reference_batch_size // batch_size
+
+
+def should_optimizer_step(
+    iteration: int,
+    accumulation_steps: int,
+    iterations_per_epoch: int,
+    max_iterations: int,
+) -> bool:
+    completed = int(iteration) + 1
+    epoch_completed = int(iteration) % int(iterations_per_epoch) + 1
+    return bool(
+        epoch_completed % int(accumulation_steps) == 0
+        or epoch_completed == int(iterations_per_epoch)
+        or completed >= int(max_iterations)
+    )
+
+
+def optimizer_updates_per_training(
+    iterations_per_epoch: int,
+    epochs: int,
+    accumulation_steps: int,
+) -> int:
+    return int(epochs) * math.ceil(int(iterations_per_epoch) / int(accumulation_steps))
 
 
 def register_optimizer(name):

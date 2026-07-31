@@ -1,0 +1,80 @@
+# EXP-20260731-005 — Patch-PnP-Only Adaptation Control
+
+Status: `LOCAL PILOT PASS — FORMAL RUN CONDITIONAL ON C2`
+
+## Purpose
+
+Test whether the existing official direct pose head can be adapted before
+introducing a new quality/coverage mechanism.
+
+Frozen protocol:
+
+```text
+research/stages/STAGE_03C0_PNP_ADAPTATION_CONTROL.md
+```
+
+## Data verification
+
+The deep preflight passed:
+
+| Asset | Verified count |
+|---|---:|
+| PBR scenes | 50 |
+| PBR RGB images | 50,000 |
+| PBR depth images | 50,000 |
+| PBR annotations | 749,600 |
+| LM-O-eight-object annotations | 399,950 |
+| Full + visible mask paths | 1,499,200 |
+| VOC JPEG images | 17,125 |
+| Positive dining-table backgrounds | 538 |
+
+The official checkpoint SHA-256 was
+`bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c`.
+
+The local split produced 8,192 effective instances from 1,389 images, exactly
+1,024 instances for each of the eight LM-O objects.
+
+## Local pilot
+
+```text
+GPU:                RTX 4060 Laptop, 8 GB
+micro-batches:      2,048
+optimizer updates:  171
+peak GPU memory:    4,820 MiB
+physical/effective: 4 / 48
+checkpoint:         model_final.pth
+```
+
+All losses remained finite.  Recorded first/last-quarter medians:
+
+| Loss | First | Last | Relative change |
+|---|---:|---:|---:|
+| Total | 0.038747 | 0.036650 | -5.41% |
+| Rotation PM | 0.003709 | 0.003757 | +1.29% |
+| Centroid | 0.008664 | 0.008476 | -2.17% |
+| Z | 0.023609 | 0.022837 | -3.27% |
+
+The checkpoint strictly reloaded with no missing or unexpected tensors.
+Against the official checkpoint, 17/17 Patch-PnP trainable tensors changed,
+while 0 frozen tensors changed.
+
+## Conclusion
+
+```text
+LOCAL_PIPELINE_AND_ISOLATION = PASS
+```
+
+This proves that the data path, online XYZ renderer, 8 GB training setup,
+gradient accumulation, checkpointing, and PnP-only isolation work. It does
+not prove pose improvement. The final C1 protocol freezes Patch-PnP, so the
+formal PnP-only run is deferred unless C2 later unfreezes Patch-PnP; in that
+case B uses all 50 PBR scenes and the same 40-epoch LM-O evaluation budget as
+C2.
+
+Artifacts:
+
+```text
+output/EXP-20260731-005/pnp_only_local/metrics.json
+output/EXP-20260731-005/pnp_only_local/local_pilot_summary.json
+output/EXP-20260731-005/pnp_only_local/model_final.pth
+```

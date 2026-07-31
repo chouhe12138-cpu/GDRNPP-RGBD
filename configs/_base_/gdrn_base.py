@@ -17,6 +17,7 @@ MODEL = dict(
         NAME="GDRN",  # used module file name
         XYZ_ONLINE=False,  # rendering xyz online
         XYZ_BP=True,  # calculate xyz from depth by backprojection
+        XYZ_RENDERER="egl",  # egl | cpp
         NUM_CLASSES=13,
         USE_MTL=False,  # uncertainty multi-task weighting
         INPUT_RES=256,
@@ -104,6 +105,13 @@ MODEL = dict(
             ROT_TYPE="ego_rot6d",  # {allo/ego}_{quat/rot6d/log_quat/lie_vec}
             TRANS_TYPE="centroid_z",  # trans | centroid_z (SITE) | centroid_z_abs
             Z_TYPE="REL",  # REL | ABS | LOG | NEG_LOG  (only valid for centroid_z)
+        ),
+        QUALITY_COVERAGE=dict(
+            ENABLED=False,
+            FREEZE=False,
+            LR_MULT=1.0,
+            HIDDEN_DIM=32,
+            MAX_RESIDUAL=0.25,
         ),
         LOSS_CFG=dict(
             # xyz loss ----------------------------

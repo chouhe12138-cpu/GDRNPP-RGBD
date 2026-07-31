@@ -1,4 +1,8 @@
+import importlib
+import os
 import os.path as osp
+import sys
+
 import torch
 import numpy as np
 import mmcv
@@ -10,6 +14,76 @@ from core.utils.data_utils import xyz_to_region_batch
 from lib.vis_utils.image import grid_show
 from core.utils.utils import get_emb_show
 from lib.pysixd import misc
+
+
+class CppTrainingRenderer:
+    """Adapter from bop_renderer's C++ API to the online-XYZ training API."""
+
+    def __init__(self, model_paths, vertex_scale, width, height):
+        self.vertex_scale = float(vertex_scale)
+        if self.vertex_scale <= 0:
+            raise ValueError(f"vertex_scale must be positive, got {vertex_scale}")
+
+        repo_root = osp.abspath(osp.join(osp.dirname(__file__), "../../.."))
+        renderer_paths = [
+            os.environ.get("BOP_RENDERER_PATH"),
+            osp.join(repo_root, "bop_renderer", "build"),
+            osp.join(repo_root, ".local", "bop_renderer", "build"),
+        ]
+        renderer_paths = [osp.abspath(path) for path in renderer_paths if path and osp.isdir(path)]
+        if not renderer_paths:
+            raise RuntimeError(
+                "bop_renderer build was not found. Set BOP_RENDERER_PATH to its build directory."
+            )
+
+        for path in reversed(renderer_paths):
+            if path not in sys.path:
+                sys.path.insert(0, path)
+        try:
+            bop_renderer = importlib.import_module("bop_renderer")
+        except ImportError as exc:
+            raise RuntimeError(
+                "Failed to import bop_renderer from: {}".format(", ".join(renderer_paths))
+            ) from exc
+
+        self._renderer = bop_renderer.Renderer()
+        self._renderer.init(width, height)
+        self._obj_ids = list(range(len(model_paths)))
+        for obj_id, model_path in zip(self._obj_ids, model_paths):
+            self._renderer.add_object(obj_id, model_path)
+
+    def render(self, obj_ids, poses, K, pc_cam_tensor=None, pc_obj_tensor=None):
+        if pc_cam_tensor is None or pc_obj_tensor is not None:
+            raise ValueError("The C++ online renderer requires XYZ_BP=True (depth backprojection).")
+        if len(obj_ids) != 1 or len(poses) != 1:
+            raise ValueError("The C++ online renderer currently renders one training ROI at a time.")
+
+        obj_id = int(obj_ids[0])
+        if obj_id not in self._obj_ids:
+            raise ValueError(f"Unknown renderer object index: {obj_id}")
+
+        pose = np.asarray(poses[0], dtype=np.float32)
+        K = np.asarray(K, dtype=np.float32)
+        rotation = pose[:, :3].flatten().tolist()
+        # Network poses are in metres; bop_renderer uses the PLY model unit.
+        translation = (pose[:, 3] / self.vertex_scale).flatten().tolist()
+        self._renderer.render_object(
+            obj_id,
+            rotation,
+            translation,
+            float(K[0, 0]),
+            float(K[1, 1]),
+            float(K[0, 2]),
+            float(K[1, 2]),
+        )
+        depth = self._renderer.get_depth_image(obj_id).astype(np.float32) * self.vertex_scale
+        depth_tensor = torch.from_numpy(depth).to(device=pc_cam_tensor.device)
+        pc_cam_tensor.zero_()
+        pc_cam_tensor[:, :, 2].copy_(depth_tensor)
+
+    def close(self):
+        # bop_renderer releases its native resources when the renderer is destroyed.
+        self._renderer = None
 
 
 def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):
@@ -272,6 +346,19 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
 
     obj_ids = [data_ref.obj2id[_obj] for _obj in obj_names]
     model_paths = [osp.join(model_dir, "obj_{:06d}.ply".format(obj_id)) for obj_id in obj_ids]
+    renderer_type = str(getattr(cfg.MODEL.POSE_NET, "XYZ_RENDERER", "egl")).lower()
+
+    if renderer_type == "cpp":
+        if not cfg.MODEL.POSE_NET.XYZ_BP:
+            raise ValueError("XYZ_RENDERER='cpp' requires MODEL.POSE_NET.XYZ_BP=True")
+        return CppTrainingRenderer(
+            model_paths,
+            vertex_scale=data_ref.vertex_scale,
+            height=cfg.MODEL.POSE_NET.OUTPUT_RES,
+            width=cfg.MODEL.POSE_NET.OUTPUT_RES,
+        )
+    if renderer_type != "egl":
+        raise ValueError(f"Unknown online XYZ renderer: {renderer_type}")
 
     texture_paths = None
     if data_ref.texture_paths is not None:

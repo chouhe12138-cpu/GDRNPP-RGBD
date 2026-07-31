@@ -27,13 +27,36 @@ from .pose_from_pred import pose_from_pred
 from .pose_from_pred_centroid_z import pose_from_pred_centroid_z
 from .pose_from_pred_centroid_z_abs import pose_from_pred_centroid_z_abs
 from .net_factory import BACKBONES
+from .heads.quality_coverage_attention import QualityCoverageAttention
 from core.utils.my_checkpoint import load_timm_pretrained
 
 logger = logging.getLogger(__name__)
 
 
+def get_backbone_init_args(cfg):
+    """Build backbone arguments without network access when loading a full checkpoint."""
+
+    backbone_cfg = cfg.MODEL.POSE_NET.BACKBONE
+    init_args = copy.deepcopy(backbone_cfg.INIT_CFG)
+    backbone_type = init_args.pop("type")
+    if "timm/" in backbone_type or "tv/" in backbone_type:
+        init_args["model_name"] = backbone_type.split("/")[-1]
+    if cfg.MODEL.WEIGHTS and init_args.get("pretrained", False):
+        logger.info("Disable backbone pretrained download because MODEL.WEIGHTS is set")
+        init_args["pretrained"] = False
+    return backbone_type, init_args
+
+
 class GDRN_DoubleMask(nn.Module):
-    def __init__(self, cfg, backbone, geo_head_net, neck=None, pnp_net=None):
+    def __init__(
+        self,
+        cfg,
+        backbone,
+        geo_head_net,
+        neck=None,
+        pnp_net=None,
+        quality_coverage_net=None,
+    ):
         super().__init__()
         assert cfg.MODEL.POSE_NET.NAME == "GDRN_double_mask", cfg.MODEL.POSE_NET.NAME
         self.backbone = backbone
@@ -41,6 +64,7 @@ class GDRN_DoubleMask(nn.Module):
 
         self.geo_head_net = geo_head_net
         self.pnp_net = pnp_net
+        self.quality_coverage_net = quality_coverage_net
 
         self.cfg = cfg
         self.xyz_out_dim, self.mask_out_dim, self.region_out_dim = get_xyz_doublemask_region_out_dim(cfg)
@@ -154,6 +178,13 @@ class GDRN_DoubleMask(nn.Module):
         region_atten = None
         if pnp_net_cfg.REGION_ATTENTION:
             region_atten = region_softmax
+
+        if self.quality_coverage_net is not None:
+            if region_atten is None:
+                raise ValueError("QUALITY_COVERAGE requires PNP_NET.REGION_ATTENTION=True")
+            quality_mask = get_mask_prob(vis_mask, mask_loss_type=net_cfg.LOSS_CFG.MASK_LOSS_TYPE)
+            quality_mask = torch.nan_to_num(quality_mask, nan=0.0, posinf=1.0, neginf=0.0)
+            region_atten = self.quality_coverage_net(coor_feat, region_atten, quality_mask)
 
         pred_rot_, pred_t_ = self.pnp_net(
             coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
@@ -542,10 +573,7 @@ def build_model_optimizer(cfg, is_test=False):
 
     params_lr_list = []
     # backbone
-    init_backbone_args = copy.deepcopy(backbone_cfg.INIT_CFG)
-    backbone_type = init_backbone_args.pop("type")
-    if "timm/" in backbone_type or "tv/" in backbone_type:
-        init_backbone_args["model_name"] = backbone_type.split("/")[-1]
+    backbone_type, init_backbone_args = get_backbone_init_args(cfg)
 
     backbone = BACKBONES[backbone_type](**init_backbone_args)
 
@@ -570,8 +598,42 @@ def build_model_optimizer(cfg, is_test=False):
     pnp_net, pnp_net_params = get_pnp_net(cfg)
     params_lr_list.extend(pnp_net_params)
 
+    # identity-initialized quality/coverage residual attention ---------------
+    quality_coverage_net = None
+    quality_coverage_cfg = net_cfg.get("QUALITY_COVERAGE", {})
+    if quality_coverage_cfg.get("ENABLED", False):
+        xyz_dim, _, _ = get_xyz_doublemask_region_out_dim(cfg)
+        pnp_in_channels = xyz_dim
+        if net_cfg.LOSS_CFG.XYZ_LOSS_TYPE in ["CE_coor", "CE"]:
+            pnp_in_channels = xyz_dim - 3
+        if net_cfg.PNP_NET.WITH_2D_COORD:
+            pnp_in_channels += 2
+        quality_coverage_net = QualityCoverageAttention(
+            coor_channels=pnp_in_channels,
+            num_regions=net_cfg.GEO_HEAD.NUM_REGIONS,
+            hidden_dim=quality_coverage_cfg.HIDDEN_DIM,
+            max_residual=quality_coverage_cfg.MAX_RESIDUAL,
+        )
+        if quality_coverage_cfg.get("FREEZE", False):
+            for param in quality_coverage_net.parameters():
+                param.requires_grad = False
+        else:
+            params_lr_list.append(
+                {
+                    "params": filter(lambda p: p.requires_grad, quality_coverage_net.parameters()),
+                    "lr": float(cfg.SOLVER.BASE_LR) * quality_coverage_cfg.LR_MULT,
+                }
+            )
+
     # build model
-    model = GDRN_DoubleMask(cfg, backbone, neck=neck, geo_head_net=geo_head, pnp_net=pnp_net)
+    model = GDRN_DoubleMask(
+        cfg,
+        backbone,
+        neck=neck,
+        geo_head_net=geo_head,
+        pnp_net=pnp_net,
+        quality_coverage_net=quality_coverage_net,
+    )
     if net_cfg.USE_MTL:
         params_lr_list.append(
             {

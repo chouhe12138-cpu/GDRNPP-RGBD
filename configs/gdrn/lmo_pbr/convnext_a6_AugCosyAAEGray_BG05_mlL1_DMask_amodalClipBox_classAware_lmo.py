@@ -62,6 +62,8 @@ MODEL = dict(
     POSE_NET=dict(
         NAME="GDRN_double_mask",
         XYZ_ONLINE=True,
+        # WSL's EGL stack may lack bindless textures; use the local BOP C++ renderer.
+        XYZ_RENDERER="cpp",
         NUM_CLASSES=8,
         BACKBONE=dict(
             FREEZE=False,

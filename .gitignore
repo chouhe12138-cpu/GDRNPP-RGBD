@@ -10,6 +10,7 @@
 /wandb/
 /tensorboard/
 /local/
+/.local/
 /secrets/
 *.log
 *.ckpt
@@ -26,6 +27,7 @@ events.out.tfevents*
 
 # Native extensions, packaging, and caches
 core/csrc/uncertainty_pnp/ceres/
+/core/csrc/uncertainty_pnp/lib
 *.so
 *.so.*
 *.egg-info*
@@ -76,4 +78,3 @@ exclude-file.txt
 git-pipeline.txt
 *dlaf*
 /models/
-

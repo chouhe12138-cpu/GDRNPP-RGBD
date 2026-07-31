@@ -29,6 +29,7 @@ from core.utils.default_args_setup import my_default_argument_parser, my_default
 from core.utils.my_setup import setup_for_distributed
 from core.utils.my_checkpoint import MyCheckpointer
 from core.utils import my_comm as comm
+from core.utils import solver_utils
 
 from lib.utils.utils import iprint
 from lib.utils.setup_logger import setup_my_logger
@@ -79,18 +80,11 @@ def setup(args):
     # ---------------------------------------------------------
     cfg.SOLVER.pop("STEPS", None)
     cfg.SOLVER.pop("MAX_ITER", None)
-    bs_ref = cfg.SOLVER.get("REFERENCE_BS", cfg.SOLVER.IMS_PER_BATCH)  # nominal batch size
-    if bs_ref <= cfg.SOLVER.IMS_PER_BATCH:
-        bs_ref = cfg.SOLVER.REFERENCE_BS = cfg.SOLVER.IMS_PER_BATCH
-        # default DDP implementation is slow for accumulation according to: https://pytorch.org/docs/stable/notes/ddp.html
-        # all-reduce operation is carried out during loss.backward().
-        # Thus, there would be redundant all-reduce communications in a accumulation procedure,
-        # which means, the result is still right but the training speed gets slower.
-        # TODO: If acceleration is needed, there is an implementation of allreduce_post_accumulation
-        # in https://github.com/NVIDIA/DeepLearningExamples/blob/master/PyTorch/LanguageModeling/BERT/run_pretraining.py
-        accumulate_iter = max(round(bs_ref / cfg.SOLVER.IMS_PER_BATCH), 1)  # accumulate loss before optimizing
-    else:
-        accumulate_iter = 1
+    bs_ref = int(cfg.SOLVER.get("REFERENCE_BS", cfg.SOLVER.IMS_PER_BATCH))
+    if bs_ref <= 0:
+        bs_ref = int(cfg.SOLVER.IMS_PER_BATCH)
+    cfg.SOLVER.REFERENCE_BS = bs_ref
+    accumulate_iter = solver_utils.get_accumulation_steps(bs_ref, cfg.SOLVER.IMS_PER_BATCH)
     # NOTE: get optimizer from string cfg dict
     if cfg.SOLVER.OPTIMIZER_CFG != "":
         if isinstance(cfg.SOLVER.OPTIMIZER_CFG, str):

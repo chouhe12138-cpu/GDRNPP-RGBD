@@ -40,7 +40,17 @@ class LM_PBR_Dataset:
 
         self.dataset_root = data_cfg.get("dataset_root", osp.join(DATASETS_ROOT, "BOP_DATASETS/lm/train_pbr"))
         self.xyz_root = data_cfg.get("xyz_root", osp.join(self.dataset_root, "xyz_crop"))
+        self.require_xyz = data_cfg.get("require_xyz", True)
+        self.scene_ids = tuple(int(scene_id) for scene_id in data_cfg.get("scene_ids", range(50)))
+        self.max_instances_per_object = int(data_cfg.get("max_instances_per_object", -1))
+        self.min_visible_fraction = float(data_cfg.get("min_visible_fraction", -1.0))
         assert osp.exists(self.dataset_root), self.dataset_root
+        if not self.scene_ids or len(set(self.scene_ids)) != len(self.scene_ids):
+            raise ValueError("scene_ids must contain unique scene identifiers")
+        if any(scene_id < 0 or scene_id >= 50 for scene_id in self.scene_ids):
+            raise ValueError(f"scene_ids must be in [0, 49], got {self.scene_ids}")
+        if self.max_instances_per_object == 0 or self.max_instances_per_object < -1:
+            raise ValueError("max_instances_per_object must be -1 or a positive integer")
         self.models_root = data_cfg["models_root"]  # BOP_DATASETS/lm/models
         self.scale_to_meter = data_cfg["scale_to_meter"]  # 0.001
 
@@ -65,7 +75,7 @@ class LM_PBR_Dataset:
         self.obj2label = OrderedDict((obj, obj_id) for obj_id, obj in enumerate(self.objs))
         ##########################################################
 
-        self.scenes = [f"{i:06d}" for i in range(50)]
+        self.scenes = [f"{scene_id:06d}" for scene_id in self.scene_ids]
 
     def __call__(self):
         """Load light-weight instance annotations of all images into a list of
@@ -85,6 +95,12 @@ class LM_PBR_Dataset:
                     self.with_depth,
                     __name__,
                 )
+                + "_scenes_{}_require_xyz_{}_max_obj_{}_min_vis_{}".format(
+                    "-".join(str(scene_id) for scene_id in self.scene_ids),
+                    self.require_xyz,
+                    self.max_instances_per_object,
+                    self.min_visible_fraction,
+                )
             ).encode("utf-8")
         ).hexdigest()
         cache_path = osp.join(self.cache_dir, "dataset_dicts_{}_{}.pkl".format(self.name, hashed_file_name))
@@ -99,6 +115,7 @@ class LM_PBR_Dataset:
         self.num_instances_without_valid_segmentation = 0
         self.num_instances_without_valid_box = 0
         dataset_dicts = []  # ######################################################
+        selected_instance_counts = {cat_id: 0 for cat_id in self.cat_ids}
         # it is slow because of loading and converting masks to rle
         for scene in tqdm(self.scenes):
             scene_id = int(scene)
@@ -137,6 +154,14 @@ class LM_PBR_Dataset:
                 for anno_i, anno in enumerate(gt_dict[str_im_id]):
                     obj_id = anno["obj_id"]
                     if obj_id not in self.cat_ids:
+                        continue
+                    visib_fract = gt_info_dict[str_im_id][anno_i].get("visib_fract", 1.0)
+                    if visib_fract <= self.min_visible_fraction:
+                        continue
+                    if (
+                        self.max_instances_per_object > 0
+                        and selected_instance_counts[obj_id] >= self.max_instances_per_object
+                    ):
                         continue
                     cur_label = self.cat2label[obj_id]  # 0-based label
                     R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
@@ -181,13 +206,12 @@ class LM_PBR_Dataset:
                     mask_full = mask_full.astype("bool")
                     mask_full_rle = binary_mask_to_rle(mask_full, compressed=True)
 
-                    visib_fract = gt_info_dict[str_im_id][anno_i].get("visib_fract", 1.0)
-
                     xyz_path = osp.join(
                         self.xyz_root,
                         f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-xyz.pkl",
                     )
-                    assert osp.exists(xyz_path), xyz_path
+                    if self.require_xyz:
+                        assert osp.exists(xyz_path), xyz_path
                     inst = {
                         "category_id": cur_label,  # 0-based label
                         "bbox": bbox_visib,
@@ -208,6 +232,7 @@ class LM_PBR_Dataset:
                     for key in ["bbox3d_and_center"]:
                         inst[key] = self.models[cur_label][key]
                     insts.append(inst)
+                    selected_instance_counts[obj_id] += 1
                 if len(insts) == 0:  # filter im without anno
                     continue
                 record["annotations"] = insts
@@ -352,9 +377,70 @@ SPLITS_LM_PBR = dict(
         dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr"),
         models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/models"),
         xyz_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr/xyz_crop"),
+        # Official LM-O configs render XYZ targets online.
+        require_xyz=False,
         scale_to_meter=0.001,
         with_masks=True,  # (load masks but may not use it)
         with_depth=True,  # (load depth path here, but may not use it)
+        height=480,
+        width=640,
+        cache_dir=osp.join(PROJ_ROOT, ".cache"),
+        use_cache=True,
+        num_to_load=-1,
+        filter_invalid=True,
+        ref_key="lmo_full",
+    ),
+    lmo_pbr_stage3_train=dict(
+        name="lmo_pbr_stage3_train",
+        objs=LM_OCC_OBJECTS,
+        dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr"),
+        models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/models"),
+        xyz_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr/xyz_crop"),
+        require_xyz=False,
+        scene_ids=tuple(list(range(12)) + list(range(15, 50))),
+        scale_to_meter=0.001,
+        with_masks=True,
+        with_depth=True,
+        height=480,
+        width=640,
+        cache_dir=osp.join(PROJ_ROOT, ".cache"),
+        use_cache=True,
+        num_to_load=-1,
+        filter_invalid=True,
+        ref_key="lmo_full",
+    ),
+    lmo_pbr_stage3_val=dict(
+        name="lmo_pbr_stage3_val",
+        objs=LM_OCC_OBJECTS,
+        dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr"),
+        models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/models"),
+        xyz_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr/xyz_crop"),
+        require_xyz=False,
+        scene_ids=(12, 13, 14),
+        scale_to_meter=0.001,
+        with_masks=True,
+        with_depth=True,
+        height=480,
+        width=640,
+        cache_dir=osp.join(PROJ_ROOT, ".cache"),
+        use_cache=True,
+        num_to_load=-1,
+        filter_invalid=True,
+        ref_key="lmo_full",
+    ),
+    lmo_pbr_stage3_local_train=dict(
+        name="lmo_pbr_stage3_local_train",
+        objs=LM_OCC_OBJECTS,
+        dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr"),
+        models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/models"),
+        xyz_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr/xyz_crop"),
+        require_xyz=False,
+        scene_ids=(0, 1, 2),
+        max_instances_per_object=1024,
+        min_visible_fraction=0.3,
+        scale_to_meter=0.001,
+        with_masks=True,
+        with_depth=True,
         height=480,
         width=640,
         cache_dir=osp.join(PROJ_ROOT, ".cache"),
@@ -403,6 +489,8 @@ for obj in ref.lmo_full.objects:
                 dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr"),
                 models_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/models"),
                 xyz_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/train_pbr/xyz_crop"),
+                # Official LM-O single-object configs also use XYZ_ONLINE=True.
+                require_xyz=False,
                 scale_to_meter=0.001,
                 with_masks=True,  # (load masks but may not use it)
                 with_depth=True,  # (load depth path here, but may not use it)
