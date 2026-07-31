@@ -25,6 +25,9 @@
 *.zip
 events.out.tfevents*
 
+# Checksum-pinned, private-repository Docker build inputs.
+!docker/l40/vendor/*.tar.gz
+
 # Native extensions, packaging, and caches
 core/csrc/uncertainty_pnp/ceres/
 /core/csrc/uncertainty_pnp/lib

@@ -1,0 +1,10 @@
+torch==2.2.0+cu121
+torchvision==0.17.0+cu121
+numpy==1.23.5
+mmcv==1.7.2
+detectron2==0.6
+fvcore==0.1.5.post20221221
+timm==0.6.7
+pytorch-lightning==1.6.4
+opencv-python-headless==4.9.0.80
+pytest==8.4.2
