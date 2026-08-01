@@ -27,6 +27,20 @@ For the offline L40:
    the server-environment smoke test;
 6. start `research/quality_coverage/run_l40.sh` only after the smoke test.
 
+The host-side controller keeps routine Docker commands short and refuses to
+overwrite an existing smoke output:
+
+```bash
+docker/l40/stage3c1.sh smoke
+docker/l40/stage3c1.sh status
+docker/l40/stage3c1.sh watch
+docker/l40/stage3c1.sh validate
+```
+
+`validate` checks completion, finite losses, strict checkpoint loading,
+bit-identical frozen official tensors, and updates isolated to the nine new
+quality/coverage tensors.
+
 Datasets, full checkpoints, Docker archives, caches, and logs must not be
 committed to Gitee.
 
