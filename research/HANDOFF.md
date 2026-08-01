@@ -2,6 +2,10 @@
 
 Last updated: 2026-07-31
 
+L40 Docker/server migration state is recorded separately in
+`research/SERVER_MIGRATION_HANDOFF.md`. Read that file before continuing any
+server-side setup or formal Stage 3C-1 execution.
+
 ## Start Here
 
 Repository:
