@@ -31,6 +31,13 @@ def load_json_lines(path: Path):
     return rows
 
 
+def scalar(value):
+    """Unwrap the ``[value, iteration]`` form written by MyJSONWriter."""
+    if isinstance(value, list):
+        return value[0]
+    return value
+
+
 def find_score(eval_dir: Path, pattern: str):
     paths = sorted(glob.glob(str(eval_dir / "*" / pattern), recursive=True))
     if len(paths) != 1:
@@ -64,7 +71,11 @@ def save_loss_plot(rows, output_path: Path):
     keys = ["total_loss", "loss_PM_R", "loss_centroid", "loss_z"]
     fig, axis = plt.subplots(figsize=(7.2, 4.5))
     for key in keys:
-        points = [(row.get("epoch"), row.get(key)) for row in rows if key in row and "epoch" in row]
+        points = [
+            (scalar(row.get("epoch")), scalar(row.get(key)))
+            for row in rows
+            if key in row and "epoch" in row
+        ]
         if points:
             axis.plot([p[0] for p in points], [p[1] for p in points], label=key)
     axis.set_xlabel("Epoch")

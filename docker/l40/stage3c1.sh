@@ -189,7 +189,11 @@ validate_smoke() {
     }
     start_container
     set +e
-    "${docker_bin}" exec -i -w /workspace/gdrnpp "${container}" \
+    "${docker_bin}" exec -i -w /workspace/gdrnpp \
+        -e PYTHONWARNINGS=ignore \
+        -e MPLCONFIGDIR=/tmp/gdrnpp-matplotlib \
+        -e TF_CPP_MIN_LOG_LEVEL=2 \
+        "${container}" \
         python - \
         /workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth \
         /workspace/gdrnpp/output/EXP-20260731-006/quality_coverage_local/model_final.pth \

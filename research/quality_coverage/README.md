@@ -41,6 +41,21 @@ docker/l40/stage3c1.sh validate
 bit-identical frozen official tensors, and updates isolated to the nine new
 quality/coverage tensors.
 
+For a Python interface similar to `model.train(...)`, open
+`train_stage3c1.py`, review the centralized settings, and change its
+`launch` value only when the run should actually start. The API automatically:
+
+- reruns the smoke checkpoint gate;
+- creates a non-overwriting output directory and run manifest;
+- computes the official GT-box baseline when it is missing;
+- trains and evaluates LM-O at the configured epoch interval;
+- retains the configured best/recent checkpoints through the existing engine;
+- draws loss/LM-O/per-object figures and writes the screening summary.
+
+Formal mode locks the frozen paper protocol. Parameter changes require
+`protocol="exploratory"` and a different run name, and the manifest labels
+that run as unsuitable for replacing the formal paper comparison.
+
 Datasets, full checkpoints, Docker archives, caches, and logs must not be
 committed to Gitee.
 
