@@ -45,6 +45,13 @@ from core.gdrn_modeling.datasets.data_loader import build_gdrn_train_loader, bui
 from .engine_utils import batch_data, get_out_coor, get_out_mask
 from .gdrn_evaluator import gdrn_inference_on_dataset, GDRN_Evaluator, gdrn_save_result_of_dataset
 from .gdrn_custom_evaluator import GDRN_EvaluatorCustom
+from .artifact_layout import (
+    artifact_dir,
+    compact_log_enabled,
+    evaluation_dir,
+    structured_layout_enabled,
+    tensorboard_enabled,
+)
 import ref
 
 
@@ -64,18 +71,23 @@ def load_bop_selection_metrics(eval_out_dir):
     metrics = {"bop_ar": float(bop_scores["bop19_average_recall"])}
 
     result_dir = osp.dirname(score_paths[0])
-    add_paths = sorted(
-        glob.glob(
-            osp.join(
-                result_dir,
-                "error=ad_ntop=*",
-                "scores_th=0.100_min-visib=-1.000.json",
+    add_paths = []
+    for pattern in ("error=ad_ntop=*", "error:ad_ntop:*"):
+        add_paths.extend(
+            glob.glob(
+                osp.join(
+                    result_dir,
+                    pattern,
+                    "scores_th=0.100_min-visib=-1.000.json",
+                )
             )
         )
-    )
+    add_paths = sorted(set(add_paths))
     if len(add_paths) == 1:
         with open(add_paths[0], "r") as handle:
-            metrics["add_s_0.1d"] = float(json.load(handle)["recall"])
+            add_scores = json.load(handle)
+        metrics["add_s_0.1d"] = float(add_scores["recall"])
+        metrics["add_s_obj_recalls"] = add_scores.get("obj_recalls", {})
     else:
         logger.warning("Expected one ADD(-S)@0.1d score under %s, found %d", result_dir, len(add_paths))
     return metrics
@@ -180,16 +192,16 @@ class GDRN_Lite(LightningLite):
         return tbx_event_writer
 
     def do_save_results(self, cfg, model, epoch=None, iteration=None):
-        model_name = osp.basename(cfg.MODEL.WEIGHTS).split(".")[0]
-
         dataset_meta = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
         train_obj_names = dataset_meta.objs
 
         for dataset_name in cfg.DATASETS.TEST:
-            if epoch is not None and iteration is not None:
-                save_out_dir = osp.join(cfg.OUTPUT_DIR, f"inference_epoch_{epoch}_iter_{iteration}", dataset_name)
-            else:
-                save_out_dir = osp.join(cfg.OUTPUT_DIR, f"inference_{model_name}", dataset_name)
+            save_out_dir = evaluation_dir(
+                cfg,
+                dataset_name,
+                epoch=epoch,
+                iteration=iteration,
+            )
 
             data_loader = build_gdrn_test_loader(cfg, dataset_name, train_objs=train_obj_names)
             data_loader = self.setup_dataloaders(data_loader, replace_sampler=False, move_to_device=False)
@@ -206,12 +218,13 @@ class GDRN_Lite(LightningLite):
 
     def do_test(self, cfg, model, epoch=None, iteration=None):
         results = OrderedDict()
-        model_name = osp.basename(cfg.MODEL.WEIGHTS).split(".")[0]
         for dataset_name in cfg.DATASETS.TEST:
-            if epoch is not None and iteration is not None:
-                eval_out_dir = osp.join(cfg.OUTPUT_DIR, f"inference_epoch_{epoch}_iter_{iteration}", dataset_name)
-            else:
-                eval_out_dir = osp.join(cfg.OUTPUT_DIR, f"inference_{model_name}", dataset_name)
+            eval_out_dir = evaluation_dir(
+                cfg,
+                dataset_name,
+                epoch=epoch,
+                iteration=iteration,
+            )
             evaluator = self.get_evaluator(cfg, dataset_name, eval_out_dir)
             evaluator.lite_self = self
             data_loader = build_gdrn_test_loader(cfg, dataset_name, train_objs=evaluator.train_objs)
@@ -220,6 +233,17 @@ class GDRN_Lite(LightningLite):
             if self.is_global_zero and MetadataCatalog.get(dataset_name).evaluator_type == "bop":
                 results_i = dict(results_i)
                 results_i.update(load_bop_selection_metrics(eval_out_dir))
+                if compact_log_enabled(cfg):
+                    compact_metrics = {
+                        "epoch": None if epoch is None else int(epoch),
+                        "bop_ar": results_i.get("bop_ar"),
+                        "add_s_0.1d": results_i.get("add_s_0.1d"),
+                        "add_s_obj_recalls": results_i.get("add_s_obj_recalls", {}),
+                    }
+                    logger.info(
+                        "EVAL_SUMMARY %s",
+                        json.dumps(compact_metrics, sort_keys=True),
+                    )
             results[dataset_name] = results_i
 
         if len(results) == 1:
@@ -290,9 +314,11 @@ class GDRN_Lite(LightningLite):
         )
         if hasattr(self._precision_plugin, "scaler"):
             extra_ckpt_dict["gradscaler"] = self._precision_plugin.scaler
+        checkpoint_dir = artifact_dir(cfg, "checkpoints")
+        mmcv.mkdir_or_exist(checkpoint_dir)
         checkpointer = MyCheckpointer(
             model,
-            cfg.OUTPUT_DIR,
+            checkpoint_dir,
             save_to_disk=self.is_global_zero,
             prefix_to_remove="_module.",
             **extra_ckpt_dict,
@@ -324,20 +350,40 @@ class GDRN_Lite(LightningLite):
             max_iter=None if keep_best else max_iter,
             max_to_keep=recent_to_keep,
         )
+        structured_checkpoints = structured_layout_enabled(cfg)
+        recent_checkpoint_paths = (
+            sorted(glob.glob(osp.join(checkpoint_dir, "model_epoch_*.pth")))
+            if structured_checkpoints and resume
+            else []
+        )
         best_metrics = {}
-        best_state_path = osp.join(cfg.OUTPUT_DIR, "best_checkpoint.json")
+        best_state_path = osp.join(checkpoint_dir, "best_checkpoint.json")
         if keep_best and resume and osp.exists(best_state_path):
             with open(best_state_path, "r") as handle:
                 best_metrics = json.load(handle).get("metrics", {})
 
         # build writers ==============================================
-        tbx_event_writer = self.get_tbx_event_writer(cfg.OUTPUT_DIR, backup=not cfg.get("RESUME", False))
-        tbx_writer = tbx_event_writer._writer  # NOTE: we want to write some non-scalar data
-        writers = (
-            [MyCommonMetricPrinter(max_iter), MyJSONWriter(osp.join(cfg.OUTPUT_DIR, "metrics.json")), tbx_event_writer]
-            if self.is_global_zero
-            else []
-        )
+        train_dir = artifact_dir(cfg, "train")
+        mmcv.mkdir_or_exist(train_dir)
+        tbx_event_writer = None
+        tbx_writer = None
+        if tensorboard_enabled(cfg):
+            tbx_event_writer = self.get_tbx_event_writer(
+                train_dir,
+                backup=not cfg.get("RESUME", False),
+            )
+            tbx_writer = tbx_event_writer._writer
+        if self.is_global_zero:
+            metrics_name = "metrics.jsonl" if structured_layout_enabled(cfg) else "metrics.json"
+            writers = [
+                MyCommonMetricPrinter(max_iter),
+                MyJSONWriter(osp.join(train_dir, metrics_name)),
+            ]
+            if tbx_event_writer is not None:
+                writers.append(tbx_event_writer)
+        else:
+            writers = []
+        self._last_periodic_eval_results = None
 
         # compared to "train_net.py", we do not support accurate timing and
         # precise BN here, because they are not trivial to implement
@@ -448,6 +494,8 @@ class GDRN_Lite(LightningLite):
                         )
                     else:
                         eval_results = self.do_test(cfg, model, epoch=epoch, iteration=iteration)
+                    if iteration == max_iter - 1:
+                        self._last_periodic_eval_results = eval_results
                     if keep_best and self.is_global_zero and eval_results.get("bop_ar") is not None:
                         tie_tolerance = float(best_cfg.get("PRIMARY_TIE_TOL", 0.001))
                         if is_better_checkpoint(eval_results, best_metrics, tie_tolerance=tie_tolerance):
@@ -471,13 +519,17 @@ class GDRN_Lite(LightningLite):
                     # Compared to "train_net.py", the test results are not dumped to EventStorage
                     self.barrier()
 
+                early_verbose = iteration < 100 and not compact_log_enabled(cfg)
                 if iteration - start_iter > 5 and (
-                    (iteration + 1) % cfg.TRAIN.PRINT_FREQ == 0 or iteration == max_iter - 1 or iteration < 100
+                    (iteration + 1) % cfg.TRAIN.PRINT_FREQ == 0
+                    or (iteration + 1) % iters_per_epoch == 0
+                    or iteration == max_iter - 1
+                    or early_verbose
                 ):
                     for writer in writers:
                         writer.write()
                     # visualize some images ========================================
-                    if cfg.TRAIN.VIS_IMG:
+                    if cfg.TRAIN.VIS_IMG and tbx_writer is not None:
                         with torch.no_grad():
                             vis_i = 0
                             roi_img_vis = batch["roi_img"][vis_i].cpu().numpy()
@@ -504,12 +556,32 @@ class GDRN_Lite(LightningLite):
 
                             gt_mask_vis = batch["roi_mask"][vis_i].detach().cpu().numpy()
                             tbx_writer.add_image("gt_mask", gt_mask_vis, iteration)
-                if (iteration + 1) % periodic_checkpointer.period == 0 or (
-                    periodic_checkpointer.max_iter is not None and (iteration + 1) >= periodic_checkpointer.max_iter
-                ):
+                checkpoint_due = (iteration + 1) % periodic_checkpointer.period == 0 or (
+                    periodic_checkpointer.max_iter is not None
+                    and (iteration + 1) >= periodic_checkpointer.max_iter
+                )
+                if checkpoint_due:
                     if hasattr(optimizer, "consolidate_state_dict"):  # for ddp_sharded
                         optimizer.consolidate_state_dict()
-                periodic_checkpointer.step(iteration, epoch=epoch)
+                if structured_checkpoints:
+                    if checkpoint_due and self.is_global_zero:
+                        checkpoint_name = f"model_epoch_{int(epoch):03d}"
+                        checkpointer.save(
+                            checkpoint_name,
+                            iteration=iteration,
+                            epoch=epoch,
+                        )
+                        checkpoint_path = osp.join(
+                            checkpoint_dir,
+                            f"{checkpoint_name}.pth",
+                        )
+                        recent_checkpoint_paths.append(checkpoint_path)
+                        while len(recent_checkpoint_paths) > recent_to_keep:
+                            old_checkpoint = recent_checkpoint_paths.pop(0)
+                            if osp.isfile(old_checkpoint):
+                                os.remove(old_checkpoint)
+                else:
+                    periodic_checkpointer.step(iteration, epoch=epoch)
 
 
 def vis_train_data(data, obj_names, cfg):

@@ -90,6 +90,11 @@ def test_conditional_control_configs_share_formal_budget():
     assert not method.MODEL.POSE_NET.PNP_NET.FREEZE
     assert method.MODEL.POSE_NET.QUALITY_COVERAGE.ENABLED
     assert method.MODEL.POSE_NET.PNP_NET.LR_MULT == pytest.approx(0.1)
+    for cfg in (baseline, method):
+        assert cfg.RUN_ARTIFACTS.STRUCTURED_LAYOUT
+        assert cfg.RUN_ARTIFACTS.COMPACT_LOG
+        assert cfg.RUN_ARTIFACTS.TENSORBOARD is False
+        assert cfg.RUN_ARTIFACTS.SKIP_DUPLICATE_FINAL_EVAL
 
 
 def test_epoch_evaluation_happens_only_after_completed_epochs():
@@ -108,14 +113,15 @@ def test_checkpoint_metric_priority_and_tie_break():
     assert not is_better_checkpoint({"bop_ar": 0.688, "add_s_0.1d": 0.80}, incumbent)
 
 
-def test_load_bop_selection_metrics(tmp_path):
+@pytest.mark.parametrize("add_dir_name", ["error=ad_ntop=-1", "error:ad_ntop:1"])
+def test_load_bop_selection_metrics(tmp_path, add_dir_name):
     result = tmp_path / "method_lmo-test"
     result.mkdir()
     (result / "scores_bop19.json").write_text(
         json.dumps({"bop19_average_recall": 0.691}),
         encoding="utf-8",
     )
-    add_dir = result / "error=ad_ntop=-1"
+    add_dir = result / add_dir_name
     add_dir.mkdir()
     (add_dir / "scores_th=0.100_min-visib=-1.000.json").write_text(
         json.dumps({"recall": 0.512}),
@@ -124,4 +130,24 @@ def test_load_bop_selection_metrics(tmp_path):
     assert load_bop_selection_metrics(tmp_path) == {
         "bop_ar": pytest.approx(0.691),
         "add_s_0.1d": pytest.approx(0.512),
+        "add_s_obj_recalls": {},
+    }
+
+
+def test_load_bop_selection_metrics_rejects_duplicate_add_scores(tmp_path):
+    result = tmp_path / "method_lmo-test"
+    result.mkdir()
+    (result / "scores_bop19.json").write_text(
+        json.dumps({"bop19_average_recall": 0.691}),
+        encoding="utf-8",
+    )
+    for directory in ("error=ad_ntop=-1", "error:ad_ntop:1"):
+        add_dir = result / directory
+        add_dir.mkdir()
+        (add_dir / "scores_th=0.100_min-visib=-1.000.json").write_text(
+            json.dumps({"recall": 0.512}),
+            encoding="utf-8",
+        )
+    assert load_bop_selection_metrics(tmp_path) == {
+        "bop_ar": pytest.approx(0.691),
     }

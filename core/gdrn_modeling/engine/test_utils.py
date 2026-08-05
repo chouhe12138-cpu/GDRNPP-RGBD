@@ -4,6 +4,7 @@ import os.path as osp
 import sys
 import subprocess
 import time
+from pathlib import Path
 
 import mmcv
 import numpy as np
@@ -14,6 +15,7 @@ cur_dir = osp.abspath(osp.dirname(__file__))
 sys.path.insert(0, osp.join(cur_dir, "../../.."))
 import ref
 from lib.pysixd import misc
+from core.gdrn_modeling.engine.artifact_layout import compact_log_enabled
 
 
 logger = logging.getLogger(__name__)
@@ -67,16 +69,31 @@ def save_and_eval_results(cfg, results_all, output_dir, obj_ids=None):
         if cfg.VAL.SCORE_ONLY:
             eval_cmd += ["--score_only"]
         eval_time = time.perf_counter()
-        if subprocess.call(eval_cmd) != 0:
-            logger.warning("evaluation failed.")
-
-        load_and_print_val_scores_tab(
-            cfg,
-            eval_root=save_root,
-            result_names=result_names,
-            error_types=cfg.VAL.ERROR_TYPES.split(","),
-            obj_ids=obj_ids,
-        )
+        if compact_log_enabled(cfg):
+            completed = subprocess.run(
+                eval_cmd,
+                check=False,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+            if completed.returncode:
+                failure_log = Path(save_root) / "evaluation_failure.log"
+                failure_log.write_text(completed.stdout, encoding="utf-8")
+                raise RuntimeError(
+                    f"BOP evaluation failed with exit code {completed.returncode}; "
+                    f"details: {failure_log}"
+                )
+        else:
+            if subprocess.call(eval_cmd) != 0:
+                logger.warning("evaluation failed.")
+            load_and_print_val_scores_tab(
+                cfg,
+                eval_root=save_root,
+                result_names=result_names,
+                error_types=cfg.VAL.ERROR_TYPES.split(","),
+                obj_ids=obj_ids,
+            )
         logger.info("eval time: {}s".format(time.perf_counter() - eval_time))
 
 

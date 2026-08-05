@@ -45,16 +45,30 @@ def find_score(eval_dir: Path, pattern: str):
     return json.loads(Path(paths[0]).read_text(encoding="utf-8"))
 
 
+def find_add_score(eval_dir: Path):
+    paths = []
+    for pattern in (
+        "error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json",
+        "error:ad_ntop:*/scores_th=0.100_min-visib=-1.000.json",
+    ):
+        paths.extend(glob.glob(str(eval_dir / "**" / pattern), recursive=True))
+    unique = sorted(set(paths))
+    if len(unique) != 1:
+        return None
+    return json.loads(Path(unique[0]).read_text(encoding="utf-8"))
+
+
 def load_epoch_scores(training_output: Path):
     rows = []
-    for eval_dir in sorted(training_output.glob("inference_epoch_*")):
-        parts = eval_dir.name.split("_")
-        epoch = int(parts[2])
+    eval_dirs = list(training_output.glob("inference_epoch_*"))
+    eval_dirs.extend((training_output / "evaluations").glob("epoch_*"))
+    for eval_dir in sorted(eval_dirs):
+        if eval_dir.name.startswith("inference_epoch_"):
+            epoch = int(eval_dir.name.split("_")[2])
+        else:
+            epoch = int(eval_dir.name.split("_")[1])
         bop = find_score(eval_dir / "lmo_bop_test", "scores_bop19.json")
-        add = find_score(
-            eval_dir / "lmo_bop_test",
-            "error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json",
-        )
+        add = find_add_score(eval_dir / "lmo_bop_test")
         if bop is not None:
             rows.append(
                 {
@@ -127,18 +141,25 @@ def save_object_plot(baseline, best, output_path: Path):
 
 def main() -> int:
     args = parse_args()
-    output_dir = args.output_dir or args.training_output / "paper_figures"
+    structured = (args.training_output / "evaluations").is_dir()
+    output_dir = args.output_dir or (
+        args.training_output / "summary/figures"
+        if structured
+        else args.training_output / "paper_figures"
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
-    training_rows = load_json_lines(args.training_output / "metrics.json")
+    metrics_path = (
+        args.training_output / "train/metrics.jsonl"
+        if structured
+        else args.training_output / "metrics.json"
+    )
+    training_rows = load_json_lines(metrics_path)
     epoch_rows = load_epoch_scores(args.training_output)
     save_loss_plot(training_rows, output_dir / "training_losses.png")
     save_metric_plot(epoch_rows, output_dir / "lmo_metrics_by_epoch.png")
 
     if args.baseline_output and epoch_rows:
-        baseline_add = find_score(
-            args.baseline_output,
-            "**/error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json",
-        )
+        baseline_add = find_add_score(args.baseline_output)
         valid_add = [row for row in epoch_rows if row["add_s"] is not None]
         if baseline_add is not None and valid_add:
             best = max(valid_add, key=lambda row: (row["bop_ar"], row["add_s"]))

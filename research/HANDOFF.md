@@ -1,6 +1,6 @@
 # GDRNPP-RGBD Research Handoff
 
-Last updated: 2026-07-31
+Last updated: 2026-08-05
 
 L40 Docker/server migration state is recorded separately in
 `research/SERVER_MIGRATION_HANDOFF.md`. Read that file before continuing any
@@ -26,11 +26,22 @@ Stage 2:  COMPLETE — PASS (XYZ GEOMETRY)
 Stage 3A: COMPLETE — CALIBRATION_MISMATCH (NOT FORMAL VALIDATION)
 Stage 3B: COMPLETE — PATCH_PNP_UNDERUTILIZATION
 Stage 3C-0: LOCAL PILOT PASS — RETAINED AS CONDITIONAL B CONTROL
-Stage 3C-1: IMPLEMENTED — LOCAL C1 PILOT PENDING
+Stage 3C-1: FORMAL COMPLETE — C1_SCREEN_FAIL
+Next controls: B PATCH-PNP / C2 JOINT — RUNTIME GATES PENDING
 ```
 
-A single lightweight quality/coverage residual-attention architecture is now
-implemented. No C1 training or pose-accuracy result exists yet.
+Experiment-budget rule: use one pre-registered seed per formal experiment.
+Do not schedule confirmation runs that differ only by random seed.  Spare GPU
+capacity is reserved for causally matched controls, key ablations, and
+cross-dataset validation.
+
+A single lightweight quality/coverage residual-attention architecture
+completed its formal L40 run.  Fixed epoch 40 scored 68.9742% BOP AR and
+50.57% ADD(-S), with 4/8 objects nonnegative, so C1 failed all final gates.
+The analysis is recorded in
+`research/experiments/EXP-20260731-006-quality-coverage/RECORD.md`.
+The compact A/C1/B/C2 experiment matrix, current results, and network diagrams
+are in `research/STAGE_03C_EXPERIMENT_OVERVIEW.md`.
 
 ## Stage 1 — Pose Aggregation Diagnostic
 
@@ -249,13 +260,7 @@ Formal protocol: all 50 PBR scenes, 40 epochs, batch 48, LM-O GT-box
 evaluation after every five completed epochs, direct `R,t`, and best-one plus
 latest-two checkpoint retention.
 
-Next execution:
-
-```bash
-conda activate pytorch22
-research/quality_coverage/run_local.sh
-```
-
-Only after that local architecture gate passes should
-`research/quality_coverage/run_l40.sh` be run inside the L40 Docker container.
-Do not describe implementation/preflight results as pose-accuracy evidence.
+The local and container gates passed and the formal 40-epoch run completed.
+The final result is `C1_SCREEN_FAIL`.  This triggers the matched B
+(Patch-PnP-only) and C2 (Patch-PnP plus quality/coverage) controls, both
+independently initialized from the official checkpoint with seed `20260731`.

@@ -1,6 +1,11 @@
 # Stage 3C-1 — Identity-Initialized Quality/Coverage Attention
 
-Status: `IMPLEMENTED — LOCAL C1 PILOT PENDING`
+Status: `FORMAL COMPLETE — C1_SCREEN_FAIL`
+
+The local and L40 runtime gates passed.  Fixed epoch 40 scored 68.9742% BOP
+AR and 50.57% ADD(-S), with 4/8 objects nonnegative.  Epoch 5 was the best
+observed checkpoint but also failed the BOP AR and ADD(-S) gates.  See
+`research/experiments/EXP-20260731-006-quality-coverage/RECORD.md`.
 
 ## Problem and hypothesis
 
@@ -52,10 +57,15 @@ optimizer:            Ranger, 8e-4, weight decay 0.01
 evaluation:           after epochs 5,10,...,40
 checkpoint retention: best BOP AR one + latest two
 seed:                 20260731
+seed repetitions:     none (single pre-registered seed)
 ```
 
 BOP AR is the primary checkpoint metric.  When values differ by at most
 0.001, ADD(-S) at 0.1 diameter is the secondary metric.
+
+The formal result is produced from this single seed.  Runs that change only
+the random seed are not required; the experiment budget is used for matched
+controls and cross-dataset evidence instead.
 
 ## Hardware gate
 

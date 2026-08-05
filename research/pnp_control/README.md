@@ -37,6 +37,12 @@ The L40 configuration uses physical/effective batch 48, 40 epochs, Ranger
 with learning rate `8e-5`, weight decay `0.01`, and FP32 inherited from the
 official configuration.
 
+For the triggered formal B run, use the shared controller documented in
+`research/stage3c_runtime/README.md`.  Its structured output is
+`output/stage3c/B_patch_pnp`; it disables TensorBoard and avoids a duplicate
+epoch-40 evaluation.  The legacy `run_full.sh` remains available for
+provenance but is not the preferred dual-GPU launcher.
+
 ## Required post-run checks
 
 ```bash

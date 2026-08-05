@@ -59,7 +59,7 @@ that run as unsuitable for replacing the formal paper comparison.
 Datasets, full checkpoints, Docker archives, caches, and logs must not be
 committed to Gitee.
 
-After the screening seed finishes:
+After the single formal run finishes:
 
 ```bash
 python -m research.quality_coverage.summarize \
@@ -67,11 +67,13 @@ python -m research.quality_coverage.summarize \
   output/EXP-20260731-006/official_gt
 ```
 
-Only after `C1_SCREEN_PASS`, run the two confirmation seeds:
+Do not run additional experiments that differ only by random seed.  The
+pre-created alternate-seed configuration files are retained for provenance
+but are not scheduled.  After `C1_SCREEN_PASS`, use available GPUs for
+problem-driven controls, key ablations, or cross-dataset validation.
 
-```bash
-CONFIG_PATH=configs/gdrn/lmo_pbr/convnext_stage3c1_quality_coverage_lmo_seed_20260801.py \
-  research/quality_coverage/run_l40.sh
-CONFIG_PATH=configs/gdrn/lmo_pbr/convnext_stage3c1_quality_coverage_lmo_seed_20260802.py \
-  research/quality_coverage/run_l40.sh
-```
+The formal C1 run has now completed with `C1_SCREEN_FAIL`.  Its legacy output
+directory is preserved unchanged.  Subsequent B/C2 runs use the structured
+layout and compact logging documented in `research/stage3c_runtime/README.md`.
+The ADD(-S) reader now accepts both historical `error=ad_ntop=*` and actual
+`error:ad_ntop:*` evaluator directory names.

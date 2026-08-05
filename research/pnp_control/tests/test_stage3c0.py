@@ -69,6 +69,10 @@ def test_formal_and_local_schedules_are_frozen():
     assert formal.SOLVER.TOTAL_EPOCHS == 40
     assert formal.SOLVER.CHECKPOINT_PERIOD == 5
     assert formal.SOLVER.MAX_TO_KEEP == 3
+    assert formal.RUN_ARTIFACTS.STRUCTURED_LAYOUT
+    assert formal.RUN_ARTIFACTS.COMPACT_LOG
+    assert formal.RUN_ARTIFACTS.TENSORBOARD is False
+    assert formal.TRAIN.PRINT_FREQ == 500
     assert tuple(local.DATASETS.TRAIN) == ("lmo_pbr_stage3_local_train",)
     assert tuple(local.DATASETS.TEST) == ()
     assert local.TEST.EVAL_PERIOD == 0

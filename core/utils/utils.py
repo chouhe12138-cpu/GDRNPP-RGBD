@@ -177,7 +177,7 @@ def allocentric_to_egocentric_torch(translation, q_allo, eps=1e-4):
     angle = obj_ray[:, 2:3].acos()
 
     # Compute rotation between ray to object centroid and optical center ray
-    axis = torch.cross(cam_ray.expand_as(obj_ray), obj_ray)
+    axis = torch.cross(cam_ray.expand_as(obj_ray), obj_ray, dim=1)
     axis = axis / (torch.norm(axis, dim=1, keepdim=True) + eps)
 
     # Build quaternion representing the rotation around the computed axis
@@ -211,7 +211,7 @@ def allo_to_ego_mat_torch(translation, rot_allo, eps=1e-4):
     angle = obj_ray[:, 2:3].acos()
 
     # Compute rotation between ray to object centroid and optical center ray
-    axis = torch.cross(cam_ray.expand_as(obj_ray), obj_ray)
+    axis = torch.cross(cam_ray.expand_as(obj_ray), obj_ray, dim=1)
     axis = axis / (torch.norm(axis, dim=1, keepdim=True) + eps)
 
     # Build quaternion representing the rotation around the computed axis

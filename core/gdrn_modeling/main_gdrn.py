@@ -26,6 +26,10 @@ cv2.ocl.setUseOpenCL(False)
 cur_dir = osp.dirname(osp.abspath(__file__))
 sys.path.insert(0, osp.join(cur_dir, "../../"))
 from core.utils.default_args_setup import my_default_argument_parser, my_default_setup
+from core.gdrn_modeling.engine.artifact_layout import (
+    compact_log_enabled,
+    skip_redundant_final_evaluation,
+)
 from core.utils.my_setup import setup_for_distributed
 from core.utils.my_checkpoint import MyCheckpointer
 from core.utils import my_comm as comm
@@ -150,7 +154,20 @@ class Lite(GDRN_Lite):
 
         logger.info(f"Used GDRN module name: {cfg.MODEL.POSE_NET.NAME}")
         model, optimizer = eval(cfg.MODEL.POSE_NET.NAME).build_model_optimizer(cfg, is_test=args.eval_only)
-        logger.info("Model:\n{}".format(model))
+        if compact_log_enabled(cfg):
+            total_params = sum(p.numel() for p in model.parameters())
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            trainable_tensors = [
+                name for name, parameter in model.named_parameters() if parameter.requires_grad
+            ]
+            logger.info(
+                "MODEL_SUMMARY total_params=%d trainable_params=%d trainable_tensors=%s",
+                total_params,
+                trainable_params,
+                ",".join(trainable_tensors),
+            )
+        else:
+            logger.info("Model:\n{}".format(model))
 
         # don't forget to call `setup` to prepare for model / optimizer for distributed training.
         # the model is moved automatically to the right device.
@@ -180,6 +197,12 @@ class Lite(GDRN_Lite):
         if hard_limit < FILE_LIMIT:
             logger.warning("set sharing strategy for multiprocessing to file_system")
             torch.multiprocessing.set_sharing_strategy("file_system")
+        if (
+            skip_redundant_final_evaluation(cfg)
+            and self._last_periodic_eval_results is not None
+        ):
+            logger.info("FINAL_EVAL_REUSED periodic_epoch=%d", int(cfg.SOLVER.TOTAL_EPOCHS))
+            return self._last_periodic_eval_results
         return self.do_test(cfg, model)
 
 

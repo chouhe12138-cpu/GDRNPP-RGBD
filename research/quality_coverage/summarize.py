@@ -8,7 +8,7 @@ import glob
 import json
 from pathlib import Path
 
-from research.quality_coverage.plot_curves import load_epoch_scores
+from research.quality_coverage.plot_curves import find_add_score, load_epoch_scores
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,10 +45,11 @@ def select_best(rows):
 def main() -> int:
     args = parse_args()
     baseline_bop = load_one(args.baseline_output, "scores_bop19.json")
-    baseline_add = load_one(
-        args.baseline_output,
-        "error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json",
-    )
+    baseline_add = find_add_score(args.baseline_output)
+    if baseline_add is None:
+        raise RuntimeError(
+            f"Expected one ADD(-S)@0.1d score below {args.baseline_output}"
+        )
     epoch_rows = load_epoch_scores(args.training_output)
     if not epoch_rows:
         raise RuntimeError(f"No periodic LM-O evaluations found below {args.training_output}")
@@ -91,7 +92,13 @@ def main() -> int:
             "minimum_nonnegative_objects": 5,
         },
     }
-    output = args.output or args.training_output / "screening_summary.json"
+    default_output = (
+        args.training_output / "summary/results.json"
+        if (args.training_output / "summary").is_dir()
+        else args.training_output / "screening_summary.json"
+    )
+    output = args.output or default_output
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(summary, indent=2, sort_keys=True))
     return 0

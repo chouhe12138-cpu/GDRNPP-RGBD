@@ -1,7 +1,14 @@
 _base_ = ["./convnext_a6_AugCosyAAEGray_BG05_mlL1_DMask_amodalClipBox_classAware_lmo.py"]
 
-OUTPUT_DIR = "output/EXP-20260731-005/pnp_only_full"
+OUTPUT_DIR = "output/stage3c/B_patch_pnp"
 SEED = 20260731
+
+RUN_ARTIFACTS = dict(
+    STRUCTURED_LAYOUT=True,
+    COMPACT_LOG=True,
+    TENSORBOARD=False,
+    SKIP_DUPLICATE_FINAL_EVAL=True,
+)
 
 MODEL = dict(
     WEIGHTS="pretrained_models/lmo_pbr/model_final_wo_optim.pth",
@@ -49,3 +56,5 @@ SOLVER = dict(
 )
 
 TEST = dict(EVAL_PERIOD=5, TEST_BBOX_TYPE="gt", USE_PNP=False)
+
+TRAIN = dict(PRINT_FREQ=500)

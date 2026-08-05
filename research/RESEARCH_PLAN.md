@@ -37,8 +37,8 @@ pose-aggregation diagnostic has produced a PASS/PARTIAL/FAIL result.
 | 3A | Build a scene-disjoint PBR validation protocol and run leakage-marked calibration | COMPLETE — CALIBRATION_MISMATCH |
 | 3B | Test whether frozen Patch-PnP converts controlled XYZ improvements into pose gains | COMPLETE — PATCH_PNP_UNDERUTILIZATION |
 | 3C-0 | Patch-PnP-only same-budget control, required only if C2 unfreezes Patch-PnP | LOCAL PILOT PASS — CONDITIONAL |
-| 3C-1 | Freeze all official parameters and train one identity-initialized quality/coverage module | IMPLEMENTED — LOCAL PILOT PENDING |
-| 3C-2 | Jointly adapt Patch-PnP and the new module only if C1 cannot adapt | NOT TRIGGERED |
+| 3C-1 | Freeze all official parameters and train one identity-initialized quality/coverage module | FORMAL COMPLETE — C1_SCREEN_FAIL |
+| 3C-2 | Jointly adapt Patch-PnP and the new module only if C1 cannot adapt | TRIGGERED — RUNTIME GATE PENDING |
 
 Only the active stage may be executed.  A completed Stage 1 does not authorize
 Stage 2.
@@ -46,6 +46,10 @@ Stage 2.
 ## Asset and Reproducibility Policy
 
 - The repository is `/home/wsluser/GDRNPP-RGBD`.
+- Each formal experiment uses one pre-registered seed only.  Additional
+  random-seed repetitions are not part of the research protocol; compute is
+  reserved for problem-driven controls, key ablations, and cross-dataset
+  validation.
 - Datasets, weights, the BOP renderer, and compatible native extensions are
   reused through ignored symbolic links.
 - Old RDPN6D and RRF projects are read-only references.
@@ -64,8 +68,8 @@ Stage 2: COMPLETE — PASS (XYZ GEOMETRY)
 Stage 3A: COMPLETE — CALIBRATION_MISMATCH
 Stage 3B: COMPLETE — PATCH_PNP_UNDERUTILIZATION
 Stage 3C-0: LOCAL PILOT PASS — CONDITIONAL B CONTROL
-Stage 3C-1: IMPLEMENTED — LOCAL PILOT PENDING
-Stage 3C-2: NOT TRIGGERED
+Stage 3C-1: FORMAL COMPLETE — C1_SCREEN_FAIL
+Stage 3C-2: TRIGGERED — RUNTIME GATE PENDING
 ```
 
 ## 2026-07-31 — Stage 3B result
