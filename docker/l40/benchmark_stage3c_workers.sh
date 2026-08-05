@@ -1,17 +1,36 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-container="lab0_chx"
-root="/data/labs/lab0/docker_data/chx"
+role="${STAGE3C_ROLE:-B}"
+case "${role}" in
+    B)
+        container="lab0_chx"
+        root="/data/labs/lab0/docker_data/chx"
+        gpu_id=0
+        run_name="B_patch_pnp"
+        config="configs/gdrn/lmo_pbr/convnext_stage3c0_pnp_only_lmo.py"
+        ;;
+    C2)
+        container="lab1_chx"
+        root="/data/labs/lab1/docker_data/chx"
+        gpu_id=1
+        run_name="C2_joint"
+        config="configs/gdrn/lmo_pbr/convnext_stage3c2_pnp_quality_coverage_lmo.py"
+        ;;
+    *)
+        echo "FAIL: STAGE3C_ROLE must be B or C2" >&2
+        exit 2
+        ;;
+esac
 bench_id="${BENCH_ID:-$(date +%Y%m%d_%H%M%S)}"
 candidate_text="${WORKER_CANDIDATES:-4 8 12 16 24}"
 gpu_wait_seconds="${GPU_WAIT_SECONDS:-86400}"
 gpu_poll_seconds="${GPU_POLL_SECONDS:-60}"
-bench_root="${root}/logs/stage3c/B_patch_pnp/worker_benchmark/${bench_id}"
+bench_root="${root}/logs/stage3c/${run_name}/worker_benchmark/${bench_id}"
 summary="${bench_root}/summary.tsv"
 ranking="${bench_root}/confirmed_ranking.tsv"
 state="${bench_root}/state.txt"
-lock_file="${root}/logs/stage3c/B_patch_pnp/worker_benchmark.lock"
+lock_file="${root}/logs/stage3c/${run_name}/worker_benchmark.lock"
 
 mkdir -p "${bench_root}"
 exec 9>"${lock_file}"
@@ -30,7 +49,7 @@ trap finish_failed ERR
 
 waited=0
 while true; do
-    active="$(nvidia-smi -i 0 \
+    active="$(nvidia-smi -i "${gpu_id}" \
         --query-compute-apps=pid,process_name,used_memory \
         --format=csv,noheader 2>/dev/null || true)"
     [[ -n "${active}" ]] || break
@@ -48,6 +67,7 @@ printf 'RUNNING\n' > "${state}"
 echo "GPU0_IDLE waited_seconds=${waited}"
 
 echo "BENCH_ID=${bench_id}"
+echo "ROLE=${role}"
 echo "CANDIDATES=${candidate_text}"
 echo "PROTOCOL=batch48_local_pbr_one_epoch_no_eval"
 /usr/bin/docker inspect "${container}" \
@@ -57,8 +77,8 @@ run_case() {
     local label="$1"
     local workers="$2"
     local output_rel output_host log started finished elapsed rc
-    output_rel="output/stage3c_worker_benchmark/${bench_id}/${label}"
-    output_host="${root}/outputs/stage3c_worker_benchmark/${bench_id}/${label}"
+    output_rel="output/stage3c_worker_benchmark/${role}/${bench_id}/${label}"
+    output_host="${root}/outputs/stage3c_worker_benchmark/${role}/${bench_id}/${label}"
     log="${bench_root}/${label}.log"
     [[ ! -e "${output_host}" ]] || {
         echo "FAIL: output already exists: ${output_host}" >&2
@@ -71,7 +91,7 @@ run_case() {
     /usr/bin/docker exec "${container}" bash -lc "
         cd /workspace/gdrnpp
         ./core/gdrn_modeling/train_gdrn.sh \
-            configs/gdrn/lmo_pbr/convnext_stage3c0_pnp_only_lmo.py \
+            ${config} \
             0 \
             --opts \
             DATALOADER.NUM_WORKERS=${workers} \

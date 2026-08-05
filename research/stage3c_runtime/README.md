@@ -103,3 +103,15 @@ docker/l40/lab0_b.sh benchmark-watch
 If GPU0 is occupied by another user's process, the benchmark records
 `WAITING_GPU` and waits in the background for up to 24 hours. It never signals
 or modifies the other process.
+
+For lab1/C2, one command performs access checks, creates `lab1_chx` when
+missing, waits for physical GPU1, runs the runtime gate and C2 smoke, validates
+parameter isolation, and then executes the same batch-48 worker benchmark:
+
+```text
+docker/l40/lab1_c2.sh benchmark-workers
+docker/l40/lab1_c2.sh benchmark-status
+docker/l40/lab1_c2.sh benchmark-watch
+```
+
+The completed C1 container and outputs are not modified.
