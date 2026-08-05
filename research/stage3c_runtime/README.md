@@ -99,3 +99,7 @@ docker/l40/lab0_b.sh benchmark-workers
 docker/l40/lab0_b.sh benchmark-status
 docker/l40/lab0_b.sh benchmark-watch
 ```
+
+If GPU0 is occupied by another user's process, the benchmark records
+`WAITING_GPU` and waits in the background for up to 24 hours. It never signals
+or modifies the other process.

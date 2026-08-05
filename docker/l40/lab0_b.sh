@@ -29,6 +29,7 @@ formal_pids() {
 }
 
 recover() {
+    local require_idle="${1:-1}"
     local pids active attempt
     container_exists || {
         echo "FAIL: missing laboratory container ${container}" >&2
@@ -61,11 +62,16 @@ recover() {
     active="$(nvidia-smi -i 0 \
         --query-compute-apps=pid,process_name,used_memory \
         --format=csv,noheader 2>/dev/null || true)"
-    [[ -z "${active}" ]] || {
-        echo "FAIL: GPU0 is not idle after recovery:" >&2
-        echo "${active}" >&2
-        exit 1
-    }
+    if [[ -n "${active}" ]]; then
+        if [[ "${require_idle}" == "1" ]]; then
+            echo "FAIL: GPU0 is not idle after recovery:" >&2
+            echo "${active}" >&2
+            exit 1
+        fi
+        echo "LAB0_B_RECOVERY=PASS_GPU_WAIT_REQUIRED"
+        echo "${active}"
+        return
+    fi
     echo "LAB0_B_RECOVERY=PASS"
 }
 
@@ -80,10 +86,10 @@ latest_path() {
 
 case "${command}" in
     recover)
-        recover
+        recover 1
         ;;
     benchmark-workers)
-        recover
+        recover 0
         mkdir -p "${log_root}"
         bench_id="$(date +%Y%m%d_%H%M%S)"
         bench_root="${log_root}/worker_benchmark/${bench_id}"

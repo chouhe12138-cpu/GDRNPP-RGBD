@@ -5,6 +5,8 @@ container="lab0_chx"
 root="/data/labs/lab0/docker_data/chx"
 bench_id="${BENCH_ID:-$(date +%Y%m%d_%H%M%S)}"
 candidate_text="${WORKER_CANDIDATES:-4 8 12 16 24}"
+gpu_wait_seconds="${GPU_WAIT_SECONDS:-86400}"
+gpu_poll_seconds="${GPU_POLL_SECONDS:-60}"
 bench_root="${root}/logs/stage3c/B_patch_pnp/worker_benchmark/${bench_id}"
 summary="${bench_root}/summary.tsv"
 ranking="${bench_root}/confirmed_ranking.tsv"
@@ -26,14 +28,24 @@ finish_failed() {
 }
 trap finish_failed ERR
 
-active="$(nvidia-smi -i 0 \
-    --query-compute-apps=pid,process_name,used_memory \
-    --format=csv,noheader 2>/dev/null || true)"
-[[ -z "${active}" ]] || {
-    echo "FAIL: GPU0 has active compute processes:" >&2
-    echo "${active}" >&2
-    exit 1
-}
+waited=0
+while true; do
+    active="$(nvidia-smi -i 0 \
+        --query-compute-apps=pid,process_name,used_memory \
+        --format=csv,noheader 2>/dev/null || true)"
+    [[ -n "${active}" ]] || break
+    printf 'WAITING_GPU\n' > "${state}"
+    echo "WAITING_GPU elapsed_seconds=${waited} limit_seconds=${gpu_wait_seconds}"
+    echo "${active}"
+    ((waited < gpu_wait_seconds)) || {
+        echo "FAIL: GPU0 did not become idle before timeout" >&2
+        exit 1
+    }
+    sleep "${gpu_poll_seconds}"
+    waited="$((waited + gpu_poll_seconds))"
+done
+printf 'RUNNING\n' > "${state}"
+echo "GPU0_IDLE waited_seconds=${waited}"
 
 echo "BENCH_ID=${bench_id}"
 echo "CANDIDATES=${candidate_text}"
