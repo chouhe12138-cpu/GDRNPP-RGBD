@@ -87,3 +87,15 @@ logs:     /data/labs/lab0/docker_data/chx/logs
 Therefore a new SSH/VS Code terminal can directly run
 `docker/l40/stage3bc2.sh B status` without repeating `export`.  Environment
 variables remain available only as optional overrides.
+
+For lab0, `docker/l40/lab0_b.sh` is the preferred one-command entry point. It
+explicitly discards stale shell overrides, can terminate only the known
+invalid early-formal process, validates the completed smoke, and runs the
+batch-48 NUM_WORKERS benchmark in the background:
+
+```text
+docker/l40/lab0_b.sh recover
+docker/l40/lab0_b.sh benchmark-workers
+docker/l40/lab0_b.sh benchmark-status
+docker/l40/lab0_b.sh benchmark-watch
+```
