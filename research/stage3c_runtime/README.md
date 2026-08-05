@@ -61,26 +61,29 @@ docker/l40/stage3bc2.sh B formal
 docker/l40/stage3bc2.sh C2 formal
 ```
 
+The `formal` command reruns smoke validation and refuses to launch while the
+smoke is running, failed, or missing its checkpoint and metrics.
+
 After both fixed epoch-40 outputs are available in one filesystem, run
 `research.stage3c_runtime.compare_formal` to measure C2's added value directly
 against B using the same three gates.
 
-For lab0, first test the existing lab1 assets without writing to them:
+The checked-in defaults follow the laboratory account/container convention:
 
-```bash
-ASSET_ROOT=/data/labs/lab1/docker_data/chx \
-BASELINE_ROOT=/data/labs/lab1/docker_data/chx/outputs/EXP-20260731-006/official_gt \
-docker/l40/stage3bc2.sh B access
+```text
+B:  lab0 / physical GPU 0 / container lab0_chx
+C2: lab1 / physical GPU 1 / container lab1_chx
 ```
 
-`ACCESS=PASS` confirms Docker-daemon access, physical GPU 0 visibility,
-directory traversal/read access, and official-checkpoint readability.  It
-does not create a container or any directory.  Reuse the same two environment
-variables for `B create`, `B gate`, `B smoke`, and `B validate`.
+Lab0 uses its account-owned root without environment overrides:
 
-The image is host-wide when lab0 and lab1 use the same Docker daemon.  Runtime
-containers use the invoking account's numeric UID/GID, so the shared image
-does not require rebuilding merely because the accounts differ.  Build the
-image once from the exact Gitee commit used by both roles.  If the access
-check fails, do not change lab1 ownership or permissions; arrange an
-administrator-approved shared path or a lab0-owned asset copy.
+```text
+assets:   /data/labs/lab0/docker_data/chx
+baseline: /data/labs/lab0/docker_data/chx/baselines/official_gt
+outputs:  /data/labs/lab0/docker_data/chx/outputs
+logs:     /data/labs/lab0/docker_data/chx/logs
+```
+
+Therefore a new SSH/VS Code terminal can directly run
+`docker/l40/stage3bc2.sh B status` without repeating `export`.  Environment
+variables remain available only as optional overrides.

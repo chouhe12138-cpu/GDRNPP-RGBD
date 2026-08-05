@@ -11,12 +11,14 @@ case "${role}" in
     B)
         gpu_id="${GPU_ID:-0}"
         chx_root="${CHX_ROOT:-/data/labs/lab0/docker_data/chx}"
-        container="${CONTAINER_NAME:-lab0_chx_stage3b}"
+        container="${CONTAINER_NAME:-lab0_chx}"
+        baseline_root="${BASELINE_ROOT:-${chx_root}/baselines/official_gt}"
         ;;
     C2)
         gpu_id="${GPU_ID:-1}"
         chx_root="${CHX_ROOT:-/data/labs/lab1/docker_data/chx}"
-        container="${CONTAINER_NAME:-lab1_chx_stage3c2}"
+        container="${CONTAINER_NAME:-lab1_chx}"
+        baseline_root="${BASELINE_ROOT:-${chx_root}/outputs/EXP-20260731-006/official_gt}"
         ;;
     *)
         echo "usage: $0 B|C2" >&2
@@ -25,7 +27,6 @@ case "${role}" in
 esac
 
 asset_root="${ASSET_ROOT:-${chx_root}}"
-baseline_root="${BASELINE_ROOT:-/data/labs/lab1/docker_data/chx/outputs/EXP-20260731-006/official_gt}"
 image="${IMAGE:-gdrnpp-stage3bc2:torch220-cu121-sm89-v2}"
 docker_bin="${DOCKER_BIN:-/usr/bin/docker}"
 

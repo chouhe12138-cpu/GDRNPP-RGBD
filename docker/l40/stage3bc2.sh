@@ -12,13 +12,15 @@ case "${role}" in
     B)
         gpu_id="${GPU_ID:-0}"
         root="${CHX_ROOT:-/data/labs/lab0/docker_data/chx}"
-        container="${CONTAINER_NAME:-lab0_chx_stage3b}"
+        container="${CONTAINER_NAME:-lab0_chx}"
+        baseline_root="${BASELINE_ROOT:-${root}/baselines/official_gt}"
         run_name="B_patch_pnp"
         ;;
     C2)
         gpu_id="${GPU_ID:-1}"
         root="${CHX_ROOT:-/data/labs/lab1/docker_data/chx}"
-        container="${CONTAINER_NAME:-lab1_chx_stage3c2}"
+        container="${CONTAINER_NAME:-lab1_chx}"
+        baseline_root="${BASELINE_ROOT:-${root}/outputs/EXP-20260731-006/official_gt}"
         run_name="C2_joint"
         ;;
     *)
@@ -118,6 +120,38 @@ launch() {
     echo "status=${status}"
 }
 
+validate_smoke() {
+    local status checkpoint metrics
+    start_container
+    status="$(latest_smoke_status 2>/dev/null || true)"
+    [[ -n "${status}" ]] || {
+        echo "FAIL: no smoke status found for ${role}" >&2
+        exit 1
+    }
+    grep -q '"state":"FINISHED"' "${status}" || {
+        echo "FAIL: smoke has not finished: ${status}" >&2
+        exit 1
+    }
+    grep -q '"exit":0' "${status}" || {
+        echo "FAIL: smoke did not exit successfully: ${status}" >&2
+        exit 1
+    }
+    checkpoint="${smoke_output}/checkpoints/model_epoch_001.pth"
+    metrics="${smoke_output}/train/metrics.jsonl"
+    [[ -f "${checkpoint}" && -f "${metrics}" ]] || {
+        echo "FAIL: incomplete smoke artifacts below ${smoke_output}" >&2
+        exit 1
+    }
+    "${docker_bin}" exec "${container}" bash -lc "
+        cd /workspace/gdrnpp
+        python -m research.stage3c_runtime.verify_checkpoint_isolation \
+            ${role} \
+            --official pretrained_models/lmo_pbr/model_final_wo_optim.pth \
+            --trained output/stage3c_smoke/${run_name}/checkpoints/model_epoch_001.pth
+    "
+    echo "SMOKE_VALIDATION=PASS role=${role}"
+}
+
 case "${command}" in
     access)
         asset_root="${ASSET_ROOT:-${root}}"
@@ -139,7 +173,7 @@ case "${command}" in
             "${asset_root}/datasets/BOP_DATASETS/lm/train_pbr" \
             "${asset_root}/datasets/BOP_DATASETS/lmo/test" \
             "${asset_root}/datasets/VOC/VOC2012/JPEGImages" \
-            "${BASELINE_ROOT:-/data/labs/lab1/docker_data/chx/outputs/EXP-20260731-006/official_gt}"; do
+            "${baseline_root}"; do
             [[ -d "${directory}" && -r "${directory}" && -x "${directory}" ]] || {
                 echo "ACCESS=FAIL directory=${directory}"
                 exit 1
@@ -170,6 +204,7 @@ case "${command}" in
         launch smoke "${smoke_output}"
         ;;
     formal)
+        validate_smoke
         launch formal "${formal_output}"
         ;;
     finalize)
@@ -192,19 +227,7 @@ case "${command}" in
         "
         ;;
     validate)
-        status="$(latest_smoke_status)"
-        grep -q '"state":"FINISHED"' "${status}"
-        grep -q '"exit":0' "${status}"
-        checkpoint="${smoke_output}/checkpoints/model_epoch_001.pth"
-        metrics="${smoke_output}/train/metrics.jsonl"
-        [[ -f "${checkpoint}" && -f "${metrics}" ]]
-        "${docker_bin}" exec "${container}" bash -lc "
-            cd /workspace/gdrnpp
-            python -m research.stage3c_runtime.verify_checkpoint_isolation \
-                ${role} \
-                --official pretrained_models/lmo_pbr/model_final_wo_optim.pth \
-                --trained output/stage3c_smoke/${run_name}/checkpoints/model_epoch_001.pth
-        "
+        validate_smoke
         ;;
     status)
         status="$(latest_file status.json 2>/dev/null || true)"
