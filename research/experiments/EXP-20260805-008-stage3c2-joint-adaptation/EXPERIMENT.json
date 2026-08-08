@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
+  "title": "Patch-PnP 与质量/覆盖模块联合适应 C2",
+  "stage": "Stage 3C2",
+  "role": "C2",
+  "status": "TRIGGERED",
+  "legacy_import": true,
+  "decision": "FORMAL_PENDING",
+  "protocol": {
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 20260731,
+    "total_epochs": 40,
+    "fixed_checkpoint": "epoch_040",
+    "trainable_modules": ["pnp_net", "quality_coverage_net"],
+    "learning_rates": {
+      "pnp_net": 0.00008,
+      "quality_coverage_net": 0.0008
+    },
+    "gate": {
+      "minimum_bop19_ar_macro_delta": 0.005,
+      "minimum_add_s_0.1d_macro_object_delta": 0.01,
+      "minimum_nonnegative_objects": 5
+    },
+    "metrics": ["bop19_ar_macro", "add_s_0.1d_macro_object"]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "overview": "research/STAGE_03C_EXPERIMENT_OVERVIEW.md",
+    "config": "configs/gdrn/lmo_pbr/convnext_stage3c2_pnp_quality_coverage_lmo.py",
+    "formal_output": "server:output/stage3c/C2_joint"
+  },
+  "comparison": {
+    "baseline_experiment_id": "EXP-20260731-005-pnp-only-control",
+    "effect": "C2 - B"
+  }
+}

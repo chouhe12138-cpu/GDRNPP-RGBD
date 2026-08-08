@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-08",
+  "git_commit": "25fb5e3cd2c8dd10681f539eef399c40468130db",
+  "purpose": "在 B/C2 正式实验完成封存前保护当前本地复现链。",
+  "server_observation": {
+    "last_checked": "2026-08-06",
+    "image_id": "sha256:04a68c9b5b54de9bd386e120d52dd9bf812c5d20ec9b24bf06e7829d4c983495",
+    "warning": "镜像、容器、GPU 和进程状态必须在服务器重新核验。"
+  },
+  "files": {
+    "configs/gdrn/lmo_pbr/convnext_stage3c0_pnp_only_lmo.py": "89b3f354e127fd8797969db88c6644e2683598cb5d791a6be9c7e38567989973",
+    "configs/gdrn/lmo_pbr/convnext_stage3c0_pnp_only_smoke_lmo.py": "1f75c6a821f2bb3fbd0e646e76bac916711c5deca4e25dd5a2953c8c5ed2072f",
+    "configs/gdrn/lmo_pbr/convnext_stage3c2_pnp_quality_coverage_lmo.py": "a82c9eff0d2771c019c0334838710a9feb820953aad158b8487977c66fd1a156",
+    "configs/gdrn/lmo_pbr/convnext_stage3c2_pnp_quality_coverage_smoke_lmo.py": "9e44fbb8f0138b4647c90f70e00212b8ee352db95e48c60285d75a8c2cbeaba9",
+    "docker/l40/benchmark_stage3c_workers.sh": "dc5cb22ceba4f51a068674fd61cb9724b2199d0fee0ba5866a37c84a3fbb9a77",
+    "docker/l40/lab0_b.sh": "c61523726f58d3f72564b3acf5168aaa1f41da0fc6ad78e6f7d7904b7647e515",
+    "docker/l40/lab1_c2.sh": "979518910fa33dc0831a7ed5b9c3930ae5d89723ce44f7f3dc0d2bbafa31d23e",
+    "docker/l40/stage3bc2.sh": "b0b55638a5c811f5843664f59e95bd54bec99a7aee2890c448fadc6995182962",
+    "research/stage3c_runtime/preflight.py": "151766e308310916a513ee0f1b3c6e30170ba23358089785d6bce0f966ac08aa",
+    "research/stage3c_runtime/run.sh": "8042477461e5caa599fc0ce30039641ae64af3a8226e2a4abde8e3dd6a2c7257"
+  }
+}

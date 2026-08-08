@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gdrnpp-rgbd/normalized_metrics.schema.json",
+  "title": "Canonical normalized experiment metrics",
+  "type": "object",
+  "required": ["schema_version", "dataset_id", "bbox_type", "checkpoint_id", "metrics"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "bbox_type": {"enum": ["gt", "det"]},
+    "metrics": {"type": "object"}
+  },
+  "additionalProperties": true
+}

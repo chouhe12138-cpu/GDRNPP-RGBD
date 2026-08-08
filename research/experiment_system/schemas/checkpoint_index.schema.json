@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gdrnpp-rgbd/checkpoint_index.schema.json",
+  "title": "Run checkpoint identity index",
+  "type": "object",
+  "required": ["schema_version", "checkpoints"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "checkpoints": {"type": "array"}
+  },
+  "additionalProperties": false
+}

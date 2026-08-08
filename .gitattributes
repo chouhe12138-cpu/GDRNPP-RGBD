@@ -1,0 +1,23 @@
+# Keep source and Chinese documentation stable across WSL, Linux servers, and Windows editors.
+# Do not run a repository-wide renormalization; these rules apply naturally to new changes.
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.txt text eol=lf
+*.cfg text eol=lf
+
+*.pth binary
+*.ckpt binary
+*.pkl binary
+*.npy binary
+*.npz binary
+*.so binary
+*.whl binary
+*.tar.gz binary
+*.tgz binary
+*.zip binary
+*.png binary
+*.jpg binary

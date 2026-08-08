@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gdrnpp-rgbd/evaluation_index.schema.json",
+  "title": "Indexed raw BOP evaluator output",
+  "type": "object",
+  "required": ["schema_version", "dataset_id", "bbox_type", "checkpoint_id", "raw_files"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "bbox_type": {"enum": ["gt", "det"]},
+    "raw_files": {"type": "object"}
+  },
+  "additionalProperties": true
+}

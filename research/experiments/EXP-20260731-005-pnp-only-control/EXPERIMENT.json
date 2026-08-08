@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-005-pnp-only-control",
+  "title": "Patch-PnP-only 适应对照",
+  "stage": "Stage 3C0 / B",
+  "role": "B",
+  "status": "TRIGGERED",
+  "legacy_import": true,
+  "decision": "LOCAL_PIPELINE_AND_ISOLATION_PASS_FORMAL_PENDING",
+  "protocol": {
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 20260731,
+    "total_epochs": 40,
+    "fixed_checkpoint": "epoch_040",
+    "trainable_modules": ["pnp_net"],
+    "gate": {
+      "minimum_bop19_ar_macro_delta": 0.005,
+      "minimum_add_s_0.1d_macro_object_delta": 0.01,
+      "minimum_nonnegative_objects": 5
+    },
+    "metrics": ["bop19_ar_macro", "add_s_0.1d_macro_object"]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "stage_protocol": "research/stages/STAGE_03C0_PNP_ADAPTATION_CONTROL.md",
+    "local_pilot": "output/EXP-20260731-005/pnp_only_local",
+    "formal_output": "server:output/stage3c/B_patch_pnp"
+  }
+}

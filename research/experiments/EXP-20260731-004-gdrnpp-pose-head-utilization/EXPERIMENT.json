@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-004-gdrnpp-pose-head-utilization",
+  "title": "冻结 Patch-PnP 的 XYZ 利用诊断",
+  "stage": "Stage 3B",
+  "role": "diagnostic",
+  "status": "COMPLETE",
+  "legacy_import": true,
+  "decision": "PATCH_PNP_UNDERUTILIZATION",
+  "protocol": {
+    "dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "parameter_updates": 0,
+    "oracle_only": true,
+    "metrics": ["bop19_ar_macro", "add_s_0.1d_macro_object"]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "conclusion": "CONCLUSION.md",
+    "stage_protocol": "research/stages/STAGE_03B_POSE_HEAD_UTILIZATION_DIAGNOSTIC.md",
+    "legacy_output": "output/EXP-20260731-004/full"
+  }
+}

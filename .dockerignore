@@ -1,0 +1,67 @@
+# Git and agent-local state
+.git
+.gitignore
+.agents
+.codex
+.local
+.cache
+.pytest_cache
+__pycache__
+**/__pycache__
+*.py[cod]
+
+# Machine-local assets and experiment artifacts
+data
+datasets
+pretrained_models
+weights
+output
+outputs
+runs
+logs
+checkpoints
+wandb
+tensorboard
+local
+secrets
+
+# Credentials and local environments
+.env
+.env.*
+*.pem
+*.key
+credentials*
+.venv
+venv
+conda-env
+
+# Editors, caches, and runtime build products
+.idea
+.vscode
+*.swp
+*.swo
+*.swn
+*~
+build
+dist
+_ext
+*.egg-info
+*.so
+*.so.*
+*.ckpt
+*.pth
+*.pkl
+*.npy
+*.npz
+*.engine
+*.onnx
+*.log
+events.out.tfevents*
+
+# Upstream native build outputs are rebuilt inside the image.
+core/csrc/uncertainty_pnp/ceres
+core/csrc/uncertainty_pnp/lib
+lib/egl_renderer/build
+
+# Docker build inputs below are intentionally versioned and checksum-pinned.
+!docker/l40/vendor/*.tar.gz

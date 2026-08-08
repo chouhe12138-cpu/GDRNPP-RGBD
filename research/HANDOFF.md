@@ -1,10 +1,12 @@
 # GDRNPP-RGBD Research Handoff
 
-Last updated: 2026-08-05
+Last updated: 2026-08-06
 
-L40 Docker/server migration state is recorded separately in
-`research/SERVER_MIGRATION_HANDOFF.md`. Read that file before continuing any
-server-side setup or formal Stage 3C-1 execution.
+Current L40 accounts, GPUs, Docker containers, data paths, runtime state, and
+next server actions are recorded in
+`research/SERVER_RUNTIME_STATUS_CN.md`. Read that file before any server-side
+setup or formal B/C2 execution. Historical migration, image-build, and C1
+environment details remain in `research/SERVER_MIGRATION_HANDOFF.md`.
 
 ## Start Here
 
@@ -187,7 +189,9 @@ conda run -n pytorch22 python -m pytest -q \
   research/pose_aggregation/tests
 ```
 
-Expected result after Stage 3C-1 implementation: `43 passed`.
+Current result including the experiment-management, Stage 3C runtime, and
+pose-head diagnostic coverage: `98 passed` (verified 2026-08-08 in Conda
+`pytorch22`).
 
 Official checkpoint SHA-256:
 

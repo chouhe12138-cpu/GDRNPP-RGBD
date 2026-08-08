@@ -1,0 +1,86 @@
+{
+  "experiment_count": 8,
+  "experiments": [
+    {
+      "decision": "FAIL",
+      "experiment_id": "EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/EXPERIMENT.json",
+      "role": "diagnostic",
+      "stage": "Stage 1",
+      "status": "COMPLETE",
+      "title": "GDRNPP 位姿聚合诊断"
+    },
+    {
+      "decision": "PASS_XYZ_GEOMETRY",
+      "experiment_id": "EXP-20260731-002-gdrnpp-causal-oracle",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260731-002-gdrnpp-causal-oracle/EXPERIMENT.json",
+      "role": "diagnostic",
+      "stage": "Stage 2",
+      "status": "COMPLETE",
+      "title": "GDRNPP 因果 Oracle 诊断"
+    },
+    {
+      "decision": "CALIBRATION_MISMATCH",
+      "experiment_id": "EXP-20260731-003-pbr-validation-calibration",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260731-003-pbr-validation-calibration/EXPERIMENT.json",
+      "role": "calibration",
+      "stage": "Stage 3A",
+      "status": "COMPLETE",
+      "title": "LM-PBR 验证基础设施与校准"
+    },
+    {
+      "decision": "PATCH_PNP_UNDERUTILIZATION",
+      "experiment_id": "EXP-20260731-004-gdrnpp-pose-head-utilization",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260731-004-gdrnpp-pose-head-utilization/EXPERIMENT.json",
+      "role": "diagnostic",
+      "stage": "Stage 3B",
+      "status": "COMPLETE",
+      "title": "冻结 Patch-PnP 的 XYZ 利用诊断"
+    },
+    {
+      "decision": "LOCAL_PIPELINE_AND_ISOLATION_PASS_FORMAL_PENDING",
+      "experiment_id": "EXP-20260731-005-pnp-only-control",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260731-005-pnp-only-control/EXPERIMENT.json",
+      "role": "B",
+      "stage": "Stage 3C0 / B",
+      "status": "TRIGGERED",
+      "title": "Patch-PnP-only 适应对照"
+    },
+    {
+      "decision": "C1_SCREEN_FAIL",
+      "experiment_id": "EXP-20260731-006-quality-coverage",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260731-006-quality-coverage/EXPERIMENT.json",
+      "role": "C1",
+      "stage": "Stage 3C1",
+      "status": "COMPLETE",
+      "title": "质量/覆盖残差注意力 C1"
+    },
+    {
+      "decision": "OFFICIAL_REGION_DOMINANT_XYZ_UNSTABLE_CROSS_MODEL_PENDING",
+      "experiment_id": "EXP-20260804-007-pose-head-information-flow",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260804-007-pose-head-information-flow/EXPERIMENT.json",
+      "role": "official/C1/B/C2 diagnostic",
+      "stage": "Stage 3C mechanism diagnostic",
+      "status": "RUNNING",
+      "title": "Patch-PnP 姿态头信息流全量统计诊断"
+    },
+    {
+      "decision": "FORMAL_PENDING",
+      "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/EXPERIMENT.json",
+      "role": "C2",
+      "stage": "Stage 3C2",
+      "status": "TRIGGERED",
+      "title": "Patch-PnP 与质量/覆盖模块联合适应 C2"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-YYYYMMDD-NNN-replace-slug",
+  "title": "替换为中文实验标题",
+  "stage": "替换为阶段",
+  "role": "替换为角色",
+  "status": "PLANNED",
+  "legacy_import": false,
+  "protocol": {
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 0,
+    "total_epochs": 40,
+    "fixed_checkpoint": "epoch_040",
+    "trainable_modules": [],
+    "metrics": [
+      "bop19_ar_macro",
+      "add_s_0.1d_macro_object"
+    ],
+    "gate": {
+      "minimum_bop19_ar_macro_delta": 0.005,
+      "minimum_add_s_0.1d_macro_object_delta": 0.01,
+      "minimum_nonnegative_objects": 5
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "config": "替换为正式 config 路径"
+  }
+}

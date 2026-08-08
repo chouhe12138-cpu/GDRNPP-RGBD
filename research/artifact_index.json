@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "note": "只读历史定位表；路径存在性和服务器状态必须在使用时重新核验。",
+  "experiments": [
+    {
+      "experiment_id": "EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic",
+      "artifacts": [
+        {"mode": "formal", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260730-001/full"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260731-002-gdrnpp-causal-oracle",
+      "artifacts": [
+        {"mode": "formal", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-002/full"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260731-003-pbr-validation-calibration",
+      "artifacts": [
+        {"mode": "calibration", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-003/calibration300"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260731-004-gdrnpp-pose-head-utilization",
+      "artifacts": [
+        {"mode": "formal", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-004/full"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260731-005-pnp-only-control",
+      "artifacts": [
+        {"mode": "local_pilot", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-005/pnp_only_local"},
+        {"mode": "formal", "status": "PENDING", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp"},
+        {"mode": "formal", "status": "INVALID", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp_INVALID_EARLY_20260805_234436"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260731-006-quality-coverage",
+      "artifacts": [
+        {"mode": "local_pilot", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-006/quality_coverage_local"},
+        {"mode": "formal", "status": "COMPLETE", "storage": "lab1", "locator": "output/EXP-20260731-006/quality_coverage_full", "checkpoint_sha256": "d3ab7167f2fc5f6aab8d7e8444c5b816036bd64e38f647a26e994c8e91939aa6"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260804-007-pose-head-information-flow",
+      "artifacts": [
+        {"mode": "official_full", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260804-007-pose-head-information-flow/official/full", "hashes_sha256": "fdabeb5b16f514a86e061204b50550dffbdfacb250c3bd51fc1109995ee4f969"},
+        {"mode": "cross_model_full", "status": "PENDING", "storage": "mixed", "locator": "output/EXP-20260804-007-pose-head-information-flow/<role>/full"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
+      "artifacts": [
+        {"mode": "formal", "status": "PENDING", "storage": "lab1", "locator": "output/stage3c/C2_joint"},
+        {"mode": "smoke", "status": "PENDING_OR_COMPLETE_RECHECK_REQUIRED", "storage": "lab1", "locator": "output/stage3c_smoke/C2_joint"}
+      ]
+    }
+  ]
+}

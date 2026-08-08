@@ -273,9 +273,13 @@ immutable evidence.
 The next matched formal controls are:
 
 ```text
-physical GPU 0 / lab0 / lab0_chx_stage3b  -> B Patch-PnP-only
-physical GPU 1 / lab1 / lab1_chx_stage3c2 -> C2 joint adaptation
+physical GPU 0 / lab0 / lab0_chx -> B Patch-PnP-only
+physical GPU 1 / lab1 / lab1_chx -> C2 joint adaptation
 ```
+
+These are the current names fixed by the account-specific launch scripts.
+For live runtime state and next actions, use
+`research/SERVER_RUNTIME_STATUS_CN.md`.
 
 Use image `gdrnpp-stage3bc2:torch220-cu121-sm89-v2` for both roles.  Build it
 once after the source is clean and committed by the user; both containers

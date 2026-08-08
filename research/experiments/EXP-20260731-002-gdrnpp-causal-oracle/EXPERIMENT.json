@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-002-gdrnpp-causal-oracle",
+  "title": "GDRNPP 因果 Oracle 诊断",
+  "stage": "Stage 2",
+  "role": "diagnostic",
+  "status": "COMPLETE",
+  "legacy_import": true,
+  "decision": "PASS_XYZ_GEOMETRY",
+  "protocol": {
+    "dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 20260730,
+    "parameter_updates": 0,
+    "oracle_only": true,
+    "metrics": ["bop19_ar_macro", "add_s_0.1d_macro_object"]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "conclusion": "CONCLUSION.md",
+    "stage_protocol": "research/stages/STAGE_02_GDRNPP_CAUSAL_ORACLE.md",
+    "legacy_output": "output/EXP-20260731-002/full"
+  }
+}

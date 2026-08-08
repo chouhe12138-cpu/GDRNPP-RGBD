@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260804-007-pose-head-information-flow",
+  "title": "Patch-PnP 姿态头信息流全量统计诊断",
+  "stage": "Stage 3C mechanism diagnostic",
+  "role": "official/C1/B/C2 diagnostic",
+  "status": "RUNNING",
+  "legacy_import": true,
+  "decision": "OFFICIAL_REGION_DOMINANT_XYZ_UNSTABLE_CROSS_MODEL_PENDING",
+  "protocol": {
+    "dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 20260804,
+    "fixed_checkpoint": "epoch_040_for_trained_roles",
+    "parameter_updates": 0,
+    "metrics": [
+      "bop19_ar_macro",
+      "add_s_0.1d_micro_target",
+      "rotation_error_deg_mean",
+      "translation_error_mm_mean"
+    ]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "handoff": "research/POSE_HEAD_DIAGNOSTIC_HANDOFF_CN.md",
+    "official_output": "output/EXP-20260804-007-pose-head-information-flow/official/full"
+  }
+}
