@@ -10,9 +10,9 @@ Stage 1:   COMPLETE — FAIL
 Stage 2:   COMPLETE — PASS（XYZ GEOMETRY）
 Stage 3A:  COMPLETE — CALIBRATION_MISMATCH
 Stage 3B:  COMPLETE — PATCH_PNP_UNDERUTILIZATION
-Stage 3C0: LOCAL PILOT PASS — B 正式对照待完成
+Stage 3C0: LOCAL PILOT PASS — B 正式对照暂不启动
 Stage 3C1: FORMAL COMPLETE — C1_SCREEN_FAIL
-Stage 3C2: TRIGGERED — C2 正式实验运行门待完成
+Stage 3C2: TRIGGERED/RUNNING_RECHECK_REQUIRED — 保持原运行链
 ```
 
 Stage 2 证明预测 XYZ 几何是主要因果瓶颈。Stage 3B 进一步确认，官方冻结
@@ -25,15 +25,14 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 
 ## 当前任务
 
-1. 重新核验服务器 GPU、后台等待器、容器和 B/C2 benchmark 状态。
-2. 保持当前 B/C2 镜像和复现链不变，完成各自 smoke、隔离验证和 worker gate。
-3. 运行 B（Patch-PnP-only）与 C2（联合适应）的单 seed、40 epoch 正式实验。
-4. 对 C1/B/C2 固定 Epoch 40 checkpoint 完成同协议信息流诊断。
-5. 用 `C2 - B` 区分“姿态头需联合适应”与“质量/覆盖模块本身无效”。
+1. 保持 C2 原环境和原运行链，重新只读核验实时状态并等待 Epoch 40。
+2. 暂不启动 B formal；C2 Epoch 40 结果后由用户决定是否取消 B。
+3. 补齐 C1 formal checkpoint/评估与 EXP007 cross-model 的服务器只读验收证据。
+4. C2 结束后完成 checkpoint、BOP、ADD(-S)、日志和 diagnostic 归档。
 
 ## 已验证的本地状态
 
-- Git HEAD：`25fb5e3cd2c8dd10681f539eef399c40468130db`。
+- 历史验收实现及证据绑定 commit：`4edab641cbe0aa43e9220d92d4f785a2b920cb31`。
 - 研究相关测试：`100 passed`（含实验管理与历史验收基础设施）。
 - B 和 C2 正式 config preflight：PASS。
 - 官方初始化权重 SHA-256：
@@ -55,3 +54,4 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 - 姿态头诊断：`research/POSE_HEAD_DIAGNOSTIC_HANDOFF_CN.md`
 - 服务器状态：`research/SERVER_RUNTIME_STATUS_CN.md`
 - 运行手册：`research/RUNBOOK_CN.md`
+- 历史验收：`research/HISTORICAL_ACCEPTANCE_CN.md`

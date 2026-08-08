@@ -1,0 +1,83 @@
+{
+  "checks": [
+    {
+      "kind": "config",
+      "path": "configs/gdrn/lmo_pbr/convnext_a6_AugCosyAAEGray_BG05_mlL1_DMask_amodalClipBox_classAware_lmo.py",
+      "resolved_output_dir": "output/gdrn/lmo_pbr/convnext_a6_AugCosyAAEGray_BG05_mlL1_DMask_amodalClipBox_classAware_lmo",
+      "sha256": "2c2e6df7f5b554bb93a02508305445133dcbb69cebe4f389f910529a9744a6c7",
+      "status": "PASS"
+    },
+    {
+      "actual_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+      "expected_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+      "id": "official_lmo",
+      "kind": "checkpoint",
+      "path": "pretrained_models/lmo_pbr/model_final_wo_optim.pth",
+      "size_bytes": 410708489,
+      "status": "PASS"
+    },
+    {
+      "kind": "required_path",
+      "path": "output/EXP-20260730-001/full",
+      "status": "PASS"
+    },
+    {
+      "actual": "FAIL",
+      "expected": "FAIL",
+      "kind": "json_value",
+      "name": "decision",
+      "path": "output/EXP-20260730-001/full/summary.json",
+      "status": "PASS",
+      "tolerance": 0.0
+    },
+    {
+      "actual": 1445,
+      "expected": 1445,
+      "kind": "json_value",
+      "name": "patch_instances",
+      "path": "output/EXP-20260730-001/full/summary.json",
+      "status": "PASS",
+      "tolerance": 0.0
+    },
+    {
+      "actual": 0.6902076124567474,
+      "expected": 0.6902076124567474,
+      "kind": "json_value",
+      "name": "patch_bop19_ar_macro",
+      "path": "output/EXP-20260730-001/full/summary.json",
+      "status": "PASS",
+      "tolerance": 5e-05
+    },
+    {
+      "actual": 0.5024221453287198,
+      "expected": 0.5024221453287198,
+      "kind": "json_value",
+      "name": "patch_add_s_0.1d_micro_target",
+      "path": "output/EXP-20260730-001/full/summary.json",
+      "status": "PASS",
+      "tolerance": 0.0005
+    },
+    {
+      "actual": 8670,
+      "expected": 8670,
+      "kind": "csv_data_rows",
+      "path": "output/EXP-20260730-001/full/per_instance.csv",
+      "status": "PASS"
+    },
+    {
+      "failures": [],
+      "files_checked": 6,
+      "kind": "hash_manifest",
+      "path": "output/EXP-20260730-001/full/bop_eval/bop_result_sha256.json",
+      "status": "PASS"
+    }
+  ],
+  "experiment_id": "EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic",
+  "normalized_decision": null,
+  "notes": [],
+  "schema_version": 1,
+  "scope": "历史 full 产物、官方 checkpoint、BOP/ADD(-S) 与 FAIL 结论",
+  "status": "PASS",
+  "verified_at": "2026-08-08T09:29:24.192987+00:00",
+  "verified_git_commit": "4edab641cbe0aa43e9220d92d4f785a2b920cb31"
+}

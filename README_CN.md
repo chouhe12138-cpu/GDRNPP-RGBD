@@ -7,10 +7,11 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 ## 从这里开始
 
 1. 查看 [当前研究状态](research/STATUS_CN.md)。
-2. 需要运行、同步或恢复实验时查看 [实验与服务器运行手册](research/RUNBOOK_CN.md)。
-3. 需要服务器实时事实时查看
+2. 查看 [历史实验验收总表](research/HISTORICAL_ACCEPTANCE_CN.md)。
+3. 需要运行、同步或恢复实验时查看 [实验与服务器运行手册](research/RUNBOOK_CN.md)。
+4. 需要服务器实时事实时查看
    [服务器运行状态](research/SERVER_RUNTIME_STATUS_CN.md)，并重新执行其中的只读检查。
-4. 需要理解研究依据时依次查看研究计划、阶段协议和具体实验记录。
+5. 需要理解研究依据时依次查看研究计划、阶段协议和具体实验记录。
 
 ## 目录地图
 
@@ -28,6 +29,7 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 ## 状态和证据的关系
 
 - `research/STATUS_CN.md`：当前状态和下一步的中文摘要。
+- `research/HISTORICAL_ACCEPTANCE_CN.md`：EXP000～008 重新验证状态。
 - `research/RESEARCH_PLAN.md`：长期研究路线。
 - `research/DECISIONS.md`：协议变更及原因。
 - `research/stages/`：阶段级冻结协议。
