@@ -4,6 +4,7 @@
 
 | 实验 ID | 阶段 | 角色 | 状态 | 标题 |
 |---|---|---|---|---|
+| EXP-20260729-000-official-gdrnpp-baseline | Baseline | official baseline | COMPLETE | 官方 GDRNPP LM-O GT-box 基线 |
 | EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic | Stage 1 | diagnostic | COMPLETE | GDRNPP 位姿聚合诊断 |
 | EXP-20260731-002-gdrnpp-causal-oracle | Stage 2 | diagnostic | COMPLETE | GDRNPP 因果 Oracle 诊断 |
 | EXP-20260731-003-pbr-validation-calibration | Stage 3A | calibration | COMPLETE | LM-PBR 验证基础设施与校准 |

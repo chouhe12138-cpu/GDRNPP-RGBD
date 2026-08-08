@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-002-gdrnpp-causal-oracle",
+  "scope": "历史 full 产物、Stage 1 基线复现、Oracle 指标与 PASS_XYZ_GEOMETRY 结论",
+  "status_on_pass": "PASS_WITH_NOTE",
+  "normalized_decision": "PASS_XYZ_GEOMETRY",
+  "configs": ["configs/gdrn/lmo_pbr/convnext_a6_AugCosyAAEGray_BG05_mlL1_DMask_amodalClipBox_classAware_lmo.py"],
+  "checkpoints": [{"id": "official_lmo", "path": "pretrained_models/lmo_pbr/model_final_wo_optim.pth", "sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"}],
+  "required_paths": [{"path": "output/EXP-20260731-002/full", "type": "directory"}],
+  "json_checks": [
+    {"name": "raw_gate_status", "path": "output/EXP-20260731-002/full/oracle_summary.json", "pointer": ["conclusion", "status"], "expected": "PASS"},
+    {"name": "patch_instances", "path": "output/EXP-20260731-002/full/oracle_summary.json", "pointer": ["methods"], "selector": {"where": {"method": "patch_pnp"}, "field": "instances"}, "expected": 1445},
+    {"name": "stage1_patch_bop", "path": "output/EXP-20260731-002/full/oracle_summary.json", "pointer": ["methods"], "selector": {"where": {"method": "patch_pnp"}, "field": "bop_ar"}, "expected": 0.6902076124567474, "tolerance": 0.00005},
+    {"name": "gt_xyz_bop", "path": "output/EXP-20260731-002/full/oracle_summary.json", "pointer": ["methods"], "selector": {"where": {"method": "gt_gt_vis_ransac"}, "field": "bop_ar"}, "expected": 1.0, "tolerance": 0.00005},
+    {"name": "gt_xyz_add", "path": "output/EXP-20260731-002/full/oracle_summary.json", "pointer": ["methods"], "selector": {"where": {"method": "gt_gt_vis_ransac"}, "field": "add_s_0.1d_recall"}, "expected": 1.0, "tolerance": 0.0005}
+  ],
+  "csv_checks": [{"path": "output/EXP-20260731-002/full/per_instance.csv", "expected_rows": 17340}],
+  "hash_manifests": [{"path": "output/EXP-20260731-002/full/bop_eval/bop_result_sha256.json", "base": "output/EXP-20260731-002/full/bop_results"}],
+  "notes": ["原始 summary 使用通用 raw_status=PASS；依据 primary.factor=xyz_geometry，规范化研究结论为 PASS_XYZ_GEOMETRY。"]
+}

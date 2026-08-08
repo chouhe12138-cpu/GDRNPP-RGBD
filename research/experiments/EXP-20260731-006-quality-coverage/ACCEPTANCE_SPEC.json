@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-006-quality-coverage",
+  "scope": "本地 C1 pilot 与 formal 配置；Epoch 40 checkpoint、评估产物等待服务器只读核验",
+  "status_on_pass": "PASS_WITH_NOTE",
+  "configs": [
+    "configs/gdrn/lmo_pbr/convnext_stage3c1_quality_coverage_local_lmo.py",
+    "configs/gdrn/lmo_pbr/convnext_stage3c1_quality_coverage_lmo.py"
+  ],
+  "checkpoints": [
+    {"id": "official_lmo", "path": "pretrained_models/lmo_pbr/model_final_wo_optim.pth", "sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"},
+    {"id": "c1_local_final", "path": "output/EXP-20260731-006/quality_coverage_local/model_final.pth", "sha256": "d1c705ba2d4c2add18701a768599d0af68639ab0b70fb9d34e8c57301347eca2"},
+    {"id": "c1_epoch40_formal", "path": "/workspace/gdrnpp/output/EXP-20260731-006/quality_coverage_full/model_0255919.pth", "sha256": "d3ab7167f2fc5f6aab8d7e8444c5b816036bd64e38f647a26e994c8e91939aa6", "external": true}
+  ],
+  "required_paths": [
+    {"path": "output/EXP-20260731-006/quality_coverage_local/metrics.json"},
+    {"path": "/workspace/gdrnpp/output/EXP-20260731-006/quality_coverage_full", "type": "directory", "external": true}
+  ],
+  "json_checks": [
+    {"name": "c1_local_checkpoint_reload", "path": "research/historical_acceptance_runtime_evidence.json", "pointer": ["checks", "c1_local_checkpoint_reload", "status"], "expected": "PASS"},
+    {"name": "c1_official_tensors_bit_identical", "path": "research/historical_acceptance_runtime_evidence.json", "pointer": ["checks", "c1_local_checkpoint_reload", "official_tensors_bit_identical"], "expected": true}
+  ],
+  "notes": [
+    "formal Epoch 40 指标来自历史服务器记录，等待用户执行只读证据脚本。",
+    "历史 evaluator 曾混用 error:ad_ntop=* 与 error=ad_ntop=* 查找规则；原结果不覆盖。"
+  ]
+}

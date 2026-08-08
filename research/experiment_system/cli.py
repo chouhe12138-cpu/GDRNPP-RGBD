@@ -46,7 +46,9 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description=__doc__)
     sub = root.add_subparsers(dest="command", required=True)
 
-    registry = sub.add_parser("registry", help="validate or inspect experiment metadata")
+    registry = sub.add_parser(
+        "registry", help="validate or inspect experiment metadata"
+    )
     registry.add_argument("--experiments-root", type=Path, default=DEFAULT_EXPERIMENTS)
     registry.add_argument("--check", action="store_true")
     registry.add_argument(
@@ -60,7 +62,9 @@ def parser() -> argparse.ArgumentParser:
         default=PROJECT_ROOT / "research" / "EXPERIMENT_INDEX.md",
     )
 
-    assets = sub.add_parser("assets", help="resolve and validate a machine path profile")
+    assets = sub.add_parser(
+        "assets", help="resolve and validate a machine path profile"
+    )
     assets.add_argument("--profile", type=Path, required=True)
     assets.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     assets.add_argument("--asset", action="append", dest="asset_ids")
@@ -82,7 +86,9 @@ def parser() -> argparse.ArgumentParser:
     prepare = sub.add_parser("prepare", help="create a non-overwriting run directory")
     prepare.add_argument("--experiment", type=Path, required=True)
     prepare.add_argument("--config", type=Path, required=True)
-    prepare.add_argument("--mode", choices=("smoke", "audit", "formal", "diagnostic"), required=True)
+    prepare.add_argument(
+        "--mode", choices=("smoke", "audit", "formal", "diagnostic"), required=True
+    )
     prepare.add_argument("--seed", type=int, required=True)
     prepare.add_argument("--attempt", type=int, default=1)
     prepare.add_argument("--run-id")
@@ -93,7 +99,9 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--asset", action="append", dest="asset_ids")
     prepare.add_argument("--image-id")
     prepare.add_argument("--image-revision")
-    prepare.add_argument("--image", help="Docker image reference to inspect instead of manual identity")
+    prepare.add_argument(
+        "--image", help="Docker image reference to inspect instead of manual identity"
+    )
     prepare.add_argument("--docker-bin", type=Path, default=Path("/usr/bin/docker"))
     prepare.add_argument("--parent-run-id")
 
@@ -102,10 +110,14 @@ def parser() -> argparse.ArgumentParser:
     state.add_argument("--set", dest="new_state")
     state.add_argument("--message", default="state updated by experiment CLI")
 
-    step = sub.add_parser("step", help="register or transition train/eval/diagnostic steps")
+    step = sub.add_parser(
+        "step", help="register or transition train/eval/diagnostic steps"
+    )
     step.add_argument("run_dir", type=Path)
     step.add_argument("--step-id", required=True)
-    step.add_argument("--kind", choices=("train", "eval", "diagnostic", "summarize", "verify"))
+    step.add_argument(
+        "--kind", choices=("train", "eval", "diagnostic", "summarize", "verify")
+    )
     step.add_argument("--command-line")
     step.add_argument("--set", dest="new_state")
     step.add_argument("--message", default="step metadata updated")
@@ -113,21 +125,42 @@ def parser() -> argparse.ArgumentParser:
     step.add_argument("--output", action="append", dest="outputs")
     step.add_argument("--complete-run", action="store_true")
 
-    evaluation = sub.add_parser("index-evaluation", help="index raw BOP evaluator results")
+    evaluation = sub.add_parser(
+        "index-evaluation", help="index raw BOP evaluator results"
+    )
     evaluation.add_argument("evaluation_root", type=Path)
     evaluation.add_argument("--dataset", required=True)
     evaluation.add_argument("--bbox-type", choices=("gt", "det"), required=True)
     evaluation.add_argument("--checkpoint", required=True)
     evaluation.add_argument("--check-only", action="store_true")
 
-    verify = sub.add_parser("verify-run", help="validate run metadata and indexed evaluations")
+    verify = sub.add_parser(
+        "verify-run", help="validate run metadata and indexed evaluations"
+    )
     verify.add_argument("run_dir", type=Path)
 
-    compare = sub.add_parser("compare", help="compare normalized result to a frozen baseline")
+    compare = sub.add_parser(
+        "compare", help="compare normalized result to a frozen baseline"
+    )
     compare.add_argument("--experiment", type=Path, required=True)
     compare.add_argument("--baseline", type=Path, required=True)
     compare.add_argument("--result", type=Path, required=True)
     compare.add_argument("--output", type=Path, required=True)
+
+    acceptance = sub.add_parser(
+        "accept-history", help="verify legacy evidence without overwriting raw outputs"
+    )
+    acceptance.add_argument(
+        "--experiments-root", type=Path, default=DEFAULT_EXPERIMENTS
+    )
+    acceptance.add_argument("--experiment", action="append", dest="experiment_ids")
+    acceptance.add_argument("--write", action="store_true")
+    acceptance.add_argument("--repo-root", type=Path, default=PROJECT_ROOT)
+    acceptance.add_argument(
+        "--index",
+        type=Path,
+        default=PROJECT_ROOT / "research" / "HISTORICAL_ACCEPTANCE_CN.md",
+    )
 
     sub.add_parser("metrics", help="print canonical metric definitions")
     return root
@@ -172,7 +205,9 @@ def command_audit(args: argparse.Namespace) -> int:
 def command_verify_freeze(args: argparse.Namespace) -> int:
     from .freeze import verify_active_freeze
 
-    print_json(verify_active_freeze(args.repo_root.resolve(), args.freeze_file.resolve()))
+    print_json(
+        verify_active_freeze(args.repo_root.resolve(), args.freeze_file.resolve())
+    )
     return 0
 
 
@@ -187,9 +222,7 @@ def command_prepare(args: argparse.Namespace) -> int:
 
     from .config_contract import validate_config_contract
 
-    planned_run_dir = (
-        args.output_root.resolve() / experiment["experiment_id"] / run_id
-    )
+    planned_run_dir = args.output_root.resolve() / experiment["experiment_id"] / run_id
     resolved_config = Config.fromfile(str(args.config.resolve()))
     validate_config_contract(
         experiment,
@@ -210,7 +243,9 @@ def command_prepare(args: argparse.Namespace) -> int:
     image_revision = args.image_revision
     if args.image:
         if image_id or image_revision:
-            raise ValueError("use --image or manual --image-id/--image-revision, not both")
+            raise ValueError(
+                "use --image or manual --image-id/--image-revision, not both"
+            )
         from .docker_image import inspect_docker_image
 
         image_identity = inspect_docker_image(args.image, args.docker_bin)
@@ -256,7 +291,9 @@ def command_prepare(args: argparse.Namespace) -> int:
 
 def command_state(args: argparse.Namespace) -> int:
     if args.new_state:
-        result = transition_run_state(args.run_dir.resolve(), args.new_state, args.message)
+        result = transition_run_state(
+            args.run_dir.resolve(), args.new_state, args.message
+        )
     else:
         result = read_run_state(args.run_dir.resolve())
     print_json(result)
@@ -310,7 +347,9 @@ def command_verify_run(args: argparse.Namespace) -> int:
     snapshot = run_dir / "meta" / "config_snapshot.py"
     if not snapshot.is_file():
         raise FileNotFoundError(f"config snapshot is missing: {snapshot}")
-    resolved = run_dir / manifest["config"].get("resolved_path", "meta/resolved_config.py")
+    resolved = run_dir / manifest["config"].get(
+        "resolved_path", "meta/resolved_config.py"
+    )
     if not resolved.is_file():
         raise FileNotFoundError(f"resolved config is missing: {resolved}")
     from .manifest import sha256_file
@@ -320,7 +359,9 @@ def command_verify_run(args: argparse.Namespace) -> int:
     if sha256_file(resolved) != manifest["config"].get("resolved_sha256"):
         raise RuntimeError("resolved config differs from the run manifest")
     checked_evaluations = 0
-    for index_path in sorted((run_dir / "evaluations").glob("*/*/evaluation_index.json")):
+    for index_path in sorted(
+        (run_dir / "evaluations").glob("*/*/evaluation_index.json")
+    ):
         verify_indexed_evaluation(index_path.parent)
         checked_evaluations += 1
     checked_checkpoints = verify_checkpoint_index(run_dir)
@@ -359,6 +400,63 @@ def command_compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_accept_history(args: argparse.Namespace) -> int:
+    from .acceptance import (
+        current_commit,
+        evaluate_acceptance,
+        render_acceptance_index,
+        write_acceptance,
+    )
+    from .manifest import collect_git_provenance
+
+    repo_root = args.repo_root.resolve()
+    specs = sorted(args.experiments_root.resolve().glob("*/ACCEPTANCE_SPEC.json"))
+    if args.experiment_ids:
+        requested = set(args.experiment_ids)
+        specs = [path for path in specs if path.parent.name in requested]
+        found = {path.parent.name for path in specs}
+        missing = requested - found
+        if missing:
+            raise FileNotFoundError(f"acceptance specs not found: {sorted(missing)}")
+    if not specs:
+        raise FileNotFoundError("no acceptance specs found")
+    if args.write:
+        source = collect_git_provenance(repo_root)
+        if source["git_dirty"]:
+            raise RuntimeError(
+                "writing acceptance results requires a clean Git worktree"
+            )
+        for spec in specs:
+            if (spec.parent / "ACCEPTANCE.json").exists() or (
+                spec.parent / "ACCEPTANCE_CN.md"
+            ).exists():
+                raise FileExistsError(
+                    f"acceptance output already exists: {spec.parent}"
+                )
+        if args.index.exists():
+            raise FileExistsError(f"acceptance index already exists: {args.index}")
+
+    commit = current_commit(repo_root)
+    results = [evaluate_acceptance(spec, repo_root, commit) for spec in specs]
+    if args.write:
+        for spec, result in zip(specs, results):
+            write_acceptance(spec, result)
+        args.index.write_text(render_acceptance_index(results), encoding="utf-8")
+    print_json(
+        {
+            "schema_version": 1,
+            "status": (
+                "CONFLICT"
+                if any(result["status"] == "CONFLICT" for result in results)
+                else "PASS"
+            ),
+            "write": bool(args.write),
+            "results": results,
+        }
+    )
+    return 2 if any(result["status"] == "CONFLICT" for result in results) else 0
+
+
 def main() -> int:
     args = parser().parse_args()
     commands = {
@@ -373,6 +471,7 @@ def main() -> int:
         "index-evaluation": command_index_evaluation,
         "verify-run": command_verify_run,
         "compare": command_compare,
+        "accept-history": command_accept_history,
         "metrics": lambda _args: (print_json(metric_registry_payload()) or 0),
     }
     return commands[args.command](args)

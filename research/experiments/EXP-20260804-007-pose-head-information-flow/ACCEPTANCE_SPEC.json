@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260804-007-pose-head-information-flow",
+  "scope": "official/full 完整产物；C1/B/C2 同协议诊断保持待完成",
+  "status_on_pass": "PASS_WITH_NOTE",
+  "configs": ["configs/gdrn/lmo_pbr/convnext_stage3c1_official_gt_lmo.py"],
+  "checkpoints": [{"id": "official_lmo", "path": "pretrained_models/lmo_pbr/model_final_wo_optim.pth", "sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"}],
+  "required_paths": [
+    {"path": "output/EXP-20260804-007-pose-head-information-flow/official/full", "type": "directory"},
+    {"path": "output/EXP-20260804-007-pose-head-information-flow/c1/full", "type": "directory", "external": true},
+    {"path": "output/EXP-20260804-007-pose-head-information-flow/c2/full", "type": "directory", "external": true}
+  ],
+  "json_checks": [
+    {"name": "shared_official_cpu_inference_smoke", "path": "research/historical_acceptance_runtime_evidence.json", "pointer": ["checks", "official_cpu_inference_smoke", "status"], "expected": "PASS"},
+    {"name": "processed_targets", "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/quality_control.json", "pointer": ["processed_targets"], "expected": 1445},
+    {"name": "conditions", "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/quality_control.json", "pointer": ["conditions"], "expected": 14},
+    {"name": "quality_gate", "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/quality_control.json", "pointer": ["passed"], "expected": true},
+    {"name": "baseline_bop", "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/bop_score_summary.json", "pointer": ["scores", "baseline"], "expected": 0.6904152249134947, "tolerance": 0.00005}
+  ],
+  "hash_manifests": [{"path": "output/EXP-20260804-007-pose-head-information-flow/official/full/hashes.sha256", "base": "output/EXP-20260804-007-pose-head-information-flow/official/full"}],
+  "notes": ["当前验收只覆盖 official/full；不因 C1/B/C2 缺失改变既有 official 结论。"]
+}

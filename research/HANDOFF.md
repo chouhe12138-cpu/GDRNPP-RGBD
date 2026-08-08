@@ -190,7 +190,7 @@ conda run -n pytorch22 python -m pytest -q \
 ```
 
 Current result including the experiment-management, Stage 3C runtime, and
-pose-head diagnostic coverage: `98 passed` (verified 2026-08-08 in Conda
+pose-head diagnostic coverage: `100 passed` (verified 2026-08-08 in Conda
 `pytorch22`).
 
 Official checkpoint SHA-256:

@@ -22,7 +22,12 @@ python -m research.experiment_system.cli metrics
 python -m research.experiment_system.cli source
 python -m research.experiment_system.cli audit
 python -m research.experiment_system.cli verify-freeze
+python -m research.experiment_system.cli accept-history
 ```
+
+`accept-history` 默认只读检查 EXP000～EXP008 的现有证据。只有在工作树干净且
+确认 dry-run 无 `CONFLICT` 后才使用 `--write`；写入时为每个实验生成独立
+`ACCEPTANCE.json`/`ACCEPTANCE_CN.md`，不修改原 `RECORD.md` 和历史 output。
 
 机器路径 profile 从 `path_profile.example.json` 复制到 Git 忽略的
 `.local/path_profiles/<machine>.json`，不得在其中保存凭据。

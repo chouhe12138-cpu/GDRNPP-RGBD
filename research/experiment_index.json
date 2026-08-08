@@ -1,6 +1,16 @@
 {
-  "experiment_count": 8,
+  "experiment_count": 9,
   "experiments": [
+    {
+      "decision": "BASELINE_VERIFIED",
+      "experiment_id": "EXP-20260729-000-official-gdrnpp-baseline",
+      "legacy_import": true,
+      "metadata_path": "research/experiments/EXP-20260729-000-official-gdrnpp-baseline/EXPERIMENT.json",
+      "role": "official baseline",
+      "stage": "Baseline",
+      "status": "COMPLETE",
+      "title": "官方 GDRNPP LM-O GT-box 基线"
+    },
     {
       "decision": "FAIL",
       "experiment_id": "EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic",

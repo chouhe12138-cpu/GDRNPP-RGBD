@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "verified_on": "2026-08-08",
+  "model_code_commit": "a60856ee112aae8db0581939ce908256bdefee63",
+  "environment": {
+    "conda": "pytorch22",
+    "cuda_available": false,
+    "note": "GPU smoke 保留给统一服务器环境；本轮只执行 CPU 低风险验收。"
+  },
+  "checks": {
+    "official_cpu_inference_smoke": {
+      "status": "PASS",
+      "dataset": "lmo_bop_test",
+      "bbox_type": "gt",
+      "processed_targets": 1,
+      "checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+      "output": "/tmp/gdrnpp-history-acceptance-official-smoke",
+      "historical_output_modified": false
+    },
+    "b_official_model_load": {
+      "status": "PASS",
+      "missing_official_tensors": 0,
+      "trainable_tensors": 17,
+      "pnp_lr": 0.00008
+    },
+    "c2_official_model_load": {
+      "status": "PASS",
+      "missing_quality_coverage_tensors": 9,
+      "trainable_tensors": 26,
+      "pnp_lr": 0.00008,
+      "quality_lr": 0.0008
+    },
+    "b_local_checkpoint_isolation": {
+      "status": "PASS",
+      "checkpoint_sha256": "dc0ad1969967aead9e554b3ac42e7941e1475d8fb8e9c872aa57e96231853b9b",
+      "official_tensor_count": 392,
+      "changed_pnp_tensors": 17,
+      "changed_frozen_tensors": 0
+    },
+    "c1_local_checkpoint_reload": {
+      "status": "PASS",
+      "checkpoint_sha256": "d1c705ba2d4c2add18701a768599d0af68639ab0b70fb9d34e8c57301347eca2",
+      "strict_checkpoint_reload": true,
+      "official_tensors_bit_identical": true,
+      "new_quality_coverage_tensors": 9,
+      "final_iteration_zero_based": 2047,
+      "finite_losses": true
+    }
+  }
+}

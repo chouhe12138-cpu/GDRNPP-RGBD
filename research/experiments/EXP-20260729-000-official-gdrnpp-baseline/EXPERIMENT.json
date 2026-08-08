@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260729-000-official-gdrnpp-baseline",
+  "title": "官方 GDRNPP LM-O GT-box 基线",
+  "stage": "Baseline",
+  "role": "official baseline",
+  "status": "COMPLETE",
+  "legacy_import": true,
+  "decision": "BASELINE_VERIFIED",
+  "protocol": {
+    "dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "parameter_updates": 0,
+    "metrics": ["bop19_ar_macro", "add_s_0.1d_micro_target"]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "config": "configs/gdrn/lmo_pbr/convnext_stage3c1_official_gt_lmo.py",
+    "shared_official_output": "output/EXP-20260804-007-pose-head-information-flow/official/full",
+    "checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"
+  }
+}

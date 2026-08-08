@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260729-000-official-gdrnpp-baseline",
+  "scope": "官方 checkpoint、GT-box config 与 EXP007 共享完整基线产物",
+  "status_on_pass": "PASS_WITH_NOTE",
+  "configs": [
+    "configs/gdrn/lmo_pbr/convnext_stage3c1_official_gt_lmo.py"
+  ],
+  "checkpoints": [
+    {
+      "id": "official_lmo",
+      "path": "pretrained_models/lmo_pbr/model_final_wo_optim.pth",
+      "sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"
+    }
+  ],
+  "required_paths": [
+    {"path": "research/historical_acceptance_runtime_evidence.json"},
+    {
+      "path": "output/EXP-20260804-007-pose-head-information-flow/official/full",
+      "type": "directory"
+    }
+  ],
+  "json_checks": [
+    {
+      "name": "official_cpu_inference_smoke",
+      "path": "research/historical_acceptance_runtime_evidence.json",
+      "pointer": ["checks", "official_cpu_inference_smoke", "status"],
+      "expected": "PASS"
+    },
+    {
+      "name": "processed_targets",
+      "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/quality_control.json",
+      "pointer": ["processed_targets"],
+      "expected": 1445
+    },
+    {
+      "name": "official_bop_reproduced",
+      "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/quality_control.json",
+      "pointer": ["official_bop_reproduced"],
+      "expected": true
+    },
+    {
+      "name": "bop19_ar_macro",
+      "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/bop_score_summary.json",
+      "pointer": ["scores", "baseline"],
+      "expected": 0.6904152249134947,
+      "tolerance": 0.00005
+    },
+    {
+      "name": "add_s_0.1d_micro_target",
+      "path": "output/EXP-20260804-007-pose-head-information-flow/official/full/quality_control.json",
+      "pointer": ["baseline_add_s_0.1d_recall"],
+      "expected": 0.5051903114186851,
+      "tolerance": 0.0005
+    }
+  ],
+  "notes": [
+    "复用 EXP007 official/full，不重复生成完整基线推理。",
+    "ADD(-S) micro-target 不与 C1 历史 macro-object 结果直接比较。"
+  ]
+}

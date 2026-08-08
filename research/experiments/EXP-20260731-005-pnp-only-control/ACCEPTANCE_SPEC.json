@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-005-pnp-only-control",
+  "scope": "本地 PnP-only pilot、checkpoint 与参数隔离；B formal 保持未启动",
+  "status_on_pass": "PASS_WITH_NOTE",
+  "configs": [
+    "configs/gdrn/lmo_pbr/convnext_stage3c0_pnp_only_local_lmo.py",
+    "configs/gdrn/lmo_pbr/convnext_stage3c0_pnp_only_lmo.py"
+  ],
+  "checkpoints": [
+    {"id": "official_lmo", "path": "pretrained_models/lmo_pbr/model_final_wo_optim.pth", "sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"},
+    {"id": "pnp_local_final", "path": "output/EXP-20260731-005/pnp_only_local/model_final.pth", "sha256": "dc0ad1969967aead9e554b3ac42e7941e1475d8fb8e9c872aa57e96231853b9b"}
+  ],
+  "required_paths": [
+    {"path": "output/EXP-20260731-005/pnp_only_local/metrics.json"},
+    {"path": "output/stage3c/B_patch_pnp", "type": "directory", "external": true}
+  ],
+  "json_checks": [
+    {"name": "b_official_model_load", "path": "research/historical_acceptance_runtime_evidence.json", "pointer": ["checks", "b_official_model_load", "status"], "expected": "PASS"},
+    {"name": "b_local_checkpoint_isolation", "path": "research/historical_acceptance_runtime_evidence.json", "pointer": ["checks", "b_local_checkpoint_isolation", "status"], "expected": "PASS"},
+    {"name": "local_pilot_status", "path": "output/EXP-20260731-005/pnp_only_local/local_pilot_summary.json", "pointer": ["status"], "expected": "PASS"},
+    {"name": "all_losses_finite", "path": "output/EXP-20260731-005/pnp_only_local/local_pilot_summary.json", "pointer": ["all_losses_finite"], "expected": true},
+    {"name": "last_iteration", "path": "output/EXP-20260731-005/pnp_only_local/local_pilot_summary.json", "pointer": ["last_iteration"], "expected": 2047}
+  ],
+  "notes": ["B formal 不启动；是否取消等待 C2 Epoch 40 后由用户决定。"]
+}

@@ -34,15 +34,15 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 ## 已验证的本地状态
 
 - Git HEAD：`25fb5e3cd2c8dd10681f539eef399c40468130db`。
-- 研究相关测试：`98 passed`（含新增实验管理基础设施）。
+- 研究相关测试：`100 passed`（含实验管理与历史验收基础设施）。
 - B 和 C2 正式 config preflight：PASS。
 - 官方初始化权重 SHA-256：
   `bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c`。
 
 ## 已知记录问题
 
-- Docker 历史构建记录中的 `43 passed` 是当时快照；当前本地完整基线为 `98 passed`。
-- EXP-001～008 已纳入统一 experiment 索引；其中 EXP-008 是已触发但尚待实时
+- Docker 历史构建记录中的 `43 passed` 是当时快照；当前本地完整基线为 `100 passed`。
+- EXP-000～008 已纳入统一 experiment 索引；其中 EXP-008 是已触发但尚待实时
   核验运行状态的 C2。
 - C1 正式 raw checkpoint/日志主要保存在服务器或外部 Windows 路径，本地仓库
   只有记录、哈希和部分 pilot 产物。

@@ -3,6 +3,12 @@
   "note": "只读历史定位表；路径存在性和服务器状态必须在使用时重新核验。",
   "experiments": [
     {
+      "experiment_id": "EXP-20260729-000-official-gdrnpp-baseline",
+      "artifacts": [
+        {"mode": "shared_official_full", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260804-007-pose-head-information-flow/official/full"}
+      ]
+    },
+    {
       "experiment_id": "EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic",
       "artifacts": [
         {"mode": "formal", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260730-001/full"}
