@@ -44,8 +44,9 @@ git switch --detach <40位commit>
 git rev-parse HEAD
 ```
 
-不得在正在运行旧实验的代码目录中 pull 或切换版本。需要临时并存时使用独立
-`git worktree`，旧实验封存后再由用户确认是否移除。
+不得在正在运行旧实验的代码目录中 pull 或切换版本。EXP005/EXP009 使用
+`releases/GDRNPP-RGBD-<short-commit>` 全新 clone，并 checkout 指定 commit；
+旧 dirty repo 和运行目录保持不动。
 
 ## 正式实验冻结条件
 
@@ -56,7 +57,7 @@ git rev-parse HEAD
 - 数据、VOC、baseline 和 renderer 检查通过；
 - smoke/audit gate 满足对应协议；
 - 输出目录不存在；
-- GPU 空闲且没有同角色重复 formal；
+- 已记录启动时 GPU 占用，且没有同容器/同角色的重复 formal；
 - manifest 已记录 experiment ID、run ID、seed 和环境。
 
 正式启动后不 pull、重建镜像、替换容器或修改 config。失败运行不删除，标记
@@ -70,9 +71,54 @@ git rev-parse HEAD
 - `summarize`：读取标准化指标并执行预注册 gate。
 - `verify`：校验 manifest、哈希、参数隔离和产物完整性。
 
-当前 B/C2 继续使用已经冻结的 `docker/l40/lab0_b.sh`、
-`docker/l40/lab1_c2.sh` 和 `research/stage3c_runtime/`；新统一入口不接管未完成的
-正式实验。
+当前正在运行的 C2 继续使用已经冻结的 `docker/l40/lab1_c2.sh` 和
+`research/stage3c_runtime/`。新的 EXP005/EXP009 run 使用受管入口；它不接管
+或修改 C2。
+
+## EXP005 / EXP009 受管入口
+
+新 run 的随机种子统一固定为 `42`。run ID 的 UTC 时间只负责目录唯一性，不
+参与随机数初始化。历史 run 保留原 seed。
+
+```bash
+docker/l40/managed_experiment.sh lab0 EXP005 access
+docker/l40/managed_experiment.sh lab0 EXP005 create
+docker/l40/managed_experiment.sh lab0 EXP005 gate
+docker/l40/managed_experiment.sh lab0 EXP005 smoke
+docker/l40/managed_experiment.sh lab0 EXP005 audit48
+docker/l40/managed_experiment.sh lab0 EXP005 launch
+```
+
+`smoke` 和 `audit48` 是后台 run，前一步显示 `COMPLETE` 后才能启动下一步：
+
+```bash
+docker/l40/managed_experiment.sh lab0 EXP005 status
+```
+
+EXP009 只在 C2 Epoch 40 完成、结果核验且旧 `lab1_chx` 封存后运行：
+
+```bash
+docker/l40/managed_experiment.sh lab1 EXP009 access
+docker/l40/managed_experiment.sh lab1 EXP009 create
+docker/l40/managed_experiment.sh lab1 EXP009 gate
+docker/l40/managed_experiment.sh lab1 EXP009 smoke
+docker/l40/managed_experiment.sh lab1 EXP009 audit48
+docker/l40/managed_experiment.sh lab1 EXP009 launch
+```
+
+`launch` 每 15 分钟检查 formal 状态；只有明确 CUDA OOM 才在保留失败 attempt
+后等待 10 分钟重试。其他错误停止重试。GPU 上存在其他进程只记录快照，不
+自动杀进程，也不单凭“非空闲”取消实验。
+
+成功训练后执行：
+
+```bash
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP005|EXP009> finalize
+```
+
+正式日志只保存 setup、每 500 iteration/epoch 的关键 loss、checkpoint、评估、
+warning 和异常。完整配置、环境、指标和 warning 计数分别保存为结构化文件；
+不保存 TensorBoard、完整模型文本或 DEBUG 级冗余信息。
 
 ## 服务器安全
 

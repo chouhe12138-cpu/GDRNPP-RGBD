@@ -26,7 +26,11 @@ def load_state(path: Path) -> dict[str, torch.Tensor]:
 
 
 def compare_states(role: str, official, trained) -> dict[str, object]:
-    allowed = ("pnp_net.",) if role == "B" else ("pnp_net.", "quality_coverage_net.")
+    allowed = (
+        ("pnp_net.", "quality_coverage_net.")
+        if role == "C2"
+        else ("pnp_net.",)
+    )
     shared = sorted(set(official) & set(trained))
     changed_allowed = []
     changed_frozen = []
@@ -50,7 +54,7 @@ def compare_states(role: str, official, trained) -> dict[str, object]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("role", choices=("B", "C2"))
+    parser.add_argument("role", choices=("B", "C2", "CPM"))
     parser.add_argument("--official", type=Path, required=True)
     parser.add_argument("--trained", type=Path, required=True)
     return parser.parse_args()
@@ -61,9 +65,14 @@ def main() -> int:
     official = load_state(args.official)
     trained = load_state(args.trained)
     result = compare_states(args.role, official, trained)
-    if result["changed_frozen"] or result["removed"]:
+    unexpected_removed = result["removed"]
+    if args.role == "CPM":
+        unexpected_removed = [
+            name for name in result["removed"] if not name.startswith("pnp_net.")
+        ]
+    if result["changed_frozen"] or unexpected_removed:
         raise RuntimeError(f"Frozen checkpoint isolation failed: {result}")
-    if not result["changed_allowed"]:
+    if not result["changed_allowed"] and not result["added"]:
         raise RuntimeError("No allowed trainable tensor changed")
     if args.role == "B" and result["added"]:
         raise RuntimeError(f"B unexpectedly added tensors: {result['added']}")
@@ -72,6 +81,12 @@ def main() -> int:
         or not all(name.startswith("quality_coverage_net.") for name in result["added"])
     ):
         raise RuntimeError(f"C2 added unexpected tensors: {result['added']}")
+    if args.role == "CPM" and (
+        not result["added"]
+        or not all(name.startswith("pnp_net.") for name in result["added"])
+        or not all(name.startswith("pnp_net.") for name in result["removed"])
+    ):
+        raise RuntimeError(f"CPM changed unexpected checkpoint tensors: {result}")
     result.update(
         {
             "status": "PASS",

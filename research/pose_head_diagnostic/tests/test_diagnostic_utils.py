@@ -3,12 +3,14 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 import numpy as np
 import torch
 
 from core.gdrn_modeling.models.heads.conv_pnp_net import ConvPnPNet
+from core.gdrn_modeling.models.heads.cpm_pnp_net import CorrespondenceAwareMomentPnPNet
 from research.pose_aggregation.metrics import pose_metrics
 from research.pose_head_diagnostic.analyze_existing import analyze
 from research.pose_head_diagnostic.diagnostic_utils import (
@@ -19,6 +21,12 @@ from research.pose_head_diagnostic.diagnostic_utils import (
     tensor_state_sha256,
 )
 from research.pose_head_diagnostic.run_statistical_diagnostic import POSE_METRICS
+from research.pose_head_diagnostic.run_information_flow import (
+    CPM_EXTRA_CONDITIONS,
+    apply_cpm_diagnostic_intervention,
+    apply_cpm_moment_intervention,
+    conditions_for_model,
+)
 from research.pose_head_diagnostic.revalidate_full import assess_full_quality_control
 from research.pose_head_diagnostic.statistical_utils import (
     aggregate_scalar_records,
@@ -83,6 +91,50 @@ class DiagnosticUtilsTest(unittest.TestCase):
         original_values = self.xyz[self.support].reshape(-1)
         changed_values = first[self.support].reshape(-1)
         np.testing.assert_array_equal(np.sort(original_values), np.sort(changed_values))
+
+    def test_cpm_specific_conditions_are_explicit_and_non_learned(self):
+        cpm = CorrespondenceAwareMomentPnPNet()
+        cpm_conditions = conditions_for_model(SimpleNamespace(pnp_net=cpm))
+        self.assertEqual(cpm_conditions[: len(CONDITIONS)], CONDITIONS)
+        self.assertEqual(cpm_conditions[len(CONDITIONS) :], CPM_EXTRA_CONDITIONS)
+        self.assertEqual(
+            conditions_for_model(SimpleNamespace(pnp_net=object())), CONDITIONS
+        )
+
+        xyz, roi, region, moment_condition = apply_cpm_diagnostic_intervention(
+            self.xyz,
+            self.gt,
+            self.roi,
+            self.region,
+            self.support,
+            "gt_xyz_alpha_025",
+            7,
+        )
+        np.testing.assert_allclose(
+            xyz[self.support],
+            0.75 * self.xyz[self.support] + 0.25 * self.gt[self.support],
+        )
+        np.testing.assert_array_equal(xyz[~self.support], self.xyz[~self.support])
+        np.testing.assert_array_equal(roi, self.roi)
+        np.testing.assert_array_equal(region, self.region)
+        self.assertIsNone(moment_condition)
+
+        raw = torch.arange(2 * 64 * 21, dtype=torch.float32).reshape(2, 64, 21)
+        scaled = cpm._apply_moment_scales(raw)
+        coverage_raw, coverage_scaled = apply_cpm_moment_intervention(
+            cpm, raw, scaled, "coverage_only"
+        )
+        torch.testing.assert_close(coverage_raw[..., 0], raw[..., 0])
+        self.assertEqual(int(torch.count_nonzero(coverage_raw[..., 1:])), 0)
+        torch.testing.assert_close(
+            coverage_scaled, cpm._apply_moment_scales(coverage_raw)
+        )
+
+        no_cross_raw, _ = apply_cpm_moment_intervention(
+            cpm, raw, scaled, "cxu_null"
+        )
+        torch.testing.assert_close(no_cross_raw[..., :15], raw[..., :15])
+        self.assertEqual(int(torch.count_nonzero(no_cross_raw[..., 15:21])), 0)
 
     def test_statistical_summary(self):
         summary = summarize_values(

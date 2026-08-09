@@ -90,11 +90,12 @@ def discover_bop_scores(evaluation_root: Path) -> tuple[Path, Path]:
     )
     result_root = bop_path.parent
     add_candidates: list[Path] = []
-    for pattern in (
-        "error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json",
-        "error:ad_ntop:*/scores_th=0.100_min-visib=-1.000.json",
-    ):
-        add_candidates.extend(result_root.glob(pattern))
+    for directory_pattern in ("error=ad_ntop=*", "error:ad_ntop:*"):
+        for score_name in (
+            "scores_th=0.100_min-visib=-1.000.json",
+            "scores_th:0.100_min-visib:-1.000.json",
+        ):
+            add_candidates.extend(result_root.glob(f"{directory_pattern}/{score_name}"))
     add_path = _exactly_one(add_candidates, "ADD(-S)@0.1d score")
     return bop_path, add_path
 
@@ -113,10 +114,17 @@ def index_bop_evaluation(
     bop = json.loads(bop_path.read_text(encoding="utf-8"))
     add = json.loads(add_path.read_text(encoding="utf-8"))
     bop_value = float(bop["bop19_average_recall"])
-    add_value = float(add["recall"])
+    if "mean_obj_recall" not in add:
+        raise ValueError(
+            "ADD(-S) score is missing mean_obj_recall; refusing to label "
+            "target-level recall as macro-object recall"
+        )
+    add_macro_value = float(add["mean_obj_recall"])
+    add_micro_value = float(add["recall"])
     for metric_id, value in (
         ("bop19_ar_macro", bop_value),
-        ("add_s_0.1d_macro_object", add_value),
+        ("add_s_0.1d_macro_object", add_macro_value),
+        ("add_s_0.1d_micro_target", add_micro_value),
     ):
         if not 0.0 <= value <= 1.0:
             raise ValueError(f"{metric_id} must be stored as a fraction in [0, 1], got {value}")
@@ -149,10 +157,18 @@ def index_bop_evaluation(
                 "source": "bop19",
             },
             "add_s_0.1d_macro_object": {
-                "value": add_value,
+                "value": add_macro_value,
                 "unit": "ratio",
                 "source": "add_s_0.1d",
                 "object_recalls": add.get("obj_recalls", {}),
+            },
+            "add_s_0.1d_micro_target": {
+                "value": add_micro_value,
+                "unit": "ratio",
+                "source": "add_s_0.1d",
+                "targets_count": add.get("targets_count"),
+                "gt_count": add.get("gt_count"),
+                "tp_count": add.get("tp_count"),
             },
         },
     }

@@ -288,3 +288,44 @@ class MyJSONWriter(EventWriter):
 
     def close(self):
         self._file_handle.close()
+
+
+class EpochJSONWriter(EventWriter):
+    """Write one compact scalar summary at each completed training epoch."""
+
+    def __init__(self, json_file, iters_per_epoch, window_size=20):
+        self._file_handle = PathManager.open(json_file, "a")
+        self._iters_per_epoch = int(iters_per_epoch)
+        self._window_size = int(window_size)
+        self._last_epoch = 0
+
+    def write(self):
+        storage = get_event_storage()
+        iteration = int(storage.iter)
+        if (iteration + 1) % self._iters_per_epoch != 0:
+            return
+        epoch = (iteration + 1) // self._iters_per_epoch
+        if epoch <= self._last_epoch:
+            return
+        payload = {
+            "epoch": epoch,
+            "iteration": iteration,
+        }
+        latest = storage.latest_with_smoothing_hint(self._window_size)
+        payload.update(
+            {
+                key: value_and_iteration[0]
+                for key, value_and_iteration in latest.items()
+                if key not in {"epoch", "iteration"}
+            }
+        )
+        self._file_handle.write(json.dumps(payload, sort_keys=True) + "\n")
+        self._file_handle.flush()
+        try:
+            os.fsync(self._file_handle.fileno())
+        except AttributeError:
+            pass
+        self._last_epoch = epoch
+
+    def close(self):
+        self._file_handle.close()

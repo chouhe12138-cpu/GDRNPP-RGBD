@@ -37,7 +37,12 @@ from lib.torch_utils.misc import nan_to_num
 from core.utils import solver_utils
 import core.utils.my_comm as comm
 from core.utils.my_checkpoint import MyCheckpointer
-from core.utils.my_writer import MyCommonMetricPrinter, MyJSONWriter, MyTensorboardXWriter
+from core.utils.my_writer import (
+    EpochJSONWriter,
+    MyCommonMetricPrinter,
+    MyJSONWriter,
+    MyTensorboardXWriter,
+)
 from core.utils.utils import get_emb_show
 from core.utils.data_utils import denormalize_image
 from core.gdrn_modeling.datasets.data_loader import build_gdrn_train_loader, build_gdrn_test_loader
@@ -72,16 +77,14 @@ def load_bop_selection_metrics(eval_out_dir):
 
     result_dir = osp.dirname(score_paths[0])
     add_paths = []
-    for pattern in ("error=ad_ntop=*", "error:ad_ntop:*"):
-        add_paths.extend(
-            glob.glob(
-                osp.join(
-                    result_dir,
-                    pattern,
-                    "scores_th=0.100_min-visib=-1.000.json",
-                )
+    for directory_pattern in ("error=ad_ntop=*", "error:ad_ntop:*"):
+        for score_name in (
+            "scores_th=0.100_min-visib=-1.000.json",
+            "scores_th:0.100_min-visib:-1.000.json",
+        ):
+            add_paths.extend(
+                glob.glob(osp.join(result_dir, directory_pattern, score_name))
             )
-        )
     add_paths = sorted(set(add_paths))
     if len(add_paths) == 1:
         with open(add_paths[0], "r") as handle:
@@ -379,6 +382,13 @@ class GDRN_Lite(LightningLite):
                 MyCommonMetricPrinter(max_iter),
                 MyJSONWriter(osp.join(train_dir, metrics_name)),
             ]
+            if structured_layout_enabled(cfg):
+                writers.append(
+                    EpochJSONWriter(
+                        osp.join(train_dir, "epoch_summary.jsonl"),
+                        iters_per_epoch,
+                    )
+                )
             if tbx_event_writer is not None:
                 writers.append(tbx_event_writer)
         else:

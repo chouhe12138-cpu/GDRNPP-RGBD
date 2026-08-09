@@ -30,6 +30,9 @@ from core.gdrn_modeling.datasets.data_loader import build_gdrn_test_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
 from core.gdrn_modeling.engine.engine_utils import batch_data, get_out_coor, get_out_mask
 from core.gdrn_modeling.models import GDRN_double_mask
+from core.gdrn_modeling.models.heads.cpm_pnp_net import (
+    CorrespondenceAwareMomentPnPNet,
+)
 from core.gdrn_modeling.models.model_utils import get_rot_mat
 from core.gdrn_modeling.models.pose_from_pred import pose_from_pred
 from core.gdrn_modeling.models.pose_from_pred_centroid_z import pose_from_pred_centroid_z
@@ -67,6 +70,97 @@ LAYERS = (
     "raw_translation",
     "final_pose",
 )
+CPM_LAYERS = (
+    "pnp_input",
+    "raw_moments",
+    "scaled_moments",
+    "fc1",
+    "fc2",
+    "raw_rotation",
+    "raw_translation",
+    "final_pose",
+)
+CPM_XYZ_ALPHA_CONDITIONS = {
+    "gt_xyz_alpha_025": 0.25,
+    "gt_xyz_alpha_050": 0.50,
+    "gt_xyz_alpha_075": 0.75,
+}
+CPM_MOMENT_CONDITIONS = ("coverage_only", "cxu_null")
+CPM_EXTRA_CONDITIONS = tuple(CPM_XYZ_ALPHA_CONDITIONS) + CPM_MOMENT_CONDITIONS
+
+
+def layers_for_model(model) -> tuple[str, ...]:
+    """Return architecture-compatible diagnostic checkpoints."""
+
+    return (
+        CPM_LAYERS
+        if isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet)
+        else LAYERS
+    )
+
+
+def conditions_for_model(model) -> tuple[str, ...]:
+    """Keep the frozen ConvPnP protocol unchanged and extend only CPM."""
+
+    if isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet):
+        return CONDITIONS + CPM_EXTRA_CONDITIONS
+    return CONDITIONS
+
+
+def apply_cpm_diagnostic_intervention(
+    xyz: np.ndarray,
+    gt_xyz: np.ndarray,
+    roi_2d: np.ndarray,
+    region: np.ndarray,
+    support: np.ndarray,
+    condition: str,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, str | None]:
+    """Apply a standard input intervention or a CPM-only diagnostic condition.
+
+    ``coverage_only`` and ``cxu_null`` deliberately leave the pixel inputs
+    unchanged.  They are applied to the deterministic moment descriptor inside
+    :func:`run_head_with_hooks` and are diagnostics, not trainable variants.
+    """
+
+    if condition in CPM_XYZ_ALPHA_CONDITIONS:
+        xyz_out = np.asarray(xyz).copy()
+        gt = np.asarray(gt_xyz)
+        mask = np.asarray(support, dtype=bool)
+        alpha = CPM_XYZ_ALPHA_CONDITIONS[condition]
+        xyz_out[mask] = (1.0 - alpha) * xyz_out[mask] + alpha * gt[mask]
+        return xyz_out, np.asarray(roi_2d).copy(), np.asarray(region).copy(), None
+    if condition in CPM_MOMENT_CONDITIONS:
+        return (
+            np.asarray(xyz).copy(),
+            np.asarray(roi_2d).copy(),
+            np.asarray(region).copy(),
+            condition,
+        )
+    xyz_out, roi_out, region_out = apply_intervention(
+        xyz, gt_xyz, roi_2d, region, support, condition, seed
+    )
+    return xyz_out, roi_out, region_out, None
+
+
+def apply_cpm_moment_intervention(
+    pnp: CorrespondenceAwareMomentPnPNet,
+    raw_descriptor: torch.Tensor,
+    scaled_descriptor: torch.Tensor,
+    condition: str | None,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Apply a fixed descriptor-level CPM diagnostic without changing weights."""
+
+    if condition is None:
+        return raw_descriptor, scaled_descriptor
+    if condition not in CPM_MOMENT_CONDITIONS:
+        raise ValueError(f"Unknown CPM moment condition: {condition}")
+    changed = raw_descriptor.clone()
+    if condition == "coverage_only":
+        changed[..., 1:21] = 0
+    else:
+        changed[..., 15:21] = 0
+    return changed, pnp._apply_moment_scales(changed)
 
 
 def parse_args() -> argparse.Namespace:
@@ -143,8 +237,10 @@ def run_head_with_hooks(
     xyz: np.ndarray,
     roi_2d: np.ndarray,
     region: np.ndarray,
+    visible_mask: np.ndarray,
     batch: dict,
     index: int,
+    moment_condition: str | None = None,
 ) -> tuple[Dict[str, torch.Tensor], np.ndarray, np.ndarray]:
     pnp = model.pnp_net
     device = next(pnp.parameters()).device
@@ -152,12 +248,72 @@ def run_head_with_hooks(
     xyz_tensor = to_chw(xyz, device, dtype)
     roi_tensor = to_chw(roi_2d, device, dtype)
     region_tensor = to_chw(region, device, dtype)
+    mask_array = np.asarray(visible_mask)
+    if mask_array.ndim == 2:
+        mask_array = mask_array[..., None]
+    if mask_array.ndim != 3 or mask_array.shape[-1] != 1:
+        raise ValueError(
+            f"visible_mask must have shape HxW or HxWx1, got {mask_array.shape}"
+        )
+    mask_tensor = to_chw(mask_array, device, dtype)
     coor = torch.cat((xyz_tensor, roi_tensor), dim=1)
     extent = sliced(batch, "roi_extent", index).to(device=device, dtype=dtype)
-    actual_input = torch.cat(
-        (((xyz_tensor - 0.5) * extent.view(1, 3, 1, 1)), roi_tensor, region_tensor),
-        dim=1,
-    )
+    metric_xyz = (xyz_tensor - 0.5) * extent.view(1, 3, 1, 1)
+    actual_input_parts = [metric_xyz, roi_tensor, region_tensor]
+    if isinstance(pnp, CorrespondenceAwareMomentPnPNet):
+        actual_input_parts.append(mask_tensor)
+    actual_input = torch.cat(actual_input_parts, dim=1)
+
+    if moment_condition is not None and moment_condition not in CPM_MOMENT_CONDITIONS:
+        raise ValueError(f"Unknown CPM moment condition: {moment_condition}")
+    if moment_condition is not None and not isinstance(
+        pnp, CorrespondenceAwareMomentPnPNet
+    ):
+        raise ValueError("Moment-level interventions require a CPM pose head")
+
+    if isinstance(pnp, CorrespondenceAwareMomentPnPNet):
+        with autocast(enabled=bool(cfg.TEST.AMP_TEST)):
+            encoding = pnp.encode_moments(
+                coor.clone(),
+                region=region_tensor,
+                extents=extent,
+                mask_attention=mask_tensor,
+            )
+            raw_descriptor, scaled_descriptor = apply_cpm_moment_intervention(
+                pnp,
+                encoding.raw_descriptor,
+                encoding.scaled_descriptor,
+                moment_condition,
+            )
+            fc1 = pnp.act(pnp.moment_fc1(scaled_descriptor.flatten(1)))
+            fc2 = pnp.act(pnp.moment_fc2(fc1))
+            raw_rotation = pnp.rotation_head(fc2)
+            raw_translation = pnp.translation_head(fc2)
+            final_rotation, final_translation = pose_from_raw(
+                model, cfg, raw_rotation, raw_translation, batch, index
+            )
+        activations = {
+            "pnp_input": actual_input.detach().cpu(),
+            "raw_moments": raw_descriptor.detach().cpu(),
+            "scaled_moments": scaled_descriptor.detach().cpu(),
+            "fc1": fc1.detach().cpu(),
+            "fc2": fc2.detach().cpu(),
+            "raw_rotation": raw_rotation.detach().cpu(),
+            "raw_translation": raw_translation.detach().cpu(),
+            "final_pose": torch.cat(
+                (
+                    final_rotation.detach().cpu().flatten(1),
+                    final_translation.detach().cpu(),
+                ),
+                dim=1,
+            ),
+        }
+        return (
+            activations,
+            final_rotation[0].detach().float().cpu().numpy(),
+            final_translation[0].detach().float().cpu().numpy(),
+        )
+
     conv_outputs: List[torch.Tensor] = []
     fc_outputs: List[torch.Tensor] = []
     direct: Dict[str, torch.Tensor] = {}
@@ -264,6 +420,7 @@ def main() -> int:
         str(args.weights), resume=False
     )
     model.eval()
+    layers = layers_for_model(model)
     before_hash = tensor_state_sha256(model.state_dict())
     loader = build_gdrn_test_loader(
         cfg, args.dataset, train_objs=metadata.objs, batch_size=1
@@ -369,7 +526,14 @@ def main() -> int:
                             instance_seed + condition_index,
                         )
                         activations, rotation, translation = run_head_with_hooks(
-                            model, cfg, xyz_i, roi_i, region_i, batch, flat_index
+                            model,
+                            cfg,
+                            xyz_i,
+                            roi_i,
+                            region_i,
+                            visible_batch[flat_index, 0],
+                            batch,
+                            flat_index,
                         )
                         if condition == "baseline":
                             baseline_activations = activations
@@ -420,7 +584,7 @@ def main() -> int:
                                 np.linalg.norm(translation - translation_gt) * 1000.0
                             ),
                         }
-                        for layer in LAYERS:
+                        for layer in layers:
                             shapes.setdefault(layer, list(activations[layer].shape))
                             metrics = response_metrics(
                                 baseline_activations[layer], activations[layer]
@@ -484,7 +648,7 @@ def main() -> int:
                         [row[f"{layer}_relative_l2"] for row in condition_rows]
                     )
                 )
-                for layer in LAYERS
+                for layer in layers
             },
         }
     architecture = {
@@ -499,7 +663,7 @@ def main() -> int:
         "formal_experiment": False,
         "seed": args.seed,
         "conditions": CONDITIONS,
-        "layers": LAYERS,
+        "layers": layers,
         "checkpoint": str(args.weights),
         "checkpoint_sha256": weight_hash,
         "device": args.device,

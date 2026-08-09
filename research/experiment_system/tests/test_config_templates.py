@@ -23,3 +23,15 @@ def test_future_smoke_template_is_small_and_has_no_evaluation():
     assert tuple(cfg.DATASETS.TEST) == ()
     assert cfg.SOLVER.TOTAL_EPOCHS == 1
     assert cfg.TEST.EVAL_PERIOD == 0
+
+
+def test_managed_exp005_and_exp009_configs_use_fixed_seed_42():
+    for experiment_dir in ("exp005_pnp_control", "exp009_cpm_head"):
+        formal = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "train.py"))
+        smoke = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "smoke.py"))
+        audit = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "audit48.py"))
+        assert formal.SEED == smoke.SEED == audit.SEED == 42
+        assert formal.SOLVER.TOTAL_EPOCHS == 40
+        assert smoke.SOLVER.IMS_PER_BATCH == 4
+        assert audit.SOLVER.IMS_PER_BATCH == 48
+        assert smoke.SOLVER.TOTAL_EPOCHS == audit.SOLVER.TOTAL_EPOCHS == 1

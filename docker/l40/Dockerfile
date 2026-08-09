@@ -6,9 +6,11 @@ ARG GDRN_UID=1010
 ARG GDRN_GID=1010
 ARG GDRN_USER=gdrn
 ARG GIT_COMMIT=unknown
+ARG GIT_REMOTE=unknown
 
-LABEL org.opencontainers.image.title="GDRNPP Stage 3C B/C2 L40"
+LABEL org.opencontainers.image.title="GDRNPP managed experiments on L40"
 LABEL org.opencontainers.image.revision="${GIT_COMMIT}"
+LABEL org.opencontainers.image.source="${GIT_REMOTE}"
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -23,6 +25,7 @@ ENV LANG=C.UTF-8 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics \
     GDRN_GIT_COMMIT=${GIT_COMMIT} \
+    GDRN_GIT_REMOTE=${GIT_REMOTE} \
     PYTHONPATH=/workspace/gdrnpp:/opt/bop_toolkit:/opt/bop_renderer/build \
     LD_LIBRARY_PATH=/workspace/gdrnpp/core/csrc/uncertainty_pnp/lib:/opt/gdrn-venv/lib/python3.10/site-packages/torch/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
@@ -87,7 +90,7 @@ RUN chmod 0755 /usr/local/bin/build-gdrn-native /usr/local/bin/verify-gdrn-envir
     && /usr/local/bin/verify-gdrn-native
 
 RUN cd /workspace/gdrnpp \
-    && PYTHONPATH=/workspace/gdrnpp PYTHONPYCACHEPREFIX=/tmp/gdrnpp-pycache python -m pytest -q -o cache_dir=/tmp/gdrnpp-pytest-cache research/quality_coverage/tests research/pnp_control/tests research/stage3c_runtime/tests research/pose_head_utilization/tests research/pbr_validation/tests research/oracle_diagnostic/tests research/pose_aggregation/tests
+    && PYTHONPATH=/workspace/gdrnpp PYTHONPYCACHEPREFIX=/tmp/gdrnpp-pycache python -m pytest -q -o cache_dir=/tmp/gdrnpp-pytest-cache research/experiment_system/tests research/managed_runtime/tests research/cpm_head/tests research/quality_coverage/tests research/pnp_control/tests research/stage3c_runtime/tests research/pose_head_utilization/tests research/pbr_validation/tests research/oracle_diagnostic/tests research/pose_aggregation/tests
 
 COPY docker/l40/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 ENV __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json

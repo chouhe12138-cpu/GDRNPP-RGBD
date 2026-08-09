@@ -4,18 +4,24 @@ set -Eeuo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 chx_root="$(cd -- "${repo_root}/../.." && pwd)"
-image="${IMAGE:-gdrnpp-stage3bc2:torch220-cu121-sm89-v2}"
 commit="$(git -C "${repo_root}" rev-parse HEAD)"
+short_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD)"
+image="${IMAGE:-gdrnpp-research:torch220-cu121-sm89-${short_commit}}"
+remote_raw="$(git -C "${repo_root}" remote get-url origin)"
+remote="$(printf '%s' "${remote_raw}" | sed -E 's#(https?://)[^/@]+@#\1#')"
 stamp="$(date +%Y%m%d_%H%M%S)"
 audit_dir="${chx_root}/audit/image_${stamp}"
 build_log="${audit_dir}/docker-build.log"
 
-git -C "${repo_root}" diff --quiet
-git -C "${repo_root}" diff --cached --quiet
+if [[ -n "$(git -C "${repo_root}" status --porcelain=v1 --untracked-files=all)" ]]; then
+    echo "FAIL: Docker release build requires a completely clean Git worktree" >&2
+    git -C "${repo_root}" status --short --branch >&2
+    exit 1
+fi
 mkdir -p "${audit_dir}"
 
 set +e
-/usr/bin/docker build --progress=plain --file "${script_dir}/Dockerfile" --build-arg GDRN_UID="$(id -u)" --build-arg GDRN_GID="$(id -g)" --build-arg GIT_COMMIT="${commit}" --tag "${image}" "${repo_root}" 2>&1 | tee "${build_log}"
+/usr/bin/docker build --progress=plain --file "${script_dir}/Dockerfile" --build-arg GDRN_UID="$(id -u)" --build-arg GDRN_GID="$(id -g)" --build-arg GIT_COMMIT="${commit}" --build-arg GIT_REMOTE="${remote}" --tag "${image}" "${repo_root}" 2>&1 | tee "${build_log}"
 build_code=${PIPESTATUS[0]}
 set -e
 

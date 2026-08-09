@@ -31,6 +31,9 @@ from core.gdrn_modeling.datasets.data_loader import build_gdrn_test_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
 from core.gdrn_modeling.engine.engine_utils import batch_data, get_out_mask
 from core.gdrn_modeling.models import GDRN_double_mask
+from core.gdrn_modeling.models.heads.cpm_pnp_net import (
+    CorrespondenceAwareMomentPnPNet,
+)
 from core.utils.my_checkpoint import MyCheckpointer
 from lib.pysixd import inout
 from lib.utils.mask_utils import cocosegm2mask
@@ -49,7 +52,6 @@ from research.pose_aggregation.run_diagnostic import (
     load_symmetry_rotations,
 )
 from research.pose_head_diagnostic.diagnostic_utils import (
-    CONDITIONS,
     apply_intervention,
     matched_spatial_masks,
     response_metrics,
@@ -57,7 +59,10 @@ from research.pose_head_diagnostic.diagnostic_utils import (
     tensor_state_sha256,
 )
 from research.pose_head_diagnostic.run_information_flow import (
-    LAYERS,
+    CPM_MOMENT_CONDITIONS,
+    apply_cpm_diagnostic_intervention,
+    conditions_for_model,
+    layers_for_model,
     run_head_with_hooks,
     sha256,
 )
@@ -80,7 +85,7 @@ POSE_ROTATION_REENTRY_TOLERANCE_CUDA = 3e-4
 POSE_TRANSLATION_REENTRY_TOLERANCE_CUDA = 5e-5
 REENTRY_TOLERANCE_CPU = 1e-6
 EXPERIMENT_ID = "EXP-20260804-007-pose-head-information-flow"
-MODEL_ROLES = ("official", "c1", "pnp_adapted", "joint")
+MODEL_ROLES = ("official", "c1", "pnp_adapted", "joint", "cpm")
 MODES = ("smoke", "audit80", "full")
 POSE_METRICS = (
     "rotation_delta_deg",
@@ -100,13 +105,6 @@ COMPONENT_METRICS = (
     "raw_translation_relative_l2",
     "final_pose_relative_l2",
 )
-LAYER_METRICS = tuple(
-    f"{layer}_{metric}"
-    for layer in LAYERS
-    for metric in ("relative_l2", "cosine_distance", "mean_absolute")
-)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=MODES, required=True)
@@ -316,8 +314,6 @@ def main() -> int:
     # Patch-PnP calls differ by one or two quantization steps and cannot satisfy
     # the exact baseline re-entry gate.
     cfg.TEST.AMP_TEST = False
-    if cfg.MODEL.POSE_NET.PNP_NET.MASK_ATTENTION != "none":
-        raise RuntimeError("The frozen aggregate protocol requires MASK_ATTENTION='none'")
     register_datasets_in_cfg(cfg)
     metadata = MetadataCatalog.get(args.dataset)
     data_ref = ref.__dict__[metadata.ref_key]
@@ -345,13 +341,30 @@ def main() -> int:
         model, save_dir=str(args.output_dir), prefix_to_remove="_module."
     ).resume_or_load(str(args.weights), resume=False)
     model.eval()
+    layers = layers_for_model(model)
+    conditions = conditions_for_model(model)
+    is_cpm = isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet)
+    if (args.model_role == "cpm") != is_cpm:
+        raise RuntimeError(
+            "--model-role cpm must agree with the pose-head type built by the config"
+        )
+    mask_attention_type = str(cfg.MODEL.POSE_NET.PNP_NET.MASK_ATTENTION)
+    if is_cpm and mask_attention_type != "mul":
+        raise RuntimeError("CPM diagnostic requires MASK_ATTENTION='mul'")
+    if not is_cpm and mask_attention_type != "none":
+        raise RuntimeError("The frozen ConvPnP protocol requires MASK_ATTENTION='none'")
+    layer_metrics = tuple(
+        f"{layer}_{metric}"
+        for layer in layers
+        for metric in ("relative_l2", "cosine_distance", "mean_absolute")
+    )
     state_before = tensor_state_sha256(model.state_dict())
     loader = build_gdrn_test_loader(
         cfg, args.dataset, train_objs=metadata.objs, batch_size=1
     )
 
     scalar_records: List[dict] = []
-    bop_rows: Dict[str, List[dict]] = {condition: [] for condition in CONDITIONS}
+    bop_rows: Dict[str, List[dict]] = {condition: [] for condition in conditions}
     shapes: Dict[str, list[int]] = {}
     occurrences: Dict[tuple, int] = {}
     depth_cache: Dict[str, np.ndarray] = {}
@@ -387,6 +400,11 @@ def main() -> int:
                 captured["region"] = (
                     hook_kwargs["region"].detach().float().cpu().clone()
                 )
+                mask_attention = hook_kwargs.get("mask_attention")
+                if mask_attention is not None:
+                    captured["mask_attention"] = (
+                        mask_attention.detach().float().cpu().clone()
+                    )
 
             def capture_pnp_output(_module, _hook_inputs, hook_output):
                 captured["raw_rotation"] = (
@@ -462,6 +480,11 @@ def main() -> int:
                     xyz = effective_coor[..., :3]
                     roi_2d = effective_coor[..., 3:5]
                     region = captured["region"][flat_index].numpy().transpose(1, 2, 0)
+                    effective_visible_mask = (
+                        captured["mask_attention"][flat_index, 0].numpy()
+                        if "mask_attention" in captured
+                        else visible_batch[flat_index, 0]
+                    )
                     image_points = normalized_image_points(roi_2d, height, width)
                     if scene_im_id not in depth_cache:
                         depth_path = (PROJECT_ROOT / image_record["depth_file"]).resolve()
@@ -505,18 +528,40 @@ def main() -> int:
                     baseline_translation = None
                     baseline_pose_metrics = None
 
-                    for condition in CONDITIONS:
-                        xyz_i, roi_i, region_i = apply_intervention(
-                            xyz,
-                            gt_xyz,
-                            roi_2d,
-                            region,
-                            support,
-                            condition,
-                            instance_seed,
-                        )
+                    for condition in conditions:
+                        if is_cpm:
+                            xyz_i, roi_i, region_i, moment_condition = (
+                                apply_cpm_diagnostic_intervention(
+                                    xyz,
+                                    gt_xyz,
+                                    roi_2d,
+                                    region,
+                                    support,
+                                    condition,
+                                    instance_seed,
+                                )
+                            )
+                        else:
+                            xyz_i, roi_i, region_i = apply_intervention(
+                                xyz,
+                                gt_xyz,
+                                roi_2d,
+                                region,
+                                support,
+                                condition,
+                                instance_seed,
+                            )
+                            moment_condition = None
                         activations, rotation, translation = run_head_with_hooks(
-                            model, cfg, xyz_i, roi_i, region_i, batch, flat_index
+                            model,
+                            cfg,
+                            xyz_i,
+                            roi_i,
+                            region_i,
+                            effective_visible_mask,
+                            batch,
+                            flat_index,
+                            moment_condition=moment_condition,
                         )
                         metrics = pose_metrics(
                             rotation,
@@ -575,7 +620,7 @@ def main() -> int:
                                 ),
                             )
                         layer_values = {}
-                        for layer in LAYERS:
+                        for layer in layers:
                             shapes.setdefault(layer, list(activations[layer].shape))
                             for metric_name, value in response_metrics(
                                 baseline_activations[layer], activations[layer]
@@ -583,12 +628,21 @@ def main() -> int:
                                 layer_values[f"{layer}_{metric_name}"] = value
                         condition_support = (
                             np.zeros_like(support)
-                            if condition == "baseline"
+                            if condition == "baseline" or condition in CPM_MOMENT_CONDITIONS
                             else spatial_masks.get(condition, support)
                         )
                         record = {
                             "target_index": processed_targets,
                             "condition": condition,
+                            "intervention_domain": (
+                                "none"
+                                if condition == "baseline"
+                                else (
+                                    "moment_descriptor"
+                                    if condition in CPM_MOMENT_CONDITIONS
+                                    else "pixel_input"
+                                )
+                            ),
                             "obj_name": data_ref.id2obj[obj_id],
                             "visibility_bin": visibility_bin(
                                 float(gt.get("visib_fract", 1.0))
@@ -670,7 +724,7 @@ def main() -> int:
         group_fields=("condition",), metric_fields=POSE_METRICS, **aggregate_args
     )
     layer_summary = aggregate_scalar_records(
-        group_fields=("condition",), metric_fields=LAYER_METRICS, **aggregate_args
+        group_fields=("condition",), metric_fields=layer_metrics, **aggregate_args
     )
     component_summary = aggregate_scalar_records(
         group_fields=("condition",), metric_fields=COMPONENT_METRICS, **aggregate_args
@@ -699,7 +753,7 @@ def main() -> int:
         condition: sum(
             record["condition"] == condition for record in scalar_records
         )
-        for condition in CONDITIONS
+        for condition in conditions
     }
     baseline_add_recall = float(
         np.mean(
@@ -715,7 +769,7 @@ def main() -> int:
     bop_hashes = {}
     if args.mode == "full":
         bop_hashes = save_bop_results(args.output_dir, bop_rows)
-        bop_scores = run_bop_evaluation(args.output_dir, CONDITIONS)
+        bop_scores = run_bop_evaluation(args.output_dir, conditions)
     official_add_reproduced = (
         args.model_role != "official"
         or args.mode != "full"
@@ -735,7 +789,7 @@ def main() -> int:
             if isinstance(value, (int, float))
         )
     )
-    expected_nonfinite_scalar_count = empty_support_targets * len(CONDITIONS)
+    expected_nonfinite_scalar_count = empty_support_targets * len(conditions)
     unexpected_nonfinite_scalar_count = (
         nonfinite_scalar_count - expected_nonfinite_scalar_count
     )
@@ -750,13 +804,21 @@ def main() -> int:
         "checkpoint_sha256": checkpoint_hash,
         "config": str(args.config_file),
         "config_sha256": sha256(args.config_file),
-        "conditions": CONDITIONS,
-        "layers": LAYERS,
+        "conditions": conditions,
+        "layers": layers,
         "fixed_support": "predicted-visible AND GT-visible AND valid-depth",
-        "intervention_point": (
-            "effective Patch-PnP input after any quality/coverage module; "
-            "all non-target inputs remain fixed"
-        ),
+        "intervention_points": {
+            "pixel_input": (
+                "effective Patch-PnP input after any quality/coverage module; "
+                "all non-target inputs remain fixed"
+            ),
+            "moment_descriptor": (
+                "CPM raw low-order descriptor before deterministic scaling and MLP; "
+                "used only by coverage_only and cxu_null"
+                if is_cpm
+                else None
+            ),
+        },
         "instance_level_features_persisted": False,
         "parameter_updates": 0,
         "optimizer_created": optimizer is not None,
@@ -767,7 +829,12 @@ def main() -> int:
         "cublas_workspace_config": os.environ["CUBLAS_WORKSPACE_CONFIG"],
     }
     architecture = {
-        "components": {"xyz": 3, "roi_2d": 2, "effective_region": 64},
+        "components": {
+            "xyz": 3,
+            "roi_2d": 2,
+            "effective_region": 64,
+            "visible_mask": 1 if is_cpm else 0,
+        },
         "layers": shapes,
         "rotation_representation": str(cfg.MODEL.POSE_NET.PNP_NET.ROT_TYPE),
         "translation_representation": str(cfg.MODEL.POSE_NET.PNP_NET.TRANS_TYPE),
@@ -775,7 +842,7 @@ def main() -> int:
     quality_control = {
         "expected_targets": expected_targets,
         "processed_targets": processed_targets,
-        "conditions": len(CONDITIONS),
+        "conditions": len(conditions),
         "condition_counts": condition_counts,
         "empty_support_targets": empty_support_targets,
         "nonfinite_scalar_count": nonfinite_scalar_count,

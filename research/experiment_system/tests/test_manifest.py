@@ -4,6 +4,7 @@ import pytest
 
 from research.experiment_system.manifest import (
     build_run_manifest,
+    collect_git_provenance,
     make_run_id,
     validate_experiment,
     validate_run_manifest,
@@ -109,3 +110,17 @@ def test_formal_requires_matching_image_revision(tmp_path, monkeypatch):
             image_id="sha256:image",
             image_revision="d" * 40,
         )
+
+
+def test_embedded_docker_revision_is_used_when_git_metadata_is_absent(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("GDRN_GIT_COMMIT", "a" * 40)
+    monkeypatch.setenv("GDRN_GIT_REMOTE", "https://gitee.example/repo.git")
+
+    source = collect_git_provenance(tmp_path)
+
+    assert source["git_commit"] == "a" * 40
+    assert source["git_remote"] == "https://gitee.example/repo.git"
+    assert source["git_dirty"] is False
+    assert source["provenance_kind"] == "embedded_docker_revision"

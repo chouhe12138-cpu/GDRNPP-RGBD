@@ -62,3 +62,18 @@ def test_checkpoint_isolation_detects_frozen_change():
     assert compare_states("B", official, trained)["changed_frozen"] == [
         "backbone.weight"
     ]
+
+
+def test_checkpoint_isolation_classifies_cpm_pose_head_replacement():
+    official = {
+        "backbone.weight": torch.tensor([1.0]),
+        "pnp_net.legacy.weight": torch.tensor([2.0]),
+    }
+    cpm = {
+        "backbone.weight": torch.tensor([1.0]),
+        "pnp_net.moment_decoder.weight": torch.tensor([3.0]),
+    }
+    result = compare_states("CPM", official, cpm)
+    assert result["changed_frozen"] == []
+    assert result["removed"] == ["pnp_net.legacy.weight"]
+    assert result["added"] == ["pnp_net.moment_decoder.weight"]

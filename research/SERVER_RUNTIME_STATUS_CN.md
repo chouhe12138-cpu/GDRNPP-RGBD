@@ -1,6 +1,20 @@
 # GDRNPP 服务器运行环境与实验进度交接
 
-最后更新：2026-08-06
+最后更新：2026-08-10
+
+## 2026-08-10 启动决策
+
+- 用户提供的最新只读检查确认旧 `lab1_chx` 中 C2 仍在运行；保持原容器、
+  镜像、代码和输出不变。
+- 先在 lab0 准备新的 `lab0_chx`，运行 EXP005/B；旧同名容器须先只读检查并
+  以 legacy 名称保存，不删除。
+- C2 Epoch 40 完成并封存后，再以同一 Git commit 和 Docker image ID 重建
+  `lab1_chx`，运行 EXP009/CPM。
+- EXP005 和 EXP009 的所有新 run 固定 seed `42`。历史失败和 C2 不改 seed。
+- 新入口为 `docker/l40/managed_experiment.sh`。GPU 上存在其他任务只记录占用，
+  不据此自动取消；实际 CUDA OOM 才保留失败 attempt 并延迟重试。
+- 以下旧 Stage 3C 状态段保留作历史运行链说明；实际启动以本节、Gitee release
+  commit 和重新执行的只读检查为准。
 
 本文是新对话处理服务器、Docker、GPU分配和Stage 3C实验运行时的首要
 入口。它记录当前操作事实和下一步顺序；历史迁移、镜像构建和C1验证细节
@@ -36,8 +50,9 @@ research/SERVER_RUNTIME_STATUS_CN.md
 research/SERVER_MIGRATION_HANDOFF.md
 ```
 
-截至本文更新时，本地分支为 `main`，HEAD为 `25fb5e3`，工作树干净并与
-`origin/main` 一致。后续对话仍须以新的 `git status` 为准。
+旧服务器状态段曾以 `25fb5e3` 为本地基准；该信息已经过时。新的 EXP005/
+EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后续对话仍须
+重新运行 `git status` 和 `git rev-parse HEAD`。
 
 ## 实验室规则和安全边界
 

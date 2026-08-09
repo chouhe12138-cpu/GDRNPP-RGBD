@@ -1,6 +1,14 @@
 # EXP-20260731-005 — Patch-PnP-Only Adaptation Control
 
-Status: `LOCAL PILOT PASS — FORMAL RUN CONDITIONAL ON C2`
+Status: `LOCAL PILOT PASS — MANAGED FORMAL AUTHORIZED`
+
+## Managed formal protocol update
+
+The historical local pilot and failed attempts retain their originally recorded
+seeds.  New managed smoke, audit, formal, evaluation, and diagnostic runs use
+the fixed seed `42`.  The frozen legacy Stage 3C0 config remains unchanged;
+`configs/gdrn/lmo_pbr/research/exp005_pnp_control/` provides additive wrappers
+for the managed run identity and output layout.
 
 ## Purpose
 

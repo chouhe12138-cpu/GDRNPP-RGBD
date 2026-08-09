@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260731-006-quality-coverage",
+  "revalidated_at": "2026-08-08",
+  "status": "PASS_WITH_NOTE",
+  "scope": "C1 formal Epoch 40 checkpoint、训练日志、权重隔离与关键 LM-O 指标的只读复验",
+  "source": {
+    "windows_locator": "E:\\6D姿态估计\\26-08-02",
+    "wsl_locator": "/mnt/e/6D姿态估计/26-08-02",
+    "preservation": "external_read_only"
+  },
+  "checkpoint": {
+    "filename": "model_0255919.pth",
+    "size_bytes": 411145010,
+    "sha256": "d3ab7167f2fc5f6aab8d7e8444c5b816036bd64e38f647a26e994c8e91939aa6",
+    "strict_load": "PASS",
+    "official_tensors": 392,
+    "formal_tensors": 401,
+    "shared_tensors_bit_identical": true,
+    "added_tensors": 9,
+    "added_tensor_prefixes": ["quality_coverage_net"],
+    "missing_keys": [],
+    "unexpected_keys": []
+  },
+  "epoch_040_metrics": {
+    "bop19_ar_macro": 0.6897416378316032,
+    "add_s_0.1d_macro_object": 0.5057,
+    "add_s_0.1d_micro_target": 0.5038,
+    "targets_count": 1445,
+    "gt_count": 1517,
+    "tp_count": 728
+  },
+  "logs": [
+    {"filename": "26-08-02-14.log", "sha256": "fc4551e073175ed40e374faf154d32c5ecb2225646b3029c221f7f5acf2b7205"},
+    {"filename": "26-08-03-15epoch.log", "sha256": "b4c2a74d638b63276ebabec0e53f1edbbb99507f44eea492e80061dd8e1d6420"},
+    {"filename": "26-08-03-20epoch.log", "sha256": "fe5643ece26f69767488662e2a78611e0ca888e41e058d2d167478dcdf432f2e"},
+    {"filename": "26-08-03-25epoch.log", "sha256": "b92e56587dd7b7e173d2041240dc399fbb1b1fd3a7cda2464edb7a2c54022410"},
+    {"filename": "26-08-04-30epoch.log", "sha256": "b7b6a3ecbdd07f58743baaa7278f51316aebc8871b7518fddde2ff9fa35712be"},
+    {"filename": "26-08-04-35epoch.log", "sha256": "b07f5d9dfe56da86a33001bcf1107fc0d4a8cccdbb907be55818d0bcd5d8292d"},
+    {"filename": "26-08-05-40epoch.log", "sha256": "a7333b54f64aa9effd2f14677f047560727d489a9e5b0987a6bc70bdf7a5009a"}
+  ],
+  "comparison_with_original_record": {
+    "checkpoint_sha256": "MATCH",
+    "bop19_ar_macro": "MATCH",
+    "add_s_0.1d_macro_object": "MATCH",
+    "decision": "MATCH_C1_SCREEN_FAIL"
+  },
+  "notes": [
+    "原 ACCEPTANCE.json 保留不覆盖；本文件是取得外部证据后的追加复验记录。",
+    "历史 evaluator 产物目录使用 error:ad_ntop:1，旧自动查找器期待 error=ad_ntop=*，因此末尾 summarizer traceback 不表示 ADD(-S) 计算失败。",
+    "外部目录未包含 C1 formal 的完整 raw evaluator 目录；日志中保留了 BOP 与 ADD(-S) 计算输出。"
+  ]
+}

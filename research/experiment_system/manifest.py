@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import platform
 import subprocess
@@ -135,6 +136,21 @@ def _git(repo_root: Path, *args: str) -> bytes:
 
 
 def collect_git_provenance(repo_root: Path) -> dict[str, Any]:
+    if not (repo_root / ".git").exists():
+        commit = os.environ.get("GDRN_GIT_COMMIT", "").strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise RuntimeError(
+                "repository has no .git metadata and no valid embedded GDRN_GIT_COMMIT"
+            )
+        return {
+            "git_commit": commit,
+            "git_remote": os.environ.get("GDRN_GIT_REMOTE", ""),
+            "git_dirty": False,
+            "git_status_sha256": sha256_bytes(b""),
+            "git_diff_sha256": sha256_bytes(b""),
+            "untracked_files": [],
+            "provenance_kind": "embedded_docker_revision",
+        }
     commit = _git(repo_root, "rev-parse", "HEAD").decode().strip()
     remote = ""
     try:
@@ -184,6 +200,7 @@ def collect_git_provenance(repo_root: Path) -> dict[str, Any]:
         "git_status_sha256": sha256_bytes(status),
         "git_diff_sha256": sha256_bytes(provenance_material),
         "untracked_files": untracked_files,
+        "provenance_kind": "git_worktree",
     }
 
 

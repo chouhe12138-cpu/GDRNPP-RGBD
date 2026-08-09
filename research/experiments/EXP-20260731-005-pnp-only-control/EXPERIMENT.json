@@ -4,14 +4,14 @@
   "title": "Patch-PnP-only 适应对照",
   "stage": "Stage 3C0 / B",
   "role": "B",
-  "status": "TRIGGERED",
+  "status": "AUTHORIZED",
   "legacy_import": true,
-  "decision": "LOCAL_PIPELINE_AND_ISOLATION_PASS_FORMAL_PENDING",
+  "decision": "MANAGED_FORMAL_AUTHORIZED_WITH_FIXED_SEED_42",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
     "bbox_type": "gt",
-    "seed": 20260731,
+    "seed": 42,
     "total_epochs": 40,
     "fixed_checkpoint": "epoch_040",
     "trainable_modules": ["pnp_net"],
@@ -26,6 +26,8 @@
     "record": "RECORD.md",
     "stage_protocol": "research/stages/STAGE_03C0_PNP_ADAPTATION_CONTROL.md",
     "local_pilot": "output/EXP-20260731-005/pnp_only_local",
-    "formal_output": "server:output/stage3c/B_patch_pnp"
+    "formal_output": "server:output/stage3c/B_patch_pnp",
+    "managed_formal_config": "configs/gdrn/lmo_pbr/research/exp005_pnp_control/train.py",
+    "historical_seed_note": "Existing legacy/local/failed runs retain their recorded seeds; new managed runs use seed 42."
   }
 }

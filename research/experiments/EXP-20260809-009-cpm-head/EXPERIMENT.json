@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260809-009-cpm-head",
+  "title": "Correspondence-Aware Moment Pose Head（CPM-Head）",
+  "stage": "Stage 4 / CPM",
+  "role": "CPM",
+  "status": "AUTHORIZED",
+  "legacy_import": false,
+  "decision": "AUTHORIZED_AFTER_C2_ARCHIVE_WITH_FIXED_SEED_42",
+  "protocol": {
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "fixed_checkpoint": "epoch_040",
+    "trainable_modules": [
+      "pnp_net"
+    ],
+    "frozen_modules": [
+      "backbone",
+      "geometry_head"
+    ],
+    "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+    "model": {
+      "pose_head": "CorrespondenceAwareMomentPnPNet",
+      "num_regions": 64,
+      "descriptor_dim_per_region": 21,
+      "decoder": "1344-512-256-shared",
+      "trainable_parameters": 822281,
+      "moment_groups": [
+        "mu_X",
+        "mu_U",
+        "C_XX",
+        "C_UU",
+        "C_XU"
+      ],
+      "moment_scaling": "fixed_PBR_8192_p95_abs",
+      "loss": "official_GDRNPP_pose_losses"
+    },
+    "comparison": {
+      "primary_controls": [
+        "EXP-20260729-000-official-gdrnpp-baseline",
+        "EXP-20260731-005-pnp-only-control"
+      ],
+      "matched_control_required": true,
+      "checkpoint_selection": "fixed_epoch_040_only"
+    },
+    "metrics": [
+      "bop19_ar_macro",
+      "add_s_0.1d_macro_object"
+    ],
+    "diagnostics": [
+      "xyz_alpha",
+      "roi_permutation",
+      "region_disruption",
+      "coverage_only",
+      "cxu_null"
+    ],
+    "gate": {
+      "minimum_bop19_ar_macro_delta": 0.005,
+      "minimum_add_s_0.1d_macro_object_delta": 0.01,
+      "minimum_nonnegative_objects": 5
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/train.py",
+    "smoke_config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/smoke.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/eval.py",
+    "moment_audit": "research/cpm_head/MOMENT_AUDIT_20260809_CN.md",
+    "local_validation": "research/cpm_head/LOCAL_CHAIN_20260809.json"
+  }
+}

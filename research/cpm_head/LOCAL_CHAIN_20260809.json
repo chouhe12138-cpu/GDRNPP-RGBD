@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "status": "PASS_LOCAL_ENGINEERING_ONLY",
+  "recorded_at": "2026-08-09",
+  "experiment_id": "EXP-20260809-009-cpm-head",
+  "scientific_conclusion": "NONE",
+  "official_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+  "moment_audit": {
+    "samples": 8192,
+    "valid_regions": 524288,
+    "low_coverage_concentrated_regions": 36,
+    "low_coverage_concentrated_fraction": 0.00006866455078125,
+    "scale_trigger_ratio": 1825.9570573080807,
+    "protocol_sha256": "10f91be673272ae0018170f7e8003b08673f342aff65ae9cff592534df27c3bf",
+    "scaling_sha256": "e185c1ae98f992b32d026c50253115e567bc61304e2732fd8f268c85d118e65b",
+    "low_support_qc_sha256": "c9ea6cdba8ac277119e0eab08f94c6196c478537833437c3bf1741057776b4a5"
+  },
+  "training_smoke": {
+    "micro_batches": 2048,
+    "optimizer_updates": 171,
+    "finite_losses": true,
+    "peak_gpu_memory_mib": 4788,
+    "checkpoint": "output/cpm_head/local_integration/model_0002047.pth",
+    "checkpoint_sha256": "e3d431c40eaf6354c5d21d18cb3d06534524ffbfedb9648be1c329492f7774a3",
+    "metrics_sha256": "3536a5fb648754ecd5401ff9a9a0336ee4bee4e0b7a09336c0f805454dd32b86",
+    "validation_sha256": "3df807b5624f5971343f8cfe2be4c0280964669967bcba545fa7ae8f40204396",
+    "official_shared_tensors_bit_identical": true,
+    "strict_checkpoint_reload": true,
+    "full_cuda_inference_finite": true
+  },
+  "standard_evaluation_smoke": {
+    "dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "checkpoint_id": "local_epoch_001",
+    "bop19_ar_macro": 0.0,
+    "add_s_0.1d_macro_object": 0.0,
+    "add_s_0.1d_micro_target": 0.0,
+    "evaluation_index_sha256": "01d9c89edd8ea28e6bf53f95aed534cde5fa13eb87c100521c4bd2e77d8fc5cd",
+    "normalized_metrics_sha256": "63cb22834fcfe5fb96009e2d47afb9154fcea20babba9be53019742c3c474d3a",
+    "interpretation": "pipeline smoke only; zero metrics are not a method result"
+  },
+  "diagnostic_smoke": {
+    "output": "output/cpm_head/diagnostic_smoke_v3",
+    "targets": 8,
+    "conditions": 19,
+    "device": "cpu",
+    "conditions_added_for_cpm": [
+      "gt_xyz_alpha_025",
+      "gt_xyz_alpha_050",
+      "gt_xyz_alpha_075",
+      "coverage_only",
+      "cxu_null"
+    ],
+    "unexpected_nonfinite_scalars": 0,
+    "state_unchanged": true,
+    "passed": true,
+    "quality_control_sha256": "577c77a7a81bd48743934914650b3ed11fcbb7ddd2670921d996b6685dde0a69",
+    "protocol_sha256": "0e9b35c38f858d6a420f2f2c9fda1034b237e61c43fc6e3cb006171646877f13",
+    "condition_summary_sha256": "f563a81e55f0fdbcf1fdb66284facc85c3e412eb0dcc67244a5de0665e6303b0",
+    "interpretation": "mechanism-pipeline smoke only; Epoch-1 responses are not scientific evidence"
+  },
+  "final_verification": {
+    "research_tests": {
+      "passed": 128,
+      "failed": 0
+    },
+    "formal_config_cpu_preflight": {
+      "status": "PASS",
+      "full_forward": true,
+      "checkpoint_round_trip": true,
+      "official_shared_tensors": 375,
+      "trainable_parameters": 822281
+    },
+    "formal_config_cuda_preflight": {
+      "status": "BLOCKED_BY_CURRENT_LOCAL_RUNTIME",
+      "reason": "torch.cuda.is_available() is false; GPU access blocked by operating system"
+    },
+    "experiment_registry": "PASS_10_EXPERIMENTS",
+    "active_b_c2_freeze": "PASS_10_FILES",
+    "docker_and_staged_file_audit": "PASS",
+    "formal_source_cleanliness": "EXPECTED_FAIL_DIRTY_UNCOMMITTED"
+  },
+  "formal_blockers": [
+    "C2 Epoch 40 and archive are incomplete",
+    "mandatory B control decision is pending",
+    "clean pushed Git commit is not available",
+    "Docker image identity is not available",
+    "server runtime state has not been rechecked",
+    "local CUDA access was unavailable during the final diagnostic rerun"
+  ]
+}

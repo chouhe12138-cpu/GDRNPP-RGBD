@@ -36,7 +36,8 @@
       "experiment_id": "EXP-20260731-005-pnp-only-control",
       "artifacts": [
         {"mode": "local_pilot", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-005/pnp_only_local"},
-        {"mode": "formal", "status": "PENDING", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp"},
+        {"mode": "legacy_formal_path", "status": "UNUSED_READ_ONLY", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp"},
+        {"mode": "managed_formal", "status": "AUTHORIZED", "storage": "lab0", "locator": "output/experiments/EXP-20260731-005-pnp-only-control/<run_id>"},
         {"mode": "formal", "status": "INVALID", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp_INVALID_EARLY_20260805_234436"}
       ]
     },
@@ -44,7 +45,8 @@
       "experiment_id": "EXP-20260731-006-quality-coverage",
       "artifacts": [
         {"mode": "local_pilot", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-006/quality_coverage_local"},
-        {"mode": "formal", "status": "COMPLETE", "storage": "lab1", "locator": "output/EXP-20260731-006/quality_coverage_full", "checkpoint_sha256": "d3ab7167f2fc5f6aab8d7e8444c5b816036bd64e38f647a26e994c8e91939aa6"}
+        {"mode": "formal", "status": "COMPLETE", "storage": "lab1", "locator": "output/EXP-20260731-006/quality_coverage_full", "checkpoint_sha256": "d3ab7167f2fc5f6aab8d7e8444c5b816036bd64e38f647a26e994c8e91939aa6"},
+        {"mode": "formal_read_only_copy", "status": "COMPLETE_PARTIAL_RAW", "storage": "external_windows", "locator": "E:\\6D姿态估计\\26-08-02", "checkpoint_sha256": "d3ab7167f2fc5f6aab8d7e8444c5b816036bd64e38f647a26e994c8e91939aa6", "evidence": "research/experiments/EXP-20260731-006-quality-coverage/REVALIDATION_20260808.json"}
       ]
     },
     {
@@ -57,8 +59,17 @@
     {
       "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
       "artifacts": [
-        {"mode": "formal", "status": "PENDING", "storage": "lab1", "locator": "output/stage3c/C2_joint"},
-        {"mode": "smoke", "status": "PENDING_OR_COMPLETE_RECHECK_REQUIRED", "storage": "lab1", "locator": "output/stage3c_smoke/C2_joint"}
+        {"mode": "formal", "status": "RUNNING", "storage": "lab1", "locator": "output/stage3c/C2_joint"},
+        {"mode": "smoke", "status": "PENDING_OR_COMPLETE_RECHECK_REQUIRED", "storage": "lab1", "locator": "output/stage3c_smoke/C2_joint"},
+        {"mode": "formal_handoff_snapshot", "status": "RUNNING_EPOCH_024", "storage": "external_windows", "locator": "E:\\6D姿态估计\\C2_handoff_20260808", "git_commit": "24a1d7aa7159cfc8113f4cfe8c11bbd2ce3ba290", "evidence": "research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/REVALIDATION_20260808.json"},
+        {"mode": "formal_evaluation_snapshot", "status": "RUNNING_LOG_EPOCH_033_EVAL_EPOCH_030", "storage": "external_windows", "locator": "E:\\6D姿态估计\\C2", "git_commit": "24a1d7aa7159cfc8113f4cfe8c11bbd2ce3ba290", "evidence": "research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/RESULTS.json"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260809-009-cpm-head",
+      "artifacts": [
+        {"mode": "local_engineering_chain", "status": "COMPLETE", "storage": "local", "locator": "output/cpm_head", "checkpoint_sha256": "e3d431c40eaf6354c5d21d18cb3d06534524ffbfedb9648be1c329492f7774a3", "evidence": "research/cpm_head/LOCAL_CHAIN_20260809.json"},
+        {"mode": "managed_formal", "status": "AUTHORIZED_AFTER_C2_ARCHIVE", "storage": "lab1", "locator": "output/experiments/EXP-20260809-009-cpm-head/<run_id>"}
       ]
     }
   ]

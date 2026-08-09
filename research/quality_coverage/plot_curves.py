@@ -47,11 +47,13 @@ def find_score(eval_dir: Path, pattern: str):
 
 def find_add_score(eval_dir: Path):
     paths = []
-    for pattern in (
-        "error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json",
-        "error:ad_ntop:*/scores_th=0.100_min-visib=-1.000.json",
-    ):
-        paths.extend(glob.glob(str(eval_dir / "**" / pattern), recursive=True))
+    for directory_pattern in ("error=ad_ntop=*", "error:ad_ntop:*"):
+        for score_name in (
+            "scores_th=0.100_min-visib=-1.000.json",
+            "scores_th:0.100_min-visib:-1.000.json",
+        ):
+            pattern = f"{directory_pattern}/{score_name}"
+            paths.extend(glob.glob(str(eval_dir / "**" / pattern), recursive=True))
     unique = sorted(set(paths))
     if len(unique) != 1:
         return None

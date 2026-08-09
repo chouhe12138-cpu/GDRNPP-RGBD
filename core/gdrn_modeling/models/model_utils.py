@@ -241,6 +241,20 @@ def get_pnp_net(cfg):
             num_regions=g_head_cfg.NUM_REGIONS,
             mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
         )
+    elif pnp_head_type == "CorrespondenceAwareMomentPnPNet":
+        if loss_cfg.XYZ_LOSS_TYPE not in ["MSE", "L1", "L2", "SmoothL1"]:
+            raise ValueError("CPM requires three-channel regression XYZ")
+        if not pnp_net_cfg.WITH_2D_COORD or pnp_net_cfg.COORD_2D_TYPE != "abs":
+            raise ValueError("CPM requires absolute ROI 2D coordinates")
+        if not pnp_net_cfg.REGION_ATTENTION:
+            raise ValueError("CPM requires the foreground Region posterior")
+        if pnp_net_cfg.MASK_ATTENTION != "mul":
+            raise ValueError("CPM requires predicted visible-mask support")
+        pnp_net_init_cfg.update(
+            rot_dim=rot_dim,
+            num_regions=g_head_cfg.NUM_REGIONS,
+            mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
+        )
     elif pnp_head_type == "PointPnPNet":
         pnp_net_init_cfg.update(
             nIn=pnp_net_in_channel,

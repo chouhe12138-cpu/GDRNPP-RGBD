@@ -113,8 +113,14 @@ def test_checkpoint_metric_priority_and_tie_break():
     assert not is_better_checkpoint({"bop_ar": 0.688, "add_s_0.1d": 0.80}, incumbent)
 
 
-@pytest.mark.parametrize("add_dir_name", ["error=ad_ntop=-1", "error:ad_ntop:1"])
-def test_load_bop_selection_metrics(tmp_path, add_dir_name):
+@pytest.mark.parametrize(
+    "add_dir_name,score_name",
+    [
+        ("error=ad_ntop=-1", "scores_th=0.100_min-visib=-1.000.json"),
+        ("error:ad_ntop:1", "scores_th:0.100_min-visib:-1.000.json"),
+    ],
+)
+def test_load_bop_selection_metrics(tmp_path, add_dir_name, score_name):
     result = tmp_path / "method_lmo-test"
     result.mkdir()
     (result / "scores_bop19.json").write_text(
@@ -123,7 +129,7 @@ def test_load_bop_selection_metrics(tmp_path, add_dir_name):
     )
     add_dir = result / add_dir_name
     add_dir.mkdir()
-    (add_dir / "scores_th=0.100_min-visib=-1.000.json").write_text(
+    (add_dir / score_name).write_text(
         json.dumps({"recall": 0.512}),
         encoding="utf-8",
     )
@@ -141,10 +147,13 @@ def test_load_bop_selection_metrics_rejects_duplicate_add_scores(tmp_path):
         json.dumps({"bop19_average_recall": 0.691}),
         encoding="utf-8",
     )
-    for directory in ("error=ad_ntop=-1", "error:ad_ntop:1"):
+    for directory, score_name in (
+        ("error=ad_ntop=-1", "scores_th=0.100_min-visib=-1.000.json"),
+        ("error:ad_ntop:1", "scores_th:0.100_min-visib:-1.000.json"),
+    ):
         add_dir = result / directory
         add_dir.mkdir()
-        (add_dir / "scores_th=0.100_min-visib=-1.000.json").write_text(
+        (add_dir / score_name).write_text(
             json.dumps({"recall": 0.512}),
             encoding="utf-8",
         )

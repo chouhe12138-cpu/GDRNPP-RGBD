@@ -128,7 +128,11 @@ def my_default_setup(cfg, args):
     # setup_my_logger(output_dir, distributed_rank=rank, name="lib")
     # logger = setup_my_logger(output_dir, distributed_rank=rank)
     log_output = None if compact_log else osp.join(output_dir, f"log_{get_time_str()}.txt")
-    setup_logger(log_output, distributed_rank=rank)
+    setup_logger(
+        log_output,
+        distributed_rank=rank,
+        log_level="INFO" if compact_log else "DEBUG",
+    )
 
     if compact_log:
         logger.info(
@@ -157,9 +161,13 @@ def my_default_setup(cfg, args):
         # path = os.path.join(output_dir, "config.yaml")
         # with PathManager.open(path, "w") as f:
         #     f.write(cfg.dump())
-        path = osp.join(meta_dir, osp.basename(args.config_file))
-        cfg.dump(path)
-        logger.info("Full config saved to {}".format(path))
+        managed_manifest_path = osp.join(meta_dir, "run_manifest.json")
+        if compact_log and osp.exists(managed_manifest_path):
+            logger.info("CONFIG_SNAPSHOT_REUSED path=%s", args.config_file)
+        else:
+            path = osp.join(meta_dir, osp.basename(args.config_file))
+            cfg.dump(path)
+            logger.info("Full config saved to {}".format(path))
         if compact_log:
             environment_path = osp.join(meta_dir, "environment.json")
             environment = {
@@ -173,23 +181,24 @@ def my_default_setup(cfg, args):
             }
             with PathManager.open(environment_path, "w") as handle:
                 json.dump(environment, handle, indent=2, sort_keys=True)
-            manifest_path = osp.join(meta_dir, "manifest.json")
-            manifest = {
-                "role": os.environ.get("GDRN_STAGE3C_ROLE"),
-                "seed": int(cfg.SEED),
-                "output_dir": cfg.OUTPUT_DIR,
-                "model_weights": cfg.MODEL.WEIGHTS,
-                "git_commit": os.environ.get("GDRN_GIT_COMMIT"),
-                "docker_image_id": os.environ.get("GDRN_IMAGE_ID"),
-                "physical_gpu": os.environ.get("GDRN_PHYSICAL_GPU"),
-                "gpu_uuid": os.environ.get("GDRN_GPU_UUID"),
-                "logical_cuda_device": os.environ.get("CUDA_DEVICE", "0"),
-                "structured_layout": True,
-                "tensorboard": False,
-            }
-            if not osp.exists(manifest_path):
-                with PathManager.open(manifest_path, "w") as handle:
-                    json.dump(manifest, handle, indent=2, sort_keys=True)
+            if not osp.exists(managed_manifest_path):
+                manifest_path = osp.join(meta_dir, "manifest.json")
+                manifest = {
+                    "role": os.environ.get("GDRN_STAGE3C_ROLE"),
+                    "seed": int(cfg.SEED),
+                    "output_dir": cfg.OUTPUT_DIR,
+                    "model_weights": cfg.MODEL.WEIGHTS,
+                    "git_commit": os.environ.get("GDRN_GIT_COMMIT"),
+                    "docker_image_id": os.environ.get("GDRN_IMAGE_ID"),
+                    "physical_gpu": os.environ.get("GDRN_PHYSICAL_GPU"),
+                    "gpu_uuid": os.environ.get("GDRN_GPU_UUID"),
+                    "logical_cuda_device": os.environ.get("CUDA_DEVICE", "0"),
+                    "structured_layout": True,
+                    "tensorboard": False,
+                }
+                if not osp.exists(manifest_path):
+                    with PathManager.open(manifest_path, "w") as handle:
+                        json.dump(manifest, handle, indent=2, sort_keys=True)
 
     assert (
         args.num_gpus <= torch.cuda.device_count() and args.num_gpus >= 1

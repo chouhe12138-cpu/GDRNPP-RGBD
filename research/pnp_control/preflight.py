@@ -54,6 +54,7 @@ def parse_args() -> argparse.Namespace:
         default=PROJECT_ROOT / "datasets/VOCdevkit/VOC2012",
     )
     parser.add_argument("--deep", action="store_true")
+    parser.add_argument("--expected-seed", type=int, default=20260731)
     return parser.parse_args()
 
 
@@ -201,7 +202,7 @@ def main() -> int:
         or float(optimizer["weight_decay"]) != 0.01
     ):
         raise RuntimeError(f"Unexpected control optimizer: {optimizer}")
-    if int(config.SEED) != 20260731:
+    if int(config.SEED) != int(args.expected_seed):
         raise RuntimeError(f"Unexpected control seed: {config.SEED}")
 
     print(json.dumps(summary, indent=2))

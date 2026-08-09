@@ -12,6 +12,10 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 4. 需要服务器实时事实时查看
    [服务器运行状态](research/SERVER_RUNTIME_STATUS_CN.md)，并重新执行其中的只读检查。
 5. 需要理解研究依据时依次查看研究计划、阶段协议和具体实验记录。
+6. 当前 CPM 姿态头工程状态见
+   [EXP009 实验记录](research/experiments/EXP-20260809-009-cpm-head/RECORD.md)。
+7. EXP005/EXP009 的服务器 smoke、audit、formal 统一使用
+   `docker/l40/managed_experiment.sh`；新 run 固定 seed `42`。
 
 ## 目录地图
 
@@ -22,6 +26,7 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 | `research/stages/` | 阶段问题、冻结协议和 gate |
 | `research/experiments/` | 具体实验记录和紧凑 metadata |
 | `research/experiment_system/` | 新实验身份、资产、指标与产物基础设施 |
+| `research/managed_runtime/` | EXP005/EXP009 的受管训练、封存与精简日志执行器 |
 | `docker/l40/` | L40 可复现环境与服务器控制脚本 |
 | `output/` | Git 忽略的本地原始产物，历史目录默认只读 |
 | `.local/` | Git 忽略的机器路径 profile，不得保存凭据 |
@@ -45,6 +50,8 @@ RECORD、stage 协议，最后才是状态摘要。
 - 本地 Python 命令使用 Conda `pytorch22`；服务器训练使用项目 Docker。
 - 不覆盖历史 output，不把 dataset、checkpoint、完整日志或 secrets 提交到 Git。
 - 当前正式实验完成前不改变其 config、镜像、容器或运行脚本。
+- `research/experiments/` 保存身份、协议和结果记录；公共训练代码仍在 `core/`，
+  实验差异由 `configs/` 和统一启动器表达，不为每个 EXP 复制训练循环。
 
 上游英文用法仍见 [README.md](README.md)。Agent 的长期工作规则见
 [AGENTS.md](AGENTS.md)。

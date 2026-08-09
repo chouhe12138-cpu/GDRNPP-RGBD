@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import json
+
 from mmcv import Config
+from detectron2.utils.events import EventStorage
 
 from core.gdrn_modeling.engine.artifact_layout import (
     artifact_dir,
@@ -9,6 +12,7 @@ from core.gdrn_modeling.engine.artifact_layout import (
     skip_redundant_final_evaluation,
     tensorboard_enabled,
 )
+from core.utils.my_writer import EpochJSONWriter
 
 
 def make_config(structured=True):
@@ -54,3 +58,19 @@ def test_final_evaluation_is_not_skipped_when_period_does_not_cover_final():
     cfg = make_config()
     cfg.TEST.EVAL_PERIOD = 6
     assert not skip_redundant_final_evaluation(cfg)
+
+
+def test_epoch_writer_emits_exactly_one_record_per_completed_epoch(tmp_path):
+    path = tmp_path / "epoch_summary.jsonl"
+    writer = EpochJSONWriter(str(path), iters_per_epoch=2)
+    with EventStorage(0) as storage:
+        for iteration in range(4):
+            storage.iter = iteration
+            storage.put_scalar("epoch", iteration // 2 + 1, smoothing_hint=False)
+            storage.put_scalar("loss_total", float(4 - iteration))
+            writer.write()
+    writer.close()
+
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [record["epoch"] for record in records] == [1, 2]
+    assert [record["iteration"] for record in records] == [1, 3]

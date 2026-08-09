@@ -39,14 +39,15 @@ python -m research.experiment_system.cli prepare \
   --experiment research/experiments/EXP-.../EXPERIMENT.json \
   --config configs/gdrn/lmo_pbr/research/<experiment>/train.py \
   --mode smoke \
-  --seed 20260731 \
+  --seed 42 \
   --profile .local/path_profiles/<machine>.json \
   --image gdrnpp:<tag> \
   --output-root output/experiments
 ```
 
 formal 模式要求包括非忽略 untracked 文件在内的 Git 工作树完全干净。当前
-B/C2 继续使用既有 `research/stage3c_runtime/` 和 Docker 控制脚本。
+C2 继续使用既有冻结运行链；新的 EXP005/EXP009 使用
+`docker/l40/managed_experiment.sh`。两者的新 run 均固定 seed `42`。
 
 长时间训练仍由已有服务器脚本后台执行；统一 CLI 只登记步骤命令和状态，不
 持有 SSH 或训练进程：
@@ -57,3 +58,6 @@ python -m research.experiment_system.cli step <run_dir> \
 python -m research.experiment_system.cli step <run_dir> \
   --step-id train --set RUNNING --message "后台任务已启动"
 ```
+
+受管 run 还会生成 `train/epoch_summary.jsonl`、checkpoint index、evaluation
+index 和去重后的 `summary/warnings.json`。控制台日志不是指标的唯一来源。

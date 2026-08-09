@@ -139,6 +139,26 @@ def parser() -> argparse.ArgumentParser:
     )
     verify.add_argument("run_dir", type=Path)
 
+    checkpoint = sub.add_parser(
+        "index-checkpoint", help="index a checkpoint inside a managed run"
+    )
+    checkpoint.add_argument("run_dir", type=Path)
+    checkpoint.add_argument("checkpoint", type=Path)
+    checkpoint.add_argument("--checkpoint-id", required=True)
+    checkpoint.add_argument("--epoch", type=int, required=True)
+    checkpoint.add_argument("--iteration", type=int, required=True)
+    checkpoint.add_argument(
+        "--selection-kind",
+        choices=("fixed_final", "best_screening", "recent", "smoke", "invalid"),
+        required=True,
+    )
+    checkpoint.add_argument("--parent-checkpoint-sha256")
+
+    log_summary = sub.add_parser(
+        "summarize-log", help="deduplicate warnings from a compact run log"
+    )
+    log_summary.add_argument("run_dir", type=Path)
+
     compare = sub.add_parser(
         "compare", help="compare normalized result to a frozen baseline"
     )
@@ -382,6 +402,30 @@ def command_verify_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_index_checkpoint(args: argparse.Namespace) -> int:
+    from .checkpoints import record_checkpoint
+
+    record = record_checkpoint(
+        args.run_dir.resolve(),
+        args.checkpoint.resolve(),
+        args.checkpoint_id,
+        args.epoch,
+        args.iteration,
+        args.selection_kind,
+        args.parent_checkpoint_sha256,
+    )
+    print_json({"status": "PASS", "checkpoint": record})
+    return 0
+
+
+def command_summarize_log(args: argparse.Namespace) -> int:
+    from .logs import compact_and_write_warning_summary
+
+    payload = compact_and_write_warning_summary(args.run_dir)
+    print_json({"status": "PASS", **payload})
+    return 0
+
+
 def command_compare(args: argparse.Namespace) -> int:
     from .summaries import (
         compare_screening_metrics,
@@ -470,6 +514,8 @@ def main() -> int:
         "step": command_step,
         "index-evaluation": command_index_evaluation,
         "verify-run": command_verify_run,
+        "index-checkpoint": command_index_checkpoint,
+        "summarize-log": command_summarize_log,
         "compare": command_compare,
         "accept-history": command_accept_history,
         "metrics": lambda _args: (print_json(metric_registry_payload()) or 0),

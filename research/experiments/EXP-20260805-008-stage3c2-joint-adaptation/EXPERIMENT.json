@@ -4,9 +4,9 @@
   "title": "Patch-PnP 与质量/覆盖模块联合适应 C2",
   "stage": "Stage 3C2",
   "role": "C2",
-  "status": "TRIGGERED",
+  "status": "RUNNING",
   "legacy_import": true,
-  "decision": "FORMAL_PENDING",
+  "decision": "CURRENTLY_BELOW_GATE_FINAL_PENDING",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
@@ -28,6 +28,7 @@
   },
   "evidence": {
     "record": "RECORD.md",
+    "results": "RESULTS.json",
     "overview": "research/STAGE_03C_EXPERIMENT_OVERVIEW.md",
     "config": "configs/gdrn/lmo_pbr/convnext_stage3c2_pnp_quality_coverage_lmo.py",
     "formal_output": "server:output/stage3c/C2_joint"

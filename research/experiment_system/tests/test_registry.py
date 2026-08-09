@@ -12,8 +12,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 def test_checked_in_registry_matches_experiment_metadata():
     records = load_experiment_registry(PROJECT_ROOT / "research/experiments")
-    assert len(records) == 9
-    assert len({record["experiment_id"] for record in records}) == 9
+    assert records
+    assert len({record["experiment_id"] for record in records}) == len(records)
     compare_generated_registry(
         PROJECT_ROOT / "research/experiments",
         PROJECT_ROOT / "research/experiment_index.json",
