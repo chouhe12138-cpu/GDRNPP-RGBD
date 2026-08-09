@@ -30,8 +30,13 @@ def test_managed_exp005_and_exp009_configs_use_fixed_seed_42():
         formal = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "train.py"))
         smoke = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "smoke.py"))
         audit = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "audit48.py"))
+        evaluation = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "eval.py"))
         assert formal.SEED == smoke.SEED == audit.SEED == 42
         assert formal.SOLVER.TOTAL_EPOCHS == 40
         assert smoke.SOLVER.IMS_PER_BATCH == 4
         assert audit.SOLVER.IMS_PER_BATCH == 48
         assert smoke.SOLVER.TOTAL_EPOCHS == audit.SOLVER.TOTAL_EPOCHS == 1
+        assert formal.DATALOADER.NUM_WORKERS == 16
+        assert audit.DATALOADER.NUM_WORKERS == 16
+        assert smoke.DATALOADER.NUM_WORKERS == 2
+        assert evaluation.DATALOADER.NUM_WORKERS == 16

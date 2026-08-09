@@ -21,4 +21,5 @@
 最终扩展诊断因本轮操作系统阻断本地 GPU 访问而使用 CPU/FP32 完成；此前
 CUDA 构建、短训、保存/重载、推理和 14-condition smoke 均已通过。机器可读
 详情和证据哈希见 `LOCAL_CHAIN_20260809.json`。C2 完成归档、B 决策、确定
-Git commit、Docker image 和服务器实时检查之前，不启动 CPM formal。
+source Git commit、稳定 environment image/native identity 和服务器实时检查完成
+之前，不启动 CPM formal。普通 Python/config 更新不因此重建镜像。

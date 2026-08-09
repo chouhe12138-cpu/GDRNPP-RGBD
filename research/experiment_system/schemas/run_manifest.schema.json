@@ -16,7 +16,7 @@
     "execution"
   ],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"enum": [1, 2]},
     "experiment_id": {"pattern": "^EXP-[0-9]{8}-[0-9]{3}-[a-z0-9][a-z0-9-]*$"},
     "run_id": {"pattern": "^RUN-[0-9]{8}-[0-9]{6}-(smoke|audit|formal|diagnostic)-s[0-9]+-a[0-9]{2}$"},
     "mode": {"enum": ["smoke", "audit", "formal", "diagnostic"]},
@@ -24,7 +24,34 @@
     "source": {"type": "object"},
     "config": {"type": "object"},
     "inputs": {"type": "array"},
+    "environment": {"type": "object"},
     "execution": {"type": "object"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": 2}}},
+      "then": {
+        "required": ["environment"],
+        "properties": {
+          "source": {
+            "required": [
+              "source_git_commit",
+              "source_tree_clean",
+              "source_head_detached"
+            ]
+          },
+          "environment": {
+            "required": [
+              "environment_image_id",
+              "environment_build_source_commit",
+              "environment_contract_sha256",
+              "native_artifact_manifest_sha256",
+              "environment_binding_sha256"
+            ]
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": true
 }

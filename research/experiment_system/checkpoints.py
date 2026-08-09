@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import atomic_write_json, utc_now
-from .manifest import read_json, sha256_file, validate_run_manifest
+from .manifest import (
+    manifest_source_commit,
+    read_json,
+    sha256_file,
+    validate_run_manifest,
+)
 
 
 SELECTION_KINDS = {
@@ -66,7 +71,7 @@ def record_checkpoint(
         "size_bytes": checkpoint.stat().st_size,
         "experiment_id": manifest["experiment_id"],
         "run_id": manifest["run_id"],
-        "git_commit": manifest["source"]["git_commit"],
+        "git_commit": manifest_source_commit(manifest),
         "config_sha256": manifest["config"]["sha256"],
         "parent_checkpoint_sha256": parent_checkpoint_sha256,
         "indexed_at": utc_now(),

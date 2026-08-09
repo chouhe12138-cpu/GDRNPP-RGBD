@@ -10,9 +10,10 @@ This image reproduces the verified GDRNPP stack on an NVIDIA L40:
 - Ceres 1.14.0 and the pinned BOP renderer;
 - experiment-system、CPM、Stage 1–3C 研究测试在镜像构建时执行。
 
-The image contains the exact Git commit passed by `build_image.sh`. Datasets
-and official weights are mounted read-only. Outputs, caches, and logs are
-separate writable host directories.
+The image is a stable runtime/environment image. Its revision label identifies
+the source used to build the environment and native extensions; it is not the
+source commit of every experiment. Datasets and official weights are mounted
+read-only. Outputs, caches, and logs are separate writable host directories.
 
 Host workflow:
 
@@ -21,8 +22,18 @@ git clone https://gitee.com/Aa1156433279/gdrnpp-rgbd.git \
   /data/labs/<lab>/docker_data/chx/releases/GDRNPP-RGBD-<short-commit>
 cd /data/labs/<lab>/docker_data/chx/releases/GDRNPP-RGBD-<short-commit>
 git checkout --detach <full-commit>
-docker/l40/build_image.sh
+docker/l40/prepare_release.sh lab0 <existing-environment-image>
 ```
+
+`prepare_release.sh` does not build an image. It verifies that Docker,
+requirements/vendor and native inputs remain compatible, then copies only the
+image-built native artifacts into ignored paths in the release checkout. The
+release is mounted read-only at `/workspace/gdrnpp`, so all Python/config code
+comes from the selected Git commit.
+
+Run `build_image.sh` only after an intentional Dockerfile, dependency, vendor,
+native extension or ABI change. Ordinary Python/config experiments reuse the
+existing image ID.
 
 不要在仍有实验或未提交修改的旧 server repo 中 pull。
 

@@ -4,11 +4,21 @@
 
 ## 2026-08-10 启动决策
 
+- 新构建镜像保留并作为 lab0/lab1 共用的稳定 environment image；不删除、不因
+  EXP010 等普通 Python/config 提交重复构建。
+- source Git commit、resolved config 与 environment image/native identity 分别
+  记录，不再要求 image build-source revision 等于实验 source commit。
+- 新实验使用 detached、只读 release checkout；镜像 native artifacts 经环境
+  契约验证后复制到 Git 忽略 overlay，再将 release 挂载为实际执行源码。
+- Dockerfile、requirements/vendor 或 C++/CUDA native/ABI 变化时环境契约拒绝
+  复用，届时才允许重建镜像。
+
 - 用户提供的最新只读检查确认旧 `lab1_chx` 中 C2 仍在运行；保持原容器、
   镜像、代码和输出不变。
 - 先在 lab0 准备新的 `lab0_chx`，运行 EXP005/B；旧同名容器须先只读检查并
   以 legacy 名称保存，不删除。
-- C2 Epoch 40 完成并封存后，再以同一 Git commit 和 Docker image ID 重建
+- C2 Epoch 40 完成并封存后，再以确定 Git commit 和同一 environment image ID
+  重建
   `lab1_chx`，运行 EXP009/CPM。
 - EXP005 和 EXP009 的所有新 run 固定 seed `42`。历史失败和 C2 不改 seed。
 - 新入口为 `docker/l40/managed_experiment.sh`。GPU 上存在其他任务只记录占用，

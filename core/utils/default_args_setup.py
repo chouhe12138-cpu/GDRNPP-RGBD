@@ -188,8 +188,11 @@ def my_default_setup(cfg, args):
                     "seed": int(cfg.SEED),
                     "output_dir": cfg.OUTPUT_DIR,
                     "model_weights": cfg.MODEL.WEIGHTS,
-                    "git_commit": os.environ.get("GDRN_GIT_COMMIT"),
-                    "docker_image_id": os.environ.get("GDRN_IMAGE_ID"),
+                    "source_git_commit": os.environ.get("GDRN_SOURCE_COMMIT"),
+                    "environment_image_id": os.environ.get("GDRN_IMAGE_ID"),
+                    "environment_build_source_commit": os.environ.get(
+                        "GDRN_ENVIRONMENT_BUILD_SOURCE"
+                    ),
                     "physical_gpu": os.environ.get("GDRN_PHYSICAL_GPU"),
                     "gpu_uuid": os.environ.get("GDRN_GPU_UUID"),
                     "logical_cuda_device": os.environ.get("CUDA_DEVICE", "0"),

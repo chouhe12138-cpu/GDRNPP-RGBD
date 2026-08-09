@@ -5,7 +5,7 @@ DATASETS = dict(
     TEST=(),
 )
 
-DATALOADER = dict(NUM_WORKERS=2)
+DATALOADER = dict(NUM_WORKERS=16)
 
 SOLVER = dict(
     IMS_PER_BATCH=48,

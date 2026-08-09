@@ -26,19 +26,25 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 
 ## 当前任务
 
-1. 将当前本地实现形成干净 Git commit 并推送 Gitee，由 lab0 构建唯一镜像。
-2. lab0 先使用 `lab0_chx` 启动 seed `42` 的 EXP005/B managed formal。
+1. 当前已构建镜像作为稳定 environment image 保留；后续确定 Git release 通过
+   source/native overlay 复用它，不因普通 Python/config 更新重建镜像。
+2. 本地完成 source/environment 解耦修正并推送确定 commit 后，lab0 使用只读
+   release checkout 和现有镜像启动 seed `42` 的 EXP005/B managed formal。
 3. 保持 C2 原环境和旧 `lab1_chx` 运行链，等待 Epoch 40 并完成结果封存。
 4. C1 formal checkpoint、日志和最终指标已完成外部只读复验；EXP007 的 C1
    8-target smoke 已通过，1,445-target full 与 B/C2 横向诊断仍待后续安排。
-5. C2 封存并释放容器名后，以相同 commit/image 重建 `lab1_chx`，再启动
+5. C2 封存并释放容器名后，以同一 environment image 和确定 source commit
+   重建 `lab1_chx`，再启动
    seed `42` 的 EXP009。
 6. EXP005/EXP009 使用统一入口、非覆盖 run 目录、精简日志和结构化指标。
+7. EXP005/EXP009 的 formal/audit/eval worker 固定为 `16`，smoke 为 `2`；不改
+   历史 B/C2 配置。
 
 ## 已验证的本地状态
 
 - 历史验收实现及证据绑定 commit：`4edab641cbe0aa43e9220d92d4f785a2b920cb31`。
-- 研究相关测试：`138 passed`（含 CPM、受管运行、实验管理与历史验收基础设施）。
+- 研究相关测试：`142 passed`（含 source/environment 解耦、CPM、受管运行、实验
+  管理与历史验收基础设施）。
 - B 和 C2 正式 config preflight：PASS。
 - 官方初始化权重 SHA-256：
   `bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c`。

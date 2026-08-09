@@ -10,7 +10,13 @@ from pathlib import Path
 from research.experiment_system.artifacts import atomic_write_json, read_run_state, utc_now
 from research.experiment_system.checkpoints import load_checkpoint_index, verify_checkpoint_index
 from research.experiment_system.logs import load_or_write_warning_summary
-from research.experiment_system.manifest import read_json, sha256_file, validate_run_manifest
+from research.experiment_system.manifest import (
+    manifest_environment_image_id,
+    manifest_source_commit,
+    read_json,
+    sha256_file,
+    validate_run_manifest,
+)
 from research.experiment_system.metrics import index_bop_evaluation, verify_indexed_evaluation
 from research.experiment_system.steps import load_steps, register_step, transition_step
 
@@ -92,8 +98,8 @@ def main() -> int:
         "experiment_id": manifest["experiment_id"],
         "run_id": manifest["run_id"],
         "seed": manifest["seed"],
-        "git_commit": manifest["source"]["git_commit"],
-        "docker_image_id": manifest["execution"]["docker_image_id"],
+        "git_commit": manifest_source_commit(manifest),
+        "docker_image_id": manifest_environment_image_id(manifest),
         "fixed_checkpoint": fixed[0],
         "evaluation_index_sha256": sha256_file(
             evaluation_root / "evaluation_index.json"

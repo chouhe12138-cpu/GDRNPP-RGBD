@@ -7,3 +7,5 @@ OUTPUT_DIR = (
     "output/experiments/EXP-20260731-005-pnp-only-control/RUN-SET-BY-LAUNCHER"
 )
 SEED = 42
+
+DATALOADER = dict(NUM_WORKERS=16)

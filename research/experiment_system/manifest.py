@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import platform
 import subprocess
@@ -97,8 +96,9 @@ def validate_experiment(payload: dict[str, Any], directory_name: str | None = No
 
 
 def validate_run_manifest(payload: dict[str, Any]) -> None:
-    if payload.get("schema_version") != 1:
-        raise ValueError("run manifest schema_version must be 1")
+    schema_version = payload.get("schema_version")
+    if schema_version not in {1, 2}:
+        raise ValueError("run manifest schema_version must be 1 or 2")
     experiment_id = _require_string(payload, "experiment_id")
     if not EXPERIMENT_ID_RE.fullmatch(experiment_id):
         raise ValueError(f"invalid experiment_id: {experiment_id}")
@@ -110,16 +110,74 @@ def validate_run_manifest(payload: dict[str, Any]) -> None:
     source = payload.get("source")
     if not isinstance(source, dict):
         raise ValueError("source must be an object")
-    commit = source.get("git_commit")
+    commit_key = "git_commit" if schema_version == 1 else "source_git_commit"
+    clean_key = "git_dirty" if schema_version == 1 else "source_tree_clean"
+    commit = source.get(commit_key)
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
-        raise ValueError("source.git_commit must be a full lowercase commit SHA")
-    if not isinstance(source.get("git_dirty"), bool):
-        raise ValueError("source.git_dirty must be a boolean")
+        raise ValueError(f"source.{commit_key} must be a full lowercase commit SHA")
+    if not isinstance(source.get(clean_key), bool):
+        raise ValueError(f"source.{clean_key} must be a boolean")
+    if schema_version == 2 and not isinstance(source.get("source_head_detached"), bool):
+        raise ValueError("source.source_head_detached must be a boolean")
+    if schema_version == 2 and payload["mode"] == "formal":
+        if not source["source_tree_clean"]:
+            raise ValueError("formal source.source_tree_clean must be true")
+        if not source["source_head_detached"]:
+            raise ValueError("formal source.source_head_detached must be true")
     config = payload.get("config")
     if not isinstance(config, dict) or not config.get("path") or not config.get("sha256"):
         raise ValueError("config.path and config.sha256 are required")
     if not isinstance(payload.get("inputs", []), list):
         raise ValueError("inputs must be a list")
+    if schema_version == 2:
+        environment = payload.get("environment")
+        if not isinstance(environment, dict):
+            raise ValueError("environment must be an object")
+        if payload["mode"] == "formal":
+            required = (
+                "environment_image_id",
+                "environment_build_source_commit",
+                "environment_contract_sha256",
+                "native_artifact_manifest_sha256",
+                "environment_binding_sha256",
+            )
+            for key in required:
+                if not isinstance(environment.get(key), str) or not environment[key]:
+                    raise ValueError(f"environment.{key} is required for formal runs")
+            if not environment["environment_image_id"].startswith("sha256:"):
+                raise ValueError("environment.environment_image_id must be immutable")
+            if not re.fullmatch(
+                r"[0-9a-f]{40}", environment["environment_build_source_commit"]
+            ):
+                raise ValueError(
+                    "environment.environment_build_source_commit must be a full commit"
+                )
+            for key in (
+                "environment_contract_sha256",
+                "native_artifact_manifest_sha256",
+                "environment_binding_sha256",
+            ):
+                if not re.fullmatch(r"[0-9a-f]{64}", environment[key]):
+                    raise ValueError(f"environment.{key} must be a SHA-256")
+        if not isinstance(environment.get("native_artifacts", []), list):
+            raise ValueError("environment.native_artifacts must be a list")
+
+
+def manifest_source_commit(payload: dict[str, Any]) -> str:
+    """Return source commit from either historical v1 or current v2 manifests."""
+
+    source = payload["source"]
+    if payload.get("schema_version") == 1:
+        return source["git_commit"]
+    return source["source_git_commit"]
+
+
+def manifest_environment_image_id(payload: dict[str, Any]) -> str | None:
+    """Return immutable environment image ID across manifest schema versions."""
+
+    if payload.get("schema_version") == 1:
+        return payload.get("execution", {}).get("docker_image_id")
+    return payload.get("environment", {}).get("environment_image_id")
 
 
 def make_run_id(mode: str, seed: int, attempt: int = 1, now: datetime | None = None) -> str:
@@ -137,20 +195,10 @@ def _git(repo_root: Path, *args: str) -> bytes:
 
 def collect_git_provenance(repo_root: Path) -> dict[str, Any]:
     if not (repo_root / ".git").exists():
-        commit = os.environ.get("GDRN_GIT_COMMIT", "").strip()
-        if not re.fullmatch(r"[0-9a-f]{40}", commit):
-            raise RuntimeError(
-                "repository has no .git metadata and no valid embedded GDRN_GIT_COMMIT"
-            )
-        return {
-            "git_commit": commit,
-            "git_remote": os.environ.get("GDRN_GIT_REMOTE", ""),
-            "git_dirty": False,
-            "git_status_sha256": sha256_bytes(b""),
-            "git_diff_sha256": sha256_bytes(b""),
-            "untracked_files": [],
-            "provenance_kind": "embedded_docker_revision",
-        }
+        raise RuntimeError(
+            "source checkout has no .git metadata; image-embedded revision is not "
+            "accepted as source provenance"
+        )
     commit = _git(repo_root, "rev-parse", "HEAD").decode().strip()
     remote = ""
     try:
@@ -193,14 +241,21 @@ def collect_git_provenance(repo_root: Path) -> dict[str, Any]:
         separators=(",", ":"),
     ).encode("utf-8")
     provenance_material = status + b"\0" + diff + b"\0" + staged + b"\0" + untracked_material
+    detached = subprocess.run(
+        ["git", "-C", str(repo_root), "symbolic-ref", "-q", "HEAD"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    ).returncode != 0
     return {
-        "git_commit": commit,
-        "git_remote": remote,
-        "git_dirty": bool(status.strip()),
-        "git_status_sha256": sha256_bytes(status),
-        "git_diff_sha256": sha256_bytes(provenance_material),
+        "source_git_commit": commit,
+        "source_git_remote": remote,
+        "source_tree_clean": not bool(status.strip()),
+        "source_head_detached": detached,
+        "source_status_sha256": sha256_bytes(status),
+        "source_diff_sha256": sha256_bytes(provenance_material),
         "untracked_files": untracked_files,
-        "provenance_kind": "git_worktree",
+        "provenance_kind": "git_release_checkout",
     }
 
 
@@ -212,27 +267,33 @@ def build_run_manifest(
     repo_root: Path,
     config_path: Path,
     inputs: list[dict[str, Any]] | None = None,
-    image_id: str | None = None,
-    image_revision: str | None = None,
+    environment_binding: dict[str, Any] | None = None,
     path_profile_id: str | None = None,
     parent_run_id: str | None = None,
 ) -> dict[str, Any]:
     validate_experiment(experiment)
     source = collect_git_provenance(repo_root)
-    if mode == "formal" and source["git_dirty"]:
+    if mode == "formal" and not source["source_tree_clean"]:
         raise RuntimeError("formal runs require a clean Git worktree, including untracked files")
     if mode == "formal":
-        if not image_id or not image_revision:
-            raise RuntimeError("formal runs require Docker image ID and image revision")
-        if image_revision != source["git_commit"]:
-            raise RuntimeError(
-                "formal Docker image revision does not match the checked-out Git commit"
-            )
+        if not source["source_head_detached"]:
+            raise RuntimeError("formal runs require a detached release checkout")
+        if not environment_binding:
+            raise RuntimeError("formal runs require a verified environment binding")
+        release = environment_binding.get("release", {})
+        if release.get("source_git_commit") != source["source_git_commit"]:
+            raise RuntimeError("environment binding belongs to a different source commit")
+        if release.get("environment_contract_sha256") != environment_binding.get(
+            "environment", {}
+        ).get("environment_contract_sha256"):
+            raise RuntimeError("release and environment contract identities differ")
+    environment = (environment_binding or {}).get("environment", {})
+    native_artifacts = (environment_binding or {}).get("native_artifacts", [])
     config_path = config_path.resolve()
     if not config_path.is_file():
         raise FileNotFoundError(config_path)
     manifest: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "experiment_id": experiment["experiment_id"],
         "experiment_protocol_sha256": sha256_json(experiment),
         "run_id": run_id,
@@ -245,9 +306,25 @@ def build_run_manifest(
             "sha256": sha256_file(config_path),
         },
         "inputs": inputs or [],
+        "environment": {
+            "environment_image_id": environment.get("environment_image_id"),
+            "environment_image_ref": environment.get("environment_image_ref"),
+            "environment_build_source_commit": environment.get(
+                "environment_build_source_commit"
+            ),
+            "environment_contract_sha256": environment.get(
+                "environment_contract_sha256"
+            ),
+            "native_artifact_manifest_sha256": environment.get(
+                "native_artifact_manifest_sha256"
+            ),
+            "native_abi": environment.get("native_abi"),
+            "native_artifacts": native_artifacts,
+            "environment_binding_sha256": (
+                sha256_json(environment_binding) if environment_binding else None
+            ),
+        },
         "execution": {
-            "docker_image_id": image_id,
-            "docker_image_revision": image_revision,
             "path_profile_id": path_profile_id,
             "python_version": platform.python_version(),
             "platform": sys.platform,

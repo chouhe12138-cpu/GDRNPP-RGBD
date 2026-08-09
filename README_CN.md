@@ -16,6 +16,8 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
    [EXP009 实验记录](research/experiments/EXP-20260809-009-cpm-head/RECORD.md)。
 7. EXP005/EXP009 的服务器 smoke、audit、formal 统一使用
    `docker/l40/managed_experiment.sh`；新 run 固定 seed `42`。
+8. 新 release 使用 `docker/l40/prepare_release.sh` 复用稳定 environment image；
+   普通 Python/config 提交不重建镜像。
 
 ## 目录地图
 

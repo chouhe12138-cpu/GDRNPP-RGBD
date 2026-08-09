@@ -44,9 +44,17 @@ esac
 docker_bin="/usr/bin/docker"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
+cd "${repo_root}"
 commit="$(git -C "${repo_root}" rev-parse HEAD)"
-short_commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD)"
-image="${IMAGE:-gdrnpp-research:torch220-cu121-sm89-${short_commit}}"
+environment_binding_host="${repo_root}/.local/environment_binding.json"
+environment_binding_container="/workspace/gdrnpp/.local/environment_binding.json"
+[[ -f "${environment_binding_host}" ]] || {
+    echo "FAIL: missing ${environment_binding_host}; run docker/l40/prepare_release.sh first" >&2
+    exit 1
+}
+image_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["environment"]["environment_image_id"])' "${environment_binding_host}")"
+image_ref="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["environment"]["environment_image_ref"])' "${environment_binding_host}")"
+environment_build_source="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["environment"]["environment_build_source_commit"])' "${environment_binding_host}")"
 runtime_dir="${root}/runtime"
 profile_host="${runtime_dir}/path_profile.json"
 profile_container="/workspace/runtime/path_profile.json"
@@ -75,23 +83,32 @@ start_container() {
 }
 
 image_identity() {
-    "${docker_bin}" image inspect "${image}" --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
+    "${docker_bin}" image inspect "${image_id}" --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}'
 }
 
 check_image_identity() {
-    local identity image_revision
+    local identity actual_image_id image_build_source
+    python3 -m research.experiment_system.environment verify \
+        --repo-root "${repo_root}" \
+        --binding "${environment_binding_host}" \
+        --image-id "${image_id}" >/dev/null
     identity="$(image_identity)"
-    image_revision="${identity##* }"
-    [[ "${image_revision}" == "${commit}" ]] || {
-        echo "FAIL: image revision ${image_revision} != release commit ${commit}" >&2
+    actual_image_id="${identity%% *}"
+    image_build_source="${identity##* }"
+    [[ "${actual_image_id}" == "${image_id}" ]] || {
+        echo "FAIL: resolved image ID ${actual_image_id} != binding ${image_id}" >&2
         exit 1
     }
-    echo "IMAGE=${image} ${identity}"
+    [[ "${image_build_source}" == "${environment_build_source}" ]] || {
+        echo "FAIL: image build-source ${image_build_source} != binding ${environment_build_source}" >&2
+        exit 1
+    }
+    echo "ENVIRONMENT_IMAGE_REF=${image_ref} IMAGE_ID=${image_id} BUILD_SOURCE=${environment_build_source} SOURCE_COMMIT=${commit}"
 }
 
 check_container_identity() {
     local expected_image actual_image
-    expected_image="$("${docker_bin}" image inspect "${image}" --format '{{.Id}}')"
+    expected_image="${image_id}"
     actual_image="$("${docker_bin}" inspect "${container}" --format '{{.Image}}')"
     [[ "${actual_image}" == "${expected_image}" ]] || {
         echo "FAIL: container ${container} uses ${actual_image}, expected ${expected_image}" >&2
@@ -126,7 +143,7 @@ access_check() {
         exit 1
     }
     check_image_identity
-    echo "ACCESS=PASS machine=${machine} experiment=${experiment_id} seed=42"
+    echo "ACCESS=PASS machine=${machine} experiment=${experiment_id} seed=42 source=${commit} environment=${image_id}"
     nvidia-smi -i "${gpu_id}" \
         --query-gpu=index,uuid,name,memory.total,memory.used,memory.free,utilization.gpu \
         --format=csv,noheader
@@ -174,8 +191,6 @@ create_container() {
     }
     write_profile
     mkdir -p "${root}/outputs" "${root}/logs" "${root}/cache" "${root}/audit" "${output_root_host}"
-    image_id="$("${docker_bin}" image inspect "${image}" --format '{{.Id}}')"
-    image_revision="$("${docker_bin}" image inspect "${image}" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
     gpu_uuid="$(nvidia-smi -i "${gpu_id}" --query-gpu=uuid --format=csv,noheader)"
     "${docker_bin}" run -d \
         --gpus "device=${gpu_id}" \
@@ -186,12 +201,18 @@ create_container() {
         --label "gdrnpp.managed=true" \
         --label "gdrnpp.machine=${machine}" \
         --label "gdrnpp.source.commit=${commit}" \
+        --label "gdrnpp.environment.image_id=${image_id}" \
+        --label "gdrnpp.environment.build_source=${environment_build_source}" \
         --env "HOME=/home/gdrn" \
         --env "XDG_CACHE_HOME=/home/gdrn/.cache" \
         --env "MPLCONFIGDIR=/home/gdrn/.cache/matplotlib" \
+        --env "BOP_RENDERER_PATH=/opt/bop_renderer/build" \
         --env "GDRN_IMAGE_ID=${image_id}" \
+        --env "GDRN_SOURCE_COMMIT=${commit}" \
+        --env "GDRN_ENVIRONMENT_BUILD_SOURCE=${environment_build_source}" \
         --env "GDRN_PHYSICAL_GPU=${gpu_id}" \
         --env "GDRN_GPU_UUID=${gpu_uuid}" \
+        --mount "type=bind,src=${repo_root},dst=/workspace/gdrnpp,readonly" \
         --mount "type=bind,src=${root}/datasets/BOP_DATASETS,dst=/workspace/gdrnpp/datasets/BOP_DATASETS,readonly" \
         --mount "type=bind,src=${root}/datasets/VOC,dst=/workspace/gdrnpp/datasets/VOCdevkit,readonly" \
         --mount "type=bind,src=${root}/weights,dst=/workspace/gdrnpp/pretrained_models,readonly" \
@@ -199,8 +220,8 @@ create_container() {
         --mount "type=bind,src=${root}/outputs,dst=/workspace/gdrnpp/output" \
         --mount "type=bind,src=${root}/cache,dst=/home/gdrn/.cache" \
         --mount "type=bind,src=${runtime_dir},dst=/workspace/runtime,readonly" \
-        "${image}" sleep infinity >/dev/null
-    echo "CONTAINER_CREATED=${container} image_id=${image_id} revision=${image_revision} physical_gpu=${gpu_id}"
+        "${image_id}" sleep infinity >/dev/null
+    echo "CONTAINER_CREATED=${container} source=${commit} environment_image_id=${image_id} environment_build_source=${environment_build_source} physical_gpu=${gpu_id}"
 }
 
 gate() {
@@ -208,7 +229,7 @@ gate() {
     check_image_identity
     check_container_identity
     "${docker_bin}" exec "${container}" bash -lc \
-        "cd /workspace/gdrnpp && /usr/local/bin/verify-gdrn-environment && /usr/local/bin/verify-gdrn-native && python -m research.experiment_system.cli registry --check"
+        "cd /workspace/gdrnpp && test -d /opt/bop_renderer/build && python -m research.experiment_system.environment verify --repo-root /workspace/gdrnpp --binding ${environment_binding_container} --image-id ${image_id} && /usr/local/bin/verify-gdrn-environment && /usr/local/bin/verify-gdrn-native && python -m research.experiment_system.cli registry --check"
     if [[ "${experiment}" == "EXP005" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.pnp_control.preflight --config ${config_root}/train.py --weights ${official_container} --expected-seed 42"
@@ -252,7 +273,7 @@ mode_config() {
 }
 
 launch_once() {
-    local mode="$1" run_id config image_id image_revision run_host run_container
+    local mode="$1" run_id config run_host run_container
     start_container
     check_image_identity
     check_container_identity
@@ -262,10 +283,8 @@ launch_once() {
     fi
     run_id="$(next_run_id "${mode}")"
     config="$(mode_config "${mode}")"
-    image_id="$("${docker_bin}" inspect "${container}" --format '{{.Image}}')"
-    image_revision="$("${docker_bin}" image inspect "${image_id}" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
     "${docker_bin}" exec "${container}" bash -lc \
-        "cd /workspace/gdrnpp && python -m research.experiment_system.cli prepare --experiment research/experiments/${experiment_id}/EXPERIMENT.json --config ${config} --mode ${mode} --seed 42 --run-id ${run_id} --output-root ${output_root_container} --profile ${profile_container} --image-id ${image_id} --image-revision ${image_revision}"
+        "cd /workspace/gdrnpp && python -m research.experiment_system.cli prepare --experiment research/experiments/${experiment_id}/EXPERIMENT.json --config ${config} --mode ${mode} --seed 42 --run-id ${run_id} --output-root ${output_root_container} --profile ${profile_container} --environment-binding ${environment_binding_container} --environment-image-id ${image_id}"
     run_host="${output_root_host}/${experiment_id}/${run_id}"
     run_container="${output_root_container}/${experiment_id}/${run_id}"
     mkdir -p "${log_root}"
@@ -299,7 +318,7 @@ require_complete() {
         exit 1
     }
     container_image="$("${docker_bin}" inspect "${container}" --format '{{.Image}}')"
-    python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); expected=(sys.argv[2],sys.argv[3],sys.argv[4]); actual=(m["source"]["git_commit"],m["execution"]["docker_image_id"],str(m["seed"])); assert actual == expected, (actual, expected)' \
+    python3 -c 'import json,sys; m=json.load(open(sys.argv[1])); expected=(sys.argv[2],sys.argv[3],sys.argv[4]); actual=(m["source"]["source_git_commit"],m["environment"]["environment_image_id"],str(m["seed"])); assert actual == expected, (actual, expected)' \
         "${run}/meta/run_manifest.json" "${commit}" "${container_image}" "42" || {
         echo "FAIL: ${mode} gate was produced by a different commit/image/seed: ${run}" >&2
         exit 1

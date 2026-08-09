@@ -20,14 +20,17 @@ checkpoint 和服务器控制脚本默认只读。
 ```text
 本地开发/测试 → Git commit → Gitee origin/main
               → 服务器 fetch 确定 commit
-              → 干净源码构建 Docker image
-              → manifest 记录 commit + image ID
+              → 新建只读 release checkout
+              → 复用稳定 environment image
+              → manifest 分别记录 source commit 与 environment image ID
 ```
 
 - `origin/main` 是唯一长期主线；功能分支只用于短期开发。
 - 服务器不提交、不 push，不通过 rsync 覆盖代码。
 - dataset、weights、checkpoint、output 和完整日志不进入 Git。
 - 正式实验绑定完整 40 位 commit SHA，不依赖“当时 main 大概是什么”。
+- 普通 Python、config 和实验入口变化不重建镜像。只有 Dockerfile、锁定依赖、
+  vendor、C++/CUDA native/ABI 变化才允许重建 environment image。
 
 服务器获取新版本前先执行：
 
@@ -51,9 +54,11 @@ git rev-parse HEAD
 ## 正式实验冻结条件
 
 - Git tracked 和非忽略 untracked 状态为空；
+- release 为 detached HEAD，正式启动后保持只读；
 - commit 已存在于 Gitee；
 - resolved config 和初始化 checkpoint 哈希已记录；
-- Docker image revision 等于 Git commit；
+- environment image ID、build-source commit、环境契约和 native artifact 哈希已记录；
+- source commit 与 image build-source commit 独立，不要求相等；
 - 数据、VOC、baseline 和 renderer 检查通过；
 - smoke/audit gate 满足对应协议；
 - 输出目录不存在；
@@ -79,6 +84,18 @@ git rev-parse HEAD
 
 新 run 的随机种子统一固定为 `42`。run ID 的 UTC 时间只负责目录唯一性，不
 参与随机数初始化。历史 run 保留原 seed。
+
+每个新 release 在创建容器前先复用已构建镜像并准备 native overlay：
+
+```bash
+docker/l40/prepare_release.sh \
+  lab0 \
+  gdrnpp-research:torch220-cu121-sm89-35313ae3d413
+```
+
+该命令不构建镜像。它只解析不可变 image ID、验证环境契约，并把镜像中的
+`.so`/uncertainty-PnP runtime libraries 按哈希复制到 Git 忽略区域。环境或
+native 输入不兼容时直接拒绝运行。
 
 ```bash
 docker/l40/managed_experiment.sh lab0 EXP005 access
@@ -134,4 +151,5 @@ warning 和异常。完整配置、环境、指标和 warning 计数分别保存
 - 每类修改独立提交；需要回退时切换已知 commit 或显式 revert。
 - 旧 Docker image/container 保留到新 smoke 完整通过。
 - resume 必须读取原 run manifest；科学字段变化时创建新 run。
-- 服务器临时修复先保存 diff，再回本地重现、测试、提交和重新构建镜像。
+- 服务器临时修复先保存 diff，再回本地重现、测试和提交。普通源码更新建立新
+  release 并复用 environment image；只有环境契约变化才重建镜像。

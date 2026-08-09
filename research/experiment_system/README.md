@@ -34,6 +34,12 @@ python -m research.experiment_system.cli accept-history
 
 ## 新 run 准备
 
+服务器先从稳定 environment image 为 detached release 准备 native overlay：
+
+```bash
+docker/l40/prepare_release.sh lab0 <existing-environment-image>
+```
+
 ```bash
 python -m research.experiment_system.cli prepare \
   --experiment research/experiments/EXP-.../EXPERIMENT.json \
@@ -41,11 +47,17 @@ python -m research.experiment_system.cli prepare \
   --mode smoke \
   --seed 42 \
   --profile .local/path_profiles/<machine>.json \
-  --image gdrnpp:<tag> \
+  --environment-binding .local/environment_binding.json \
+  --environment-image-id sha256:<actual-container-image-id> \
   --output-root output/experiments
 ```
 
-formal 模式要求包括非忽略 untracked 文件在内的 Git 工作树完全干净。当前
+新 manifest 分别记录 `source_git_commit`、resolved config hash、不可变
+environment image ID、environment build-source commit、环境契约和 native
+artifact identity；不要求 image build-source commit 等于 source commit。
+
+formal 模式要求 detached release checkout 和包括非忽略 untracked 文件在内的
+Git 工作树完全干净。当前
 C2 继续使用既有冻结运行链；新的 EXP005/EXP009 使用
 `docker/l40/managed_experiment.sh`。两者的新 run 均固定 seed `42`。
 

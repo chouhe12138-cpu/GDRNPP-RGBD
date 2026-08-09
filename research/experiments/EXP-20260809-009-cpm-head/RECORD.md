@@ -39,7 +39,8 @@ diagnostic smoke（含 XYZ α、coverage-only、CXU-null）。
 
 1. C2 仍未完成 Epoch 40 与最终归档，现有服务器运行链不得改变；
 2. mandatory B matched-training-protocol control 先以同一 seed `42` 启动；
-3. 当前实现尚未形成干净、已推送的确定 Git commit，也没有对应 Docker image ID；
+3. formal 必须使用干净、已推送的 detached Git release，并绑定已验证的稳定
+   environment image ID；两者分别记录，不要求 build-source commit 相等；
 4. EXP009 只能在 C2 完成封存并释放 `lab1_chx` 后创建 formal server run。
 
 满足以上条件前不得启动 formal，也不得将本地 checkpoint 当作正式初始结果；

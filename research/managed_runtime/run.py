@@ -15,7 +15,12 @@ import torch
 from research.experiment_system.artifacts import atomic_write_json, utc_now
 from research.experiment_system.checkpoints import record_checkpoint
 from research.experiment_system.logs import compact_and_write_warning_summary
-from research.experiment_system.manifest import read_json, sha256_file
+from research.experiment_system.manifest import (
+    manifest_environment_image_id,
+    manifest_source_commit,
+    read_json,
+    sha256_file,
+)
 from research.experiment_system.steps import register_step, transition_step
 
 
@@ -121,8 +126,8 @@ def main() -> int:
             "MANAGED_RUN_START "
             f"experiment={manifest['experiment_id']} run={manifest['run_id']} "
             f"mode={args.mode} seed={manifest['seed']} "
-            f"commit={manifest['source']['git_commit']} "
-            f"image={manifest['execution']['docker_image_id']} "
+            f"commit={manifest_source_commit(manifest)} "
+            f"image={manifest_environment_image_id(manifest)} "
             f"official_sha256={sha256_file(official)} "
             f"at={utc_now()} command={command_text}\n"
         )

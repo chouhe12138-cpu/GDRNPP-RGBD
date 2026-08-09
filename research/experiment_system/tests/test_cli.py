@@ -32,11 +32,14 @@ def test_prepare_creates_immutable_metadata_and_resolved_config(tmp_path, monkey
     monkeypatch.setattr(
         "research.experiment_system.manifest.collect_git_provenance",
         lambda _root: {
-            "git_commit": "a" * 40,
-            "git_remote": "origin",
-            "git_dirty": True,
-            "git_status_sha256": "b" * 64,
-            "git_diff_sha256": "c" * 64,
+            "source_git_commit": "a" * 40,
+            "source_git_remote": "origin",
+            "source_tree_clean": False,
+            "source_head_detached": True,
+            "source_status_sha256": "b" * 64,
+            "source_diff_sha256": "c" * 64,
+            "untracked_files": [],
+            "provenance_kind": "git_release_checkout",
         },
     )
     output = tmp_path / "outputs"
@@ -52,16 +55,14 @@ def test_prepare_creates_immutable_metadata_and_resolved_config(tmp_path, monkey
         profile=None,
         catalog=None,
         asset_ids=None,
-        image_id=None,
-        image_revision=None,
-        image=None,
-        docker_bin=None,
+        environment_binding=None,
+        environment_image_id=None,
         parent_run_id=None,
     )
     assert command_prepare(args) == 0
     run = output / "EXP-20260808-008-example/RUN-20260808-010203-smoke-s1-a01"
     manifest = json.loads((run / "meta/run_manifest.json").read_text())
-    assert manifest["source"]["git_dirty"]
+    assert not manifest["source"]["source_tree_clean"]
     assert (run / "meta/config_snapshot.py").is_file()
     assert (run / "meta/resolved_config.py").is_file()
     assert command_verify_run(argparse.Namespace(run_dir=run)) == 0

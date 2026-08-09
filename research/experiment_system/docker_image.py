@@ -1,4 +1,4 @@
-"""Resolve immutable Docker image identity for formal run manifests."""
+"""Resolve immutable environment image identity."""
 
 from __future__ import annotations
 
@@ -24,11 +24,13 @@ def inspect_docker_image(image: str, docker_bin: Path = Path("/usr/bin/docker"))
     parts = output.split("\t")
     if len(parts) != 2 or not parts[0].startswith("sha256:"):
         raise RuntimeError(f"unexpected Docker image identity: {output!r}")
-    revision = parts[1].strip()
-    if not revision or revision == "<no value>":
-        raise RuntimeError("Docker image has no org.opencontainers.image.revision label")
+    build_source_revision = parts[1].strip()
+    if not build_source_revision or build_source_revision == "<no value>":
+        raise RuntimeError(
+            "Docker image has no environment build-source revision label"
+        )
     return {
         "image": image,
         "image_id": parts[0],
-        "revision": revision,
+        "build_source_revision": build_source_revision,
     }

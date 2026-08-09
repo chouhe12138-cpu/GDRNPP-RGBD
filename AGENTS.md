@@ -38,7 +38,9 @@ RECORD、stage 协议、STATUS/HANDOFF 摘要。
 
 - 科学协议使用唯一 `experiment_id`；一次实际执行使用唯一 `run_id`。
 - smoke、audit、formal 是 run mode，不因运行规模不同自动创建新实验。
-- formal 必须绑定确定的 Git commit、resolved config、初始化权重哈希和镜像 ID。
+- formal 必须分别绑定确定的 source Git commit、resolved config、初始化权重哈希、
+  environment image ID 和 native/environment identity；source commit 不要求等于
+  image build-source commit。
 - 禁止覆盖已有 run 目录；失败或无效运行保留证据并标记状态。
 - train 只负责训练，eval 只评估明确 checkpoint，diagnostic 只读固定 checkpoint，
   summarize 读取标准化指标并执行预注册 gate。
@@ -48,10 +50,13 @@ RECORD、stage 协议、STATUS/HANDOFF 摘要。
 ## Git 和服务器同步
 
 - 本地工作区是唯一代码修改来源；Gitee `origin/main` 是唯一长期代码主线。
-- 服务器只 fetch/checkout 确定 commit、构建镜像和运行实验，不提交、不 push。
+- 服务器只 fetch/checkout 确定 commit、准备只读 release 并运行实验，不提交、
+  不 push。普通 Python/config 更新复用稳定 environment image；只有 Dockerfile、
+  requirements/vendor、C++/CUDA native 或 ABI 变化才重建镜像。
 - 服务器发现本地修改时先保存只读 diff 和审计信息，再回本地修复、测试和提交；
   不在服务器覆盖或 reset。
-- 正式实验启动后不 pull、重建或替换其代码镜像。checkpoint、dataset、output、
+- 正式实验启动后不 pull、不修改 release checkout、不重建或替换其环境镜像。
+  checkpoint、dataset、output、
   完整日志和 secrets 不进入 Git。
 - 用户在服务器终端执行命令并返回输出；Agent 不主动 SSH、不生成密钥、不保存
   Gitee 口令或 PAT。

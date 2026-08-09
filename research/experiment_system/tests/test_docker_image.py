@@ -10,4 +10,4 @@ def test_image_inspection_reads_id_and_revision(monkeypatch):
     )
     result = inspect_docker_image("gdrnpp:test", Path("/usr/bin/docker"))
     assert result["image_id"] == "sha256:image"
-    assert result["revision"] == "a" * 40
+    assert result["build_source_revision"] == "a" * 40

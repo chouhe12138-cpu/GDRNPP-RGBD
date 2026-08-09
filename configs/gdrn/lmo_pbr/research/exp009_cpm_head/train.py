@@ -6,6 +6,8 @@ OUTPUT_DIR = (
 )
 SEED = 42
 
+DATALOADER = dict(NUM_WORKERS=16)
+
 MODEL = dict(
     WEIGHTS="pretrained_models/lmo_pbr/model_final_wo_optim.pth",
     POSE_NET=dict(

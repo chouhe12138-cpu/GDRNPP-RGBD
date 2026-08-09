@@ -97,12 +97,15 @@ def parser() -> argparse.ArgumentParser:
     prepare.add_argument("--profile", type=Path)
     prepare.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     prepare.add_argument("--asset", action="append", dest="asset_ids")
-    prepare.add_argument("--image-id")
-    prepare.add_argument("--image-revision")
     prepare.add_argument(
-        "--image", help="Docker image reference to inspect instead of manual identity"
+        "--environment-binding",
+        type=Path,
+        help="verified release-to-environment binding created by prepare_release.sh",
     )
-    prepare.add_argument("--docker-bin", type=Path, default=Path("/usr/bin/docker"))
+    prepare.add_argument(
+        "--environment-image-id",
+        help="actual immutable image ID of the container executing this run",
+    )
     prepare.add_argument("--parent-run-id")
 
     state = sub.add_parser("state", help="read or transition a run state")
@@ -210,7 +213,10 @@ def command_source(args: argparse.Namespace) -> int:
     from .manifest import collect_git_provenance
 
     result = collect_git_provenance(args.repo_root.resolve())
-    result["formal_clean"] = not result["git_dirty"]
+    result["formal_clean"] = result["source_tree_clean"]
+    result["formal_release_ready"] = (
+        result["source_tree_clean"] and result["source_head_detached"]
+    )
     print_json(result)
     return 0
 
@@ -259,18 +265,18 @@ def command_prepare(args: argparse.Namespace) -> int:
         resolved = resolve_assets(args.catalog, args.profile, args.asset_ids)
         inputs = resolved["assets"]
         path_profile_id = resolved["profile_id"]
-    image_id = args.image_id
-    image_revision = args.image_revision
-    if args.image:
-        if image_id or image_revision:
-            raise ValueError(
-                "use --image or manual --image-id/--image-revision, not both"
-            )
-        from .docker_image import inspect_docker_image
+    environment_binding = None
+    if args.environment_binding:
+        from .environment import verify_release_binding
 
-        image_identity = inspect_docker_image(args.image, args.docker_bin)
-        image_id = image_identity["image_id"]
-        image_revision = image_identity["revision"]
+        verify_release_binding(
+            repo_root,
+            args.environment_binding.resolve(),
+            args.environment_image_id,
+        )
+        environment_binding = read_json(args.environment_binding.resolve())
+    if args.mode == "formal" and not args.environment_image_id:
+        raise RuntimeError("formal runs require the actual environment image ID")
     manifest = build_run_manifest(
         experiment=experiment,
         run_id=run_id,
@@ -279,8 +285,7 @@ def command_prepare(args: argparse.Namespace) -> int:
         repo_root=repo_root,
         config_path=args.config,
         inputs=inputs,
-        image_id=image_id,
-        image_revision=image_revision,
+        environment_binding=environment_binding,
         path_profile_id=path_profile_id,
         parent_run_id=args.parent_run_id,
     )
@@ -466,7 +471,7 @@ def command_accept_history(args: argparse.Namespace) -> int:
         raise FileNotFoundError("no acceptance specs found")
     if args.write:
         source = collect_git_provenance(repo_root)
-        if source["git_dirty"]:
+        if not source["source_tree_clean"]:
             raise RuntimeError(
                 "writing acceptance results requires a clean Git worktree"
             )
