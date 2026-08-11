@@ -31,6 +31,12 @@ image-built native artifacts into ignored paths in the release checkout. The
 release is mounted read-only at `/workspace/gdrnpp`, so all Python/config code
 comes from the selected Git commit.
 
+Release preparation also writes a binding-v2 SHA-256 snapshot of every tracked
+source file. Git cleanliness and detached HEAD are checked on the host. The
+runtime container does not need a `git` executable: it re-hashes the tracked
+snapshot, image ID and native artifacts. A missing Git client inside the stable
+environment image is therefore expected and does not require rebuilding it.
+
 Run `build_image.sh` only after an intentional Dockerfile, dependency, vendor,
 native extension or ABI change. Ordinary Python/config experiments reuse the
 existing image ID.
@@ -45,4 +51,4 @@ docker/l40/managed_experiment.sh lab1 EXP009 status
 ```
 
 新的受管 run 固定 seed `42`。正式 40 epoch 之前必须依次通过 gate、smoke 和
-batch-48 audit。正在运行的 C2 继续使用原冻结镜像和脚本，不由该入口接管。
+batch-48 audit。

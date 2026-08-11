@@ -22,7 +22,7 @@ case "${machine}" in
         root="/data/labs/lab1/docker_data/chx"
         gpu_id=1
         container="lab1_chx"
-        baseline_root="${root}/outputs/EXP-20260731-006/official_gt"
+        baseline_root="${root}/baselines/official_gt"
         ;;
     *) usage ;;
 esac
@@ -88,7 +88,7 @@ image_identity() {
 
 check_image_identity() {
     local identity actual_image_id image_build_source
-    python3 -m research.experiment_system.environment verify \
+    python3 -m research.experiment_system.environment verify-host \
         --repo-root "${repo_root}" \
         --binding "${environment_binding_host}" \
         --image-id "${image_id}" >/dev/null
@@ -229,7 +229,7 @@ gate() {
     check_image_identity
     check_container_identity
     "${docker_bin}" exec "${container}" bash -lc \
-        "cd /workspace/gdrnpp && test -d /opt/bop_renderer/build && python -m research.experiment_system.environment verify --repo-root /workspace/gdrnpp --binding ${environment_binding_container} --image-id ${image_id} && /usr/local/bin/verify-gdrn-environment && /usr/local/bin/verify-gdrn-native && python -m research.experiment_system.cli registry --check"
+        "cd /workspace/gdrnpp && test -d /opt/bop_renderer/build && python -m research.experiment_system.environment verify-runtime --repo-root /workspace/gdrnpp --binding ${environment_binding_container} --image-id ${image_id} && /usr/local/bin/verify-gdrn-environment && /usr/local/bin/verify-gdrn-native && python -m research.experiment_system.cli registry --check"
     if [[ "${experiment}" == "EXP005" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.pnp_control.preflight --config ${config_root}/train.py --weights ${official_container} --expected-seed 42"

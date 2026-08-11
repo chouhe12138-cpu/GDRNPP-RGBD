@@ -1,6 +1,6 @@
 # EXP-20260809-009 — CPM-Head
 
-状态：`AUTHORIZED — LOCAL PIPELINE PASS, WAITING FOR C2 ARCHIVE`
+状态：`AUTHORIZED — LOCAL PIPELINE PASS, SERVER RELEASE PENDING`
 
 ## 研究问题
 
@@ -35,16 +35,16 @@ diagnostic smoke（含 XYZ α、coverage-only、CXU-null）。
 
 详细哈希和验收结果见 `research/cpm_head/LOCAL_CHAIN_20260809.json`。
 
-## 当前阻塞
+## 服务器启动条件
 
-1. C2 仍未完成 Epoch 40 与最终归档，现有服务器运行链不得改变；
-2. mandatory B matched-training-protocol control 先以同一 seed `42` 启动；
+1. C2 已完成 Epoch 40、最小归档和旧容器清理，该条件已满足；
+2. mandatory B matched-training-protocol control 与 CPM 均使用 seed `42`、同一
+   source commit 和同一 environment image，可分别在 lab0/lab1 启动；
 3. formal 必须使用干净、已推送的 detached Git release，并绑定已验证的稳定
    environment image ID；两者分别记录，不要求 build-source commit 相等；
-4. EXP009 只能在 C2 完成封存并释放 `lab1_chx` 后创建 formal server run。
+4. 新建 `lab1_chx` 后仍须依次通过 gate、smoke、batch-48 audit，才能启动 formal。
 
-满足以上条件前不得启动 formal，也不得将本地 checkpoint 当作正式初始结果；
-该条件不撤销已登记的实验授权。
+本地 checkpoint 只作为工程验收，不能当作正式初始结果或性能结果。
 
 ## 结果与结论
 

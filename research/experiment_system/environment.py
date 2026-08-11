@@ -17,7 +17,9 @@ from typing import Any
 from .artifacts import atomic_write_json, utc_now
 from .docker_image import inspect_docker_image
 from .manifest import (
+    collect_bound_source_provenance,
     collect_git_provenance,
+    collect_source_snapshot,
     read_json,
     sha256_file,
     sha256_json,
@@ -283,13 +285,20 @@ def prepare_release(
         (repo_root / relative).mkdir(parents=True, exist_ok=True)
     native_artifact_sha = sha256_json({"artifacts": artifacts})
     abi = _native_abi(image["image_id"], docker_bin)
+    source_snapshot = collect_source_snapshot(
+        repo_root, source["source_git_commit"]
+    )
     binding = {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_at": utc_now(),
         "release": {
             "source_git_commit": source["source_git_commit"],
+            "source_git_remote": source["source_git_remote"],
             "source_tree_clean": True,
             "source_head_detached": True,
+            "source_status_sha256": source["source_status_sha256"],
+            "source_diff_sha256": source["source_diff_sha256"],
+            "source_snapshot": source_snapshot,
             "environment_contract_sha256": current_contract["sha256"],
         },
         "environment": {
@@ -316,8 +325,8 @@ def verify_release_binding(
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     binding = read_json(binding_path.resolve())
-    if binding.get("schema_version") != 1:
-        raise ValueError("environment binding schema_version must be 1")
+    if binding.get("schema_version") != 2:
+        raise ValueError("environment binding schema_version must be 2")
     source = collect_git_provenance(repo_root)
     if not source["source_tree_clean"]:
         raise RuntimeError("bound source checkout is not clean")
@@ -327,6 +336,9 @@ def verify_release_binding(
     environment = binding.get("environment", {})
     if release.get("source_git_commit") != source["source_git_commit"]:
         raise RuntimeError("environment binding source commit mismatch")
+    snapshot = collect_source_snapshot(repo_root, source["source_git_commit"])
+    if snapshot != release.get("source_snapshot"):
+        raise RuntimeError("environment binding source snapshot mismatch")
     contract = environment_contract(repo_root, source["source_git_commit"])
     if contract["sha256"] != release.get("environment_contract_sha256"):
         raise RuntimeError("release environment contract changed after binding")
@@ -350,6 +362,53 @@ def verify_release_binding(
         "environment_contract_sha256": contract["sha256"],
         "native_artifact_manifest_sha256": artifact_sha,
         "native_artifacts_checked": len(artifacts),
+        "source_snapshot_sha256": snapshot["sha256"],
+        "source_files_checked": snapshot["file_count"],
+        "verification_mode": "host_git",
+    }
+
+
+def verify_runtime_binding(
+    repo_root: Path,
+    binding_path: Path,
+    expected_image_id: str | None = None,
+) -> dict[str, Any]:
+    """Verify immutable source/environment identity without requiring Git."""
+
+    repo_root = repo_root.resolve()
+    binding = read_json(binding_path.resolve())
+    if binding.get("schema_version") != 2:
+        raise ValueError("environment binding schema_version must be 2")
+    source = collect_bound_source_provenance(repo_root, binding)
+    release = binding.get("release", {})
+    environment = binding.get("environment", {})
+    release_contract = release.get("environment_contract_sha256")
+    if release_contract != environment.get("environment_contract_sha256"):
+        raise RuntimeError("release is incompatible with the environment image")
+    if expected_image_id and environment.get("environment_image_id") != expected_image_id:
+        raise RuntimeError("environment image ID does not match the release binding")
+    artifacts = [
+        _artifact_entry(repo_root, repo_root / item["path"])
+        for item in binding["native_artifacts"]
+    ]
+    if artifacts != binding["native_artifacts"]:
+        raise RuntimeError("native artifact paths or hashes changed after binding")
+    artifact_sha = sha256_json({"artifacts": artifacts})
+    if artifact_sha != environment.get("native_artifact_manifest_sha256"):
+        raise RuntimeError("native artifact manifest hash mismatch")
+    return {
+        "status": "PASS",
+        "source_git_commit": source["source_git_commit"],
+        "environment_image_id": environment["environment_image_id"],
+        "environment_build_source_commit": environment[
+            "environment_build_source_commit"
+        ],
+        "environment_contract_sha256": release_contract,
+        "native_artifact_manifest_sha256": artifact_sha,
+        "native_artifacts_checked": len(artifacts),
+        "source_snapshot_sha256": source["source_snapshot_sha256"],
+        "source_files_checked": source["source_files_checked"],
+        "verification_mode": "runtime_snapshot",
     }
 
 
@@ -360,15 +419,21 @@ def main() -> int:
     prepare.add_argument("--repo-root", type=Path, required=True)
     prepare.add_argument("--image", required=True)
     prepare.add_argument("--docker-bin", type=Path, default=Path("/usr/bin/docker"))
-    verify = subparsers.add_parser("verify")
-    verify.add_argument("--repo-root", type=Path, required=True)
-    verify.add_argument("--binding", type=Path, required=True)
-    verify.add_argument("--image-id")
+    verify_host = subparsers.add_parser("verify-host")
+    verify_host.add_argument("--repo-root", type=Path, required=True)
+    verify_host.add_argument("--binding", type=Path, required=True)
+    verify_host.add_argument("--image-id")
+    verify_runtime = subparsers.add_parser("verify-runtime")
+    verify_runtime.add_argument("--repo-root", type=Path, required=True)
+    verify_runtime.add_argument("--binding", type=Path, required=True)
+    verify_runtime.add_argument("--image-id")
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare_release(args.repo_root, args.image, args.docker_bin)
-    else:
+    elif args.command == "verify-host":
         result = verify_release_binding(args.repo_root, args.binding, args.image_id)
+    else:
+        result = verify_runtime_binding(args.repo_root, args.binding, args.image_id)
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 

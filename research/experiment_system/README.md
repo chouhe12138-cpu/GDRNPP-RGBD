@@ -56,10 +56,15 @@ python -m research.experiment_system.cli prepare \
 environment image ID、environment build-source commit、环境契约和 native
 artifact identity；不要求 image build-source commit 等于 source commit。
 
+`prepare_release.sh` 在宿主机使用 Git 验证 detached/clean release，并在 binding
+v2 中保存全部 tracked source 的 SHA-256 snapshot。容器内不要求安装 Git；gate
+和 run manifest 逐文件复核该 snapshot，同时独立复核 image ID 与 native
+artifacts。宿主机使用 `environment verify-host`，容器使用
+`environment verify-runtime`，两种验证不得互换或静默降级。
+
 formal 模式要求 detached release checkout 和包括非忽略 untracked 文件在内的
-Git 工作树完全干净。当前
-C2 继续使用既有冻结运行链；新的 EXP005/EXP009 使用
-`docker/l40/managed_experiment.sh`。两者的新 run 均固定 seed `42`。
+Git 工作树完全干净。新的 EXP005/EXP009 使用
+`docker/l40/managed_experiment.sh`，两者的新 run 均固定 seed `42`。
 
 长时间训练仍由已有服务器脚本后台执行；统一 CLI 只登记步骤命令和状态，不
 持有 SSH 或训练进程：

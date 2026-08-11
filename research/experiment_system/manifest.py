@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
+import os
 import platform
+import re
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -259,6 +261,140 @@ def collect_git_provenance(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def _tracked_source_entry(repo_root: Path, relative: str) -> dict[str, Any]:
+    relative_path = Path(relative)
+    if (
+        not relative
+        or relative_path.is_absolute()
+        or ".." in relative_path.parts
+        or relative_path.as_posix() != relative
+    ):
+        raise ValueError(f"invalid tracked source path: {relative!r}")
+    path = repo_root / relative_path
+    try:
+        info = path.lstat()
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"tracked source path is missing: {relative}") from exc
+    if stat.S_ISLNK(info.st_mode):
+        return {
+            "path": relative,
+            "kind": "symlink",
+            "target": os.readlink(path),
+        }
+    if not stat.S_ISREG(info.st_mode):
+        raise RuntimeError(f"unsupported tracked source type: {relative}")
+    return {
+        "path": relative,
+        "kind": "file",
+        "sha256": sha256_file(path),
+        "size_bytes": info.st_size,
+        "executable": bool(info.st_mode & stat.S_IXUSR),
+    }
+
+
+def collect_source_snapshot(repo_root: Path, commit: str | None = None) -> dict[str, Any]:
+    """Hash every tracked working-tree path for gitless runtime verification."""
+
+    repo_root = repo_root.resolve()
+    head_commit = _git(repo_root, "rev-parse", "HEAD").decode().strip()
+    resolved_commit = commit or head_commit
+    if not re.fullmatch(r"[0-9a-f]{40}", resolved_commit):
+        raise ValueError("source snapshot requires a full lowercase Git commit")
+    if resolved_commit != head_commit:
+        raise RuntimeError("source snapshot commit does not match checked-out HEAD")
+    raw_paths = _git(repo_root, "ls-files", "-z")
+    paths = sorted(
+        raw.decode("utf-8") for raw in raw_paths.split(b"\0") if raw
+    )
+    if not paths:
+        raise RuntimeError("source snapshot selected no tracked files")
+    entries = [_tracked_source_entry(repo_root, relative) for relative in paths]
+    material = {
+        "schema_version": 1,
+        "source_git_commit": resolved_commit,
+        "files": entries,
+    }
+    return {
+        **material,
+        "file_count": len(entries),
+        "sha256": sha256_json(material),
+    }
+
+
+def verify_source_snapshot(repo_root: Path, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Verify a host-created source snapshot without executing Git."""
+
+    if snapshot.get("schema_version") != 1:
+        raise ValueError("source snapshot schema_version must be 1")
+    commit = snapshot.get("source_git_commit")
+    if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("source snapshot has no valid source_git_commit")
+    expected = snapshot.get("files")
+    if not isinstance(expected, list) or not expected:
+        raise ValueError("source snapshot files must be a non-empty list")
+    paths = [entry.get("path") for entry in expected if isinstance(entry, dict)]
+    if len(paths) != len(expected) or not all(isinstance(path, str) for path in paths):
+        raise ValueError("source snapshot contains an invalid file entry")
+    if paths != sorted(paths) or len(paths) != len(set(paths)):
+        raise ValueError("source snapshot paths must be sorted and unique")
+    if snapshot.get("file_count") != len(expected):
+        raise ValueError("source snapshot file_count mismatch")
+    material = {
+        "schema_version": 1,
+        "source_git_commit": commit,
+        "files": expected,
+    }
+    expected_sha = sha256_json(material)
+    if snapshot.get("sha256") != expected_sha:
+        raise RuntimeError("source snapshot manifest hash mismatch")
+    for expected_entry in expected:
+        actual_entry = _tracked_source_entry(repo_root.resolve(), expected_entry["path"])
+        if actual_entry != expected_entry:
+            raise RuntimeError(
+                f"tracked source snapshot mismatch: {expected_entry['path']}"
+            )
+    return {
+        "source_git_commit": commit,
+        "source_snapshot_sha256": expected_sha,
+        "source_files_checked": len(expected),
+    }
+
+
+def collect_bound_source_provenance(
+    repo_root: Path, environment_binding: dict[str, Any]
+) -> dict[str, Any]:
+    """Build run provenance from a verified v2 release binding, without Git."""
+
+    if environment_binding.get("schema_version") != 2:
+        raise ValueError("runtime provenance requires environment binding schema_version 2")
+    release = environment_binding.get("release")
+    if not isinstance(release, dict):
+        raise ValueError("environment binding release must be an object")
+    snapshot = release.get("source_snapshot")
+    if not isinstance(snapshot, dict):
+        raise ValueError("environment binding has no source snapshot")
+    checked = verify_source_snapshot(repo_root, snapshot)
+    commit = release.get("source_git_commit")
+    if commit != checked["source_git_commit"]:
+        raise RuntimeError("release commit does not match its source snapshot")
+    if release.get("source_tree_clean") is not True:
+        raise RuntimeError("release binding was not prepared from a clean source tree")
+    if release.get("source_head_detached") is not True:
+        raise RuntimeError("release binding was not prepared from detached HEAD")
+    return {
+        "source_git_commit": commit,
+        "source_git_remote": release.get("source_git_remote", ""),
+        "source_tree_clean": True,
+        "source_head_detached": True,
+        "source_status_sha256": release.get("source_status_sha256"),
+        "source_diff_sha256": release.get("source_diff_sha256"),
+        "source_snapshot_sha256": checked["source_snapshot_sha256"],
+        "source_files_checked": checked["source_files_checked"],
+        "untracked_files": [],
+        "provenance_kind": "verified_release_binding_snapshot",
+    }
+
+
 def build_run_manifest(
     experiment: dict[str, Any],
     run_id: str,
@@ -272,7 +408,11 @@ def build_run_manifest(
     parent_run_id: str | None = None,
 ) -> dict[str, Any]:
     validate_experiment(experiment)
-    source = collect_git_provenance(repo_root)
+    source = (
+        collect_bound_source_provenance(repo_root, environment_binding)
+        if environment_binding
+        else collect_git_provenance(repo_root)
+    )
     if mode == "formal" and not source["source_tree_clean"]:
         raise RuntimeError("formal runs require a clean Git worktree, including untracked files")
     if mode == "formal":

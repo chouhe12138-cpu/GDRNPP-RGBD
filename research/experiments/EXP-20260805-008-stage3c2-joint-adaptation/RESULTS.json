@@ -2,8 +2,8 @@
   "schema_version": 1,
   "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
   "run_id": "RUN-20260806-174419-C2-formal",
-  "status": "RUNNING_CURRENTLY_BELOW_GATE",
-  "recorded_at": "2026-08-09",
+  "status": "COMPLETE_C2_SCREEN_FAIL",
+  "recorded_at": "2026-08-11",
   "identity": {
     "git_commit": "24a1d7aa7159cfc8113f4cfe8c11bbd2ce3ba290",
     "docker_image_id": "sha256:04a68c9b5b54de9bd386e120d52dd9bf812c5d20ec9b24bf06e7829d4c983495",
@@ -12,19 +12,23 @@
     "bbox_type": "gt"
   },
   "progress": {
-    "last_completed_evaluation_epoch": 30,
-    "downloaded_training_log_last_epoch": 33,
-    "downloaded_training_log_last_iteration": 206999,
+    "last_completed_evaluation_epoch": 40,
+    "downloaded_training_log_last_epoch": 40,
+    "downloaded_training_log_last_iteration": 255919,
     "total_iterations": 255920,
-    "training_complete": false
+    "training_complete": true
   },
   "selection": {
     "primary_metric": "bop19_ar_macro",
-    "best_observed_epoch": 25,
-    "best_observed_value": 0.6927381776239908,
-    "server_checkpoint_name": "model_best.pth",
-    "checkpoint_copy_available": false,
-    "checkpoint_sha256": null
+    "best_observed_epoch": 35,
+    "best_observed_value": 0.6935201845444059,
+    "fixed_formal_epoch": 40,
+    "fixed_formal_value": 0.6930057670126873,
+    "retained_checkpoint_name": "model_epoch_040.pth",
+    "checkpoint_copy_available": true,
+    "checkpoint_sha256": "44d69b5cf97829d0a982bba6c6644b4fe2f41a3c88908fecb6ebb0deb905b270",
+    "best_epoch_checkpoint_retained": false,
+    "historical_model_best_last_updated_epoch": 25
   },
   "metric_definitions": {
     "bop19_ar_macro": "official BOP19 error/threshold macro average",
@@ -34,10 +38,11 @@
   "screening": {
     "baseline_bop19_ar_macro": 0.6904152249134947,
     "minimum_bop19_delta": 0.005,
-    "best_observed_bop19_delta": 0.002322952710496096,
+    "best_observed_bop19_delta": 0.003104959630911175,
+    "fixed_epoch40_bop19_delta": 0.0025905420991926276,
     "bop19_gate_passed": false,
-    "overall_status": "NO_OBSERVED_CHECKPOINT_PASSES_ALL_GATES",
-    "formal_decision_deferred_until_training_finishes": true
+    "overall_status": "COMPLETE_C2_SCREEN_FAIL",
+    "formal_decision_deferred_until_training_finishes": false
   },
   "periodic_evaluations": [
     {
@@ -98,6 +103,30 @@
       "missing": ["ADD(-S)@0.1d macro-object result and per-object recalls"]
     },
     {
+      "epoch": 35,
+      "bop19_ar_macro": 0.6935201845444059,
+      "add_s_0.1d_macro_object": null,
+      "add_s_0.1d_micro_target": null,
+      "bop_source_file": "scores_bop19-35epoch.json",
+      "bop_source_sha256": "cdf330dee6c9d9baa29fbfe1c701da25e745bfda5d033b888e7dc0bee8821019",
+      "evaluator_log_file": "log-35epoch.log",
+      "evaluator_log_sha256": "b205e3448912d1213c0fe7290ee48c8deccbc4d0c99218a0418e33bb5e827be9",
+      "missing": ["ADD(-S)@0.1d macro-object, micro-target and per-object results"]
+    },
+    {
+      "epoch": 40,
+      "bop19_ar_macro": 0.6930057670126873,
+      "add_s_0.1d_macro_object": null,
+      "add_s_0.1d_micro_target": null,
+      "bop_source_file": "scores_bop19-40epoch.json",
+      "bop_source_sha256": "3b86c45cef5dfbc7f102342e33f61b05dd8fe0c965e81b1255b7185c1930b625",
+      "evaluator_log_file": "log-40epoch.log",
+      "evaluator_log_sha256": "50fccd7cb7d4ddbbe4bcefed0324602cfcbb572168840cf279c4e6e898cdd6d6",
+      "checkpoint_file": "model_epoch_040.pth",
+      "checkpoint_sha256": "44d69b5cf97829d0a982bba6c6644b4fe2f41a3c88908fecb6ebb0deb905b270",
+      "missing": ["ADD(-S)@0.1d macro-object, micro-target and per-object results"]
+    },
+    {
       "epoch": 30,
       "bop19_ar_macro": 0.6915317185697809,
       "add_s_0.1d_macro_object": null,
@@ -116,12 +145,14 @@
     "wsl_root": "/mnt/e/6D姿态估计/C2",
     "historical_add_root": "E:\\6D姿态估计\\C2_handoff_20260808",
     "full_log": "formal_20260806_174419.log",
-    "full_log_sha256": "54670b8b1c7c23c3cad9e386523701e6b2cf9675af0fb8fa2af8ea2103bddc58",
-    "preservation": "external_read_only"
+    "full_log_sha256": "f0e2d6b670091ac949d548bec642994eb832a74c0a4fe5455ce5d93daaed0d5a",
+    "server_minimal_archive": "weights/archives/EXP-20260805-008-C2-epoch40",
+    "preservation": "external_read_only_plus_server_minimal_archive"
   },
   "notes": [
-    "The downloaded full log continues into Epoch 33, while Epoch 30 is the latest completed evaluation in the supplied files.",
-    "Epoch 25 is the current BOP-best checkpoint and triggered a new model_best.pth save event.",
-    "Training remains active; this file records an interim screen, not a final scientific decision."
+    "Training naturally completed at Epoch 40 / iteration 255919.",
+    "Epoch 35 has the highest observed BOP AR, but the historical model_best file was last updated at Epoch 25.",
+    "Per user-approved minimal preservation, only the fixed Epoch 40 checkpoint is retained; ADD(-S) for Epoch 35/40 remains explicitly missing.",
+    "Old C1/C2 containers and raw server outputs were deleted on 2026-08-11 after hash verification; datasets, official weights, baseline and images were preserved."
   ]
 }

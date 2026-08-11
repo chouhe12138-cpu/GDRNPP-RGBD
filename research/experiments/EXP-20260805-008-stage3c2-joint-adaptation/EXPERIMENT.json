@@ -4,9 +4,9 @@
   "title": "Patch-PnP 与质量/覆盖模块联合适应 C2",
   "stage": "Stage 3C2",
   "role": "C2",
-  "status": "RUNNING",
+  "status": "COMPLETE",
   "legacy_import": true,
-  "decision": "CURRENTLY_BELOW_GATE_FINAL_PENDING",
+  "decision": "COMPLETE_C2_SCREEN_FAIL",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
@@ -31,7 +31,9 @@
     "results": "RESULTS.json",
     "overview": "research/STAGE_03C_EXPERIMENT_OVERVIEW.md",
     "config": "configs/gdrn/lmo_pbr/convnext_stage3c2_pnp_quality_coverage_lmo.py",
-    "formal_output": "server:output/stage3c/C2_joint"
+    "formal_output": "historical-server-output-deleted-after-minimal-archive",
+    "epoch40_checkpoint": "external:E:/6D姿态估计/C2/model_epoch_040.pth",
+    "server_minimal_archive": "server:weights/archives/EXP-20260805-008-C2-epoch40"
   },
   "comparison": {
     "baseline_experiment_id": "EXP-20260731-005-pnp-only-control",

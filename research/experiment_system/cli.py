@@ -267,9 +267,9 @@ def command_prepare(args: argparse.Namespace) -> int:
         path_profile_id = resolved["profile_id"]
     environment_binding = None
     if args.environment_binding:
-        from .environment import verify_release_binding
+        from .environment import verify_runtime_binding
 
-        verify_release_binding(
+        verify_runtime_binding(
             repo_root,
             args.environment_binding.resolve(),
             args.environment_image_id,

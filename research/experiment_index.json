@@ -82,17 +82,17 @@
       "title": "Patch-PnP 姿态头信息流全量统计诊断"
     },
     {
-      "decision": "CURRENTLY_BELOW_GATE_FINAL_PENDING",
+      "decision": "COMPLETE_C2_SCREEN_FAIL",
       "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
       "legacy_import": true,
       "metadata_path": "research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/EXPERIMENT.json",
       "role": "C2",
       "stage": "Stage 3C2",
-      "status": "RUNNING",
+      "status": "COMPLETE",
       "title": "Patch-PnP 与质量/覆盖模块联合适应 C2"
     },
     {
-      "decision": "AUTHORIZED_AFTER_C2_ARCHIVE_WITH_FIXED_SEED_42",
+      "decision": "AUTHORIZED_C2_ARCHIVE_GATE_SATISFIED_FIXED_SEED_42",
       "experiment_id": "EXP-20260809-009-cpm-head",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260809-009-cpm-head/EXPERIMENT.json",

@@ -6,7 +6,7 @@
   "role": "CPM",
   "status": "AUTHORIZED",
   "legacy_import": false,
-  "decision": "AUTHORIZED_AFTER_C2_ARCHIVE_WITH_FIXED_SEED_42",
+  "decision": "AUTHORIZED_C2_ARCHIVE_GATE_SATISFIED_FIXED_SEED_42",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",

@@ -38,10 +38,11 @@ def source(clean: bool) -> dict:
 
 def binding(build_source: str = "d" * 40) -> dict:
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "release": {
             "source_git_commit": "a" * 40,
             "source_tree_clean": True,
+            "source_head_detached": True,
             "environment_contract_sha256": "e" * 64,
         },
         "environment": {
@@ -113,8 +114,14 @@ def test_formal_accepts_independent_source_and_environment_build_commits(
     config = repo / "config.py"
     config.write_text("SEED = 1\n")
     monkeypatch.setattr(
+        "research.experiment_system.manifest.collect_bound_source_provenance",
+        lambda _root, _binding: source(True),
+    )
+    monkeypatch.setattr(
         "research.experiment_system.manifest.collect_git_provenance",
-        lambda _root: source(True),
+        lambda _root: (_ for _ in ()).throw(
+            AssertionError("bound runtime manifest must not execute Git")
+        ),
     )
     result = build_run_manifest(
         EXPERIMENT,
@@ -158,8 +165,8 @@ def test_formal_rejects_binding_for_different_source_commit(tmp_path, monkeypatc
     config = repo / "config.py"
     config.write_text("SEED = 1\n")
     monkeypatch.setattr(
-        "research.experiment_system.manifest.collect_git_provenance",
-        lambda _root: source(True),
+        "research.experiment_system.manifest.collect_bound_source_provenance",
+        lambda _root, _binding: source(True),
     )
     wrong = binding()
     wrong["release"]["source_git_commit"] = "b" * 40

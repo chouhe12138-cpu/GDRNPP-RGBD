@@ -1,6 +1,26 @@
 # GDRNPP 服务器运行环境与实验进度交接
 
-最后更新：2026-08-10
+最后更新：2026-08-11
+
+## 2026-08-11 清理后的当前状态
+
+- C2 已自然完成 Epoch 40，固定 Epoch 40 BOP AR 为 `0.6930057670`；筛选结论
+  为 `C2_SCREEN_FAIL`。Epoch 40 checkpoint、完整日志和 BOP JSON 已在本地与
+  服务器完成 SHA-256 对照，历史 ADD(-S) 保持缺失。
+- `lab0_chx`、`lab0_chx_pre_overlay_20260810`、`lab1_chx` 和
+  `lab1_chx_stage3c1` 已按用户授权删除；服务器当前尚未重建本项目容器。
+- 两端旧 outputs/logs/cache/audit/runtime/releases/code 已清理；lab1 的
+  `chx_old_20260801` 已删除。数据集、官方权重和 official baseline 保留。
+- lab0/lab1 baseline 现在统一位于各自
+  `/data/labs/<lab>/docker_data/chx/baselines/official_gt`。
+- 稳定 environment image 仍为
+  `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`，
+  build-source 为 `35313ae3d4139a559a97c01b2d3ee007dc16604c`。
+- 下一步是推送通过 gitless-runtime 验证的新 source commit，随后复用该镜像
+  重建 `lab0_chx`/`lab1_chx`。普通 Python/config 更新不重建镜像。
+
+以下 2026-08-10 段落保留迁移背景；与本节冲突时以本节及重新执行的只读检查
+为准。
 
 ## 2026-08-10 启动决策
 
@@ -13,13 +33,8 @@
 - Dockerfile、requirements/vendor 或 C++/CUDA native/ABI 变化时环境契约拒绝
   复用，届时才允许重建镜像。
 
-- 用户提供的最新只读检查确认旧 `lab1_chx` 中 C2 仍在运行；保持原容器、
-  镜像、代码和输出不变。
-- 先在 lab0 准备新的 `lab0_chx`，运行 EXP005/B；旧同名容器须先只读检查并
-  以 legacy 名称保存，不删除。
-- C2 Epoch 40 完成并封存后，再以确定 Git commit 和同一 environment image ID
-  重建
-  `lab1_chx`，运行 EXP009/CPM。
+- C2 运行链已完成并清理；新容器只使用后续确定的 source release。
+- lab0 重建 `lab0_chx` 运行 EXP005/B，lab1 重建 `lab1_chx` 运行 EXP009/CPM。
 - EXP005 和 EXP009 的所有新 run 固定 seed `42`。历史失败和 C2 不改 seed。
 - 新入口为 `docker/l40/managed_experiment.sh`。GPU 上存在其他任务只记录占用，
   不据此自动取消；实际 CUDA OOM 才保留失败 attempt 并延迟重试。
@@ -85,7 +100,7 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 | 账户 | 分配的物理GPU | 容器内可见设备 | 当前实验角色 |
 |---|---:|---:|---|
 | `lab0` | GPU 0 | 通常为CUDA device 0 | B：Patch-PnP-only |
-| `lab1` | GPU 1 | 通常为CUDA device 0 | C2：Patch-PnP + 质量/覆盖联合训练 |
+| `lab1` | GPU 1 | 通常为CUDA device 0 | EXP009：CPM-Head |
 
 服务器GPU为NVIDIA L40，每张约46,068 MiB。
 
@@ -103,9 +118,8 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 用途 | 账户/GPU | 容器 | 镜像 | 状态 |
 |---|---|---|---|---|
-| 已完成C1证据 | lab1/GPU1 | `lab1_chx_stage3c1` | `gdrnpp-stage3c1:torch220-cu121-sm89-v1` | 保留，不修改 |
-| B实验 | lab0/GPU0 | `lab0_chx` | `gdrnpp-stage3bc2:torch220-cu121-sm89-v2` | smoke已通过，正式训练未有效启动 |
-| C2实验 | lab1/GPU1 | `lab1_chx` | `gdrnpp-stage3bc2:torch220-cu121-sm89-v2` | 容器已准备，流水线等待GPU1 |
+| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | 待重建 |
+| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | 待重建 |
 
 B/C2镜像最后观察到的ID：
 
@@ -134,7 +148,7 @@ sha256:8e2ee36cae8c9916c6f98b2e29d7c0c9d8cde4d06daca31532f2f7ca47891a99
 代码：
 
 ```text
-/data/labs/lab1/docker_data/chx/code/GDRNPP-RGBD
+/data/labs/lab1/docker_data/chx/releases/GDRNPP-RGBD-<short-commit>
 ```
 
 主要资源：
@@ -144,7 +158,7 @@ sha256:8e2ee36cae8c9916c6f98b2e29d7c0c9d8cde4d06daca31532f2f7ca47891a99
 /data/labs/lab1/docker_data/chx/datasets/BOP_DATASETS/lmo
 /data/labs/lab1/docker_data/chx/datasets/VOC/VOC2012
 /data/labs/lab1/docker_data/chx/weights/lmo_pbr/model_final_wo_optim.pth
-/data/labs/lab1/docker_data/chx/outputs/EXP-20260731-006/official_gt
+/data/labs/lab1/docker_data/chx/baselines/official_gt
 ```
 
 运行数据：
@@ -239,11 +253,10 @@ C1容器、日志、输出和权重是不可变实验依据，不用于覆盖式
 
 ### C2：Patch-PnP + 质量/覆盖联合训练
 
-- 已运行 `docker/l40/lab1_c2.sh benchmark-workers`。
-- 一键流水线最后状态为 `PREPARING/WAITING_GPU1`。
-- 等待期间尚未开始C2 smoke、NUM_WORKERS实测或正式训练。
-- 流水线使用nohup后台运行；VPN或VS Code SSH断开不会自动终止。
-- GPU1释放后，流水线设计为自动继续完成gate、smoke、隔离验证和worker测试。
+- 正式训练已于 2026-08-10 完成 40 epoch。
+- 固定 Epoch 40 BOP AR 为 `0.6930057670`，未通过预注册筛选门槛。
+- 最小归档完成后，旧容器和 raw server outputs 已删除；完整身份和证据边界见
+  `research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/`。
 
 ### 2026-08-06最后观察到的外部GPU进程
 

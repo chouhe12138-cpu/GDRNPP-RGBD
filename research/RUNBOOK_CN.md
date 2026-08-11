@@ -76,9 +76,8 @@ git rev-parse HEAD
 - `summarize`：读取标准化指标并执行预注册 gate。
 - `verify`：校验 manifest、哈希、参数隔离和产物完整性。
 
-当前正在运行的 C2 继续使用已经冻结的 `docker/l40/lab1_c2.sh` 和
-`research/stage3c_runtime/`。新的 EXP005/EXP009 run 使用受管入口；它不接管
-或修改 C2。
+C2 已完成 Epoch 40 并按历史最小证据归档；新的 EXP005/EXP009 run 使用受管
+入口，不复用已删除的旧 C2 容器或输出目录。
 
 ## EXP005 / EXP009 受管入口
 
@@ -97,6 +96,10 @@ docker/l40/prepare_release.sh \
 `.so`/uncertainty-PnP runtime libraries 按哈希复制到 Git 忽略区域。环境或
 native 输入不兼容时直接拒绝运行。
 
+宿主机用 Git 检查 detached/clean release，并生成 binding v2 tracked-source
+snapshot；容器只验证该 snapshot、image ID 和 native artifacts，不要求镜像内
+安装 Git。普通 Python/config commit 不触发镜像重建。
+
 ```bash
 docker/l40/managed_experiment.sh lab0 EXP005 access
 docker/l40/managed_experiment.sh lab0 EXP005 create
@@ -112,7 +115,7 @@ docker/l40/managed_experiment.sh lab0 EXP005 launch
 docker/l40/managed_experiment.sh lab0 EXP005 status
 ```
 
-EXP009 只在 C2 Epoch 40 完成、结果核验且旧 `lab1_chx` 封存后运行：
+EXP009 的 C2 完成、结果核验和旧 `lab1_chx` 清理门槛已经满足：
 
 ```bash
 docker/l40/managed_experiment.sh lab1 EXP009 access
