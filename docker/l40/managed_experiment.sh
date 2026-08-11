@@ -56,6 +56,7 @@ image_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["env
 image_ref="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["environment"]["environment_image_ref"])' "${environment_binding_host}")"
 environment_build_source="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["environment"]["environment_build_source_commit"])' "${environment_binding_host}")"
 runtime_dir="${root}/runtime"
+home_dir="${root}/home"
 profile_host="${runtime_dir}/path_profile.json"
 profile_container="/workspace/runtime/path_profile.json"
 output_root_host="${root}/outputs/experiments"
@@ -190,7 +191,14 @@ create_container() {
         exit 1
     }
     write_profile
-    mkdir -p "${root}/outputs" "${root}/logs" "${root}/cache" "${root}/audit" "${output_root_host}"
+    mkdir -p \
+        "${root}/outputs" \
+        "${root}/logs" \
+        "${root}/cache/matplotlib" \
+        "${root}/cache/gdrnpp_datasets" \
+        "${root}/audit" \
+        "${home_dir}/.cache" \
+        "${output_root_host}"
     gpu_uuid="$(nvidia-smi -i "${gpu_id}" --query-gpu=uuid --format=csv,noheader)"
     "${docker_bin}" run -d \
         --gpus "device=${gpu_id}" \
@@ -206,6 +214,7 @@ create_container() {
         --env "HOME=/home/gdrn" \
         --env "XDG_CACHE_HOME=/home/gdrn/.cache" \
         --env "MPLCONFIGDIR=/home/gdrn/.cache/matplotlib" \
+        --env "GDRN_DATASET_CACHE_DIR=/home/gdrn/.cache/gdrnpp_datasets" \
         --env "BOP_RENDERER_PATH=/opt/bop_renderer/build" \
         --env "GDRN_IMAGE_ID=${image_id}" \
         --env "GDRN_SOURCE_COMMIT=${commit}" \
@@ -218,6 +227,8 @@ create_container() {
         --mount "type=bind,src=${root}/weights,dst=/workspace/gdrnpp/pretrained_models,readonly" \
         --mount "type=bind,src=${baseline_root},dst=/workspace/baselines/official_gt,readonly" \
         --mount "type=bind,src=${root}/outputs,dst=/workspace/gdrnpp/output" \
+        --mount "type=bind,src=${root}/cache/gdrnpp_datasets,dst=/workspace/gdrnpp/.cache" \
+        --mount "type=bind,src=${home_dir},dst=/home/gdrn" \
         --mount "type=bind,src=${root}/cache,dst=/home/gdrn/.cache" \
         --mount "type=bind,src=${runtime_dir},dst=/workspace/runtime,readonly" \
         "${image_id}" sleep infinity >/dev/null
@@ -229,7 +240,7 @@ gate() {
     check_image_identity
     check_container_identity
     "${docker_bin}" exec "${container}" bash -lc \
-        "cd /workspace/gdrnpp && test -d /opt/bop_renderer/build && python -m research.experiment_system.environment verify-runtime --repo-root /workspace/gdrnpp --binding ${environment_binding_container} --image-id ${image_id} && /usr/local/bin/verify-gdrn-environment && /usr/local/bin/verify-gdrn-native && python -m research.experiment_system.cli registry --check"
+        "cd /workspace/gdrnpp && test -d /opt/bop_renderer/build && test -w /home/gdrn && test -w /home/gdrn/.cache && test -w \${GDRN_DATASET_CACHE_DIR} && test -w /workspace/gdrnpp/.cache && python -m research.experiment_system.environment verify-runtime --repo-root /workspace/gdrnpp --binding ${environment_binding_container} --image-id ${image_id} && /usr/local/bin/verify-gdrn-environment && /usr/local/bin/verify-gdrn-native && python -m research.experiment_system.cli registry --check"
     if [[ "${experiment}" == "EXP005" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.pnp_control.preflight --config ${config_root}/train.py --weights ${official_container} --expected-seed 42"

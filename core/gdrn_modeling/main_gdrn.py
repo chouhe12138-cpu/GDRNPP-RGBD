@@ -206,7 +206,7 @@ class Lite(GDRN_Lite):
         return self.do_test(cfg, model)
 
 
-@loguru_logger.catch
+@loguru_logger.catch(reraise=True)
 def main(args):
     cfg = setup(args)
 

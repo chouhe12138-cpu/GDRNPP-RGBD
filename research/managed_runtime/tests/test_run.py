@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from research.managed_runtime.run import checkpoint_for_mode, detect_failure_kind
 
 
@@ -15,3 +17,11 @@ def test_failure_classification_distinguishes_cuda_oom(tmp_path):
     assert detect_failure_kind(log) == "CUDA_OOM"
     log.write_text("RuntimeError: data loader failed\n", encoding="utf-8")
     assert detect_failure_kind(log) == "RUNTIME_ERROR"
+
+
+def test_training_entrypoint_reraises_caught_exceptions():
+    source = (
+        Path(__file__).resolve().parents[3]
+        / "core/gdrn_modeling/main_gdrn.py"
+    ).read_text(encoding="utf-8")
+    assert "@loguru_logger.catch(reraise=True)" in source

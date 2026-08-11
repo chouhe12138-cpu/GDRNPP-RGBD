@@ -1,6 +1,6 @@
 # EXP-20260731-005 — Patch-PnP-Only Adaptation Control
 
-Status: `LOCAL PILOT PASS — MANAGED FORMAL AUTHORIZED`
+Status: `LOCAL PILOT PASS — MANAGED FORMAL AUTHORIZED, SERVER SMOKE RETRY REQUIRED`
 
 ## Managed formal protocol update
 
@@ -65,6 +65,28 @@ All losses remained finite.  Recorded first/last-quarter medians:
 The checkpoint strictly reloaded with no missing or unexpected tensors.
 Against the official checkpoint, 17/17 Patch-PnP trainable tensors changed,
 while 0 frozen tensors changed.
+
+## 2026-08-11 managed server smoke（无效基础设施运行）
+
+第一次新架构服务器 smoke 使用以下冻结身份：
+
+```text
+run_id:                   RUN-20260811-052852-smoke-s42-a01
+source_git_commit:        b39f68092de2609b7ee1726811c9ee965e606328
+environment_image_id:     sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee
+seed:                     42
+```
+
+release snapshot、native artifact、环境、数据和 EXP005 isolation gate 均通过，
+但训练在创建 LM-PBR dataset cache 时尝试写只读 source release 下的
+`/workspace/gdrnpp/.cache`，触发 `OSError: [Errno 30] Read-only file system`。
+当时训练入口的 Loguru decorator 又吞掉了内部异常并返回 0，导致 managed
+postprocess 继续查找不存在的 `model_epoch_001.pth`，最终表面状态被记为
+`POSTPROCESS_ERROR`。
+
+该 run 没有 checkpoint、评估指标或科学结论，必须原样保留为无效基础设施
+证据，不计入 EXP005 结果。修复仅允许提供外置可写 cache/home，并让训练异常
+正确返回非零；不得修改模型、loss 或正式实验定义。
 
 ## Conclusion
 

@@ -4,7 +4,11 @@ import pytest
 import torch
 from mmcv import Config
 
-from core.gdrn_modeling.datasets.lm_pbr import SPLITS_LM_PBR
+from core.gdrn_modeling.datasets.lm_pbr import (
+    PROJ_ROOT,
+    SPLITS_LM_PBR,
+    resolve_dataset_cache_root,
+)
 from core.gdrn_modeling.models.GDRN_double_mask import get_backbone_init_args
 from core.utils.solver_utils import (
     accumulation_window_size,
@@ -41,6 +45,18 @@ def test_local_split_is_balanced_and_visibility_filtered():
     assert local["max_instances_per_object"] == 1024
     assert local["min_visible_fraction"] == pytest.approx(0.3)
     assert local["require_xyz"] is False
+
+
+def test_dataset_cache_supports_an_absolute_machine_local_override():
+    assert resolve_dataset_cache_root({}) == str(Path(PROJ_ROOT) / ".cache")
+    override = "/home/gdrn/.cache/gdrnpp_datasets"
+    assert resolve_dataset_cache_root({"GDRN_DATASET_CACHE_DIR": override}) == override
+    with pytest.raises(ValueError, match="absolute path"):
+        resolve_dataset_cache_root({"GDRN_DATASET_CACHE_DIR": "relative/cache"})
+    assert all(
+        split["cache_dir"] == str(Path(PROJ_ROOT) / ".cache")
+        for split in SPLITS_LM_PBR.values()
+    )
 
 
 @pytest.mark.parametrize("config_path", [FORMAL_CONFIG, LOCAL_CONFIG])

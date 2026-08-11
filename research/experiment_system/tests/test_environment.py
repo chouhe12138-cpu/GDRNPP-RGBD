@@ -52,6 +52,7 @@ def make_contract_repo(tmp_path):
     (repo / "docker/l40/requirements.lock").write_text("torch==test\n")
     (repo / "docker/l40/build_native.sh").write_text("build\n")
     (repo / "docker/l40/10_nvidia.json").write_text("{}\n")
+    (repo / "docker/l40/managed_experiment.sh").write_text("launch-v1\n")
     (repo / "docker/l40/vendor/SHA256SUMS").write_text("vendor\n")
     (repo / "core/csrc/flow/setup.py").write_text("setup()\n")
     (repo / "core/csrc/flow/src/kernel.cu").write_text("kernel-v1\n")
@@ -69,6 +70,7 @@ def test_contract_ignores_python_and_config_but_detects_native_change(tmp_path):
 
     (repo / "core/model.py").write_text("MODEL = 2\n")
     (repo / "configs/exp.py").write_text("SEED = 7\n")
+    (repo / "docker/l40/managed_experiment.sh").write_text("launch-v2\n")
     ordinary = commit(repo, "ordinary source")
     assert environment_contract(repo, ordinary)["sha256"] == first_contract["sha256"]
 

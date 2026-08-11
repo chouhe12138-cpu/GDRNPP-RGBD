@@ -1,6 +1,6 @@
 # EXP-20260809-009 — CPM-Head
 
-状态：`AUTHORIZED — LOCAL PIPELINE PASS, SERVER RELEASE PENDING`
+状态：`AUTHORIZED — SERVER GATE PASS, SMOKE INFRASTRUCTURE RETRY REQUIRED`
 
 ## 研究问题
 
@@ -45,6 +45,26 @@ diagnostic smoke（含 XYZ α、coverage-only、CXU-null）。
 4. 新建 `lab1_chx` 后仍须依次通过 gate、smoke、batch-48 audit，才能启动 formal。
 
 本地 checkpoint 只作为工程验收，不能当作正式初始结果或性能结果。
+
+## 2026-08-11 managed server smoke（无效基础设施运行）
+
+第一次服务器 smoke 的冻结身份为：
+
+```text
+run_id:                   RUN-20260811-052906-smoke-s42-a01
+source_git_commit:        b39f68092de2609b7ee1726811c9ee965e606328
+environment_image_id:     sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee
+seed:                     42
+```
+
+release snapshot、17 个 native artifacts、CUDA/L40 环境、experiment registry
+和 CPM preflight 均通过；CPM CUDA full forward 通过，参数隔离仍为预期的
+`822,281` 个可训练参数。随后训练阶段因 dataset cache 指向只读 source release
+而异常，且旧训练入口吞掉异常，使 postprocess 最终只看到缺失的
+`model_epoch_001.pth`。
+
+该 run 没有 checkpoint、指标或机制诊断结果，不构成 CPM 科学失败。原目录
+保持不覆盖；修复可写 cache/home 和异常退出传播后创建新的唯一 run 重试。
 
 ## 结果与结论
 

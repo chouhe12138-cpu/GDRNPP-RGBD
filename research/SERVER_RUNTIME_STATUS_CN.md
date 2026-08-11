@@ -2,22 +2,34 @@
 
 最后更新：2026-08-11
 
-## 2026-08-11 清理后的当前状态
+## 2026-08-11 当前状态
 
 - C2 已自然完成 Epoch 40，固定 Epoch 40 BOP AR 为 `0.6930057670`；筛选结论
   为 `C2_SCREEN_FAIL`。Epoch 40 checkpoint、完整日志和 BOP JSON 已在本地与
   服务器完成 SHA-256 对照，历史 ADD(-S) 保持缺失。
-- `lab0_chx`、`lab0_chx_pre_overlay_20260810`、`lab1_chx` 和
-  `lab1_chx_stage3c1` 已按用户授权删除；服务器当前尚未重建本项目容器。
-- 两端旧 outputs/logs/cache/audit/runtime/releases/code 已清理；lab1 的
-  `chx_old_20260801` 已删除。数据集、官方权重和 official baseline 保留。
+- 清理完成后，两端已 checkout detached source release
+  `b39f68092de2609b7ee1726811c9ee965e606328`，复用同一个稳定 environment
+  image 重建了 `lab0_chx`/`lab1_chx`。两端 source snapshot、native、环境、
+  registry 和角色 preflight gate 均通过。
+- 两端第一次 managed smoke 已结束但均为无效基础设施运行：EXP005 run
+  `RUN-20260811-052852-smoke-s42-a01`、EXP009 run
+  `RUN-20260811-052906-smoke-s42-a01`。dataset cache 错误指向只读 source
+  release，训练异常又被 Loguru decorator 吞掉，因而未生成 checkpoint，最后
+  表面记录为 `POSTPROCESS_ERROR`。这不是 EXP005 或 CPM 的科学失败。
+- 两个失败 run 必须保留。当前 b39f 容器不得直接继续 audit/formal；应先完成
+  本地 cache/home 与异常退出修复、测试和新 Git release，再重建容器并用新
+  run_id 重试 smoke。无需重建 environment image。
+- 两端旧历史 outputs/logs/cache/audit/runtime/releases/code 已在重建前清理；
+  lab1 的 `chx_old_20260801` 已删除。数据集、官方权重和 official baseline
+  保留。
 - lab0/lab1 baseline 现在统一位于各自
   `/data/labs/<lab>/docker_data/chx/baselines/official_gt`。
 - 稳定 environment image 仍为
   `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`，
   build-source 为 `35313ae3d4139a559a97c01b2d3ee007dc16604c`。
-- 下一步是推送通过 gitless-runtime 验证的新 source commit，随后复用该镜像
-  重建 `lab0_chx`/`lab1_chx`。普通 Python/config 更新不重建镜像。
+- 当前本地修复已通过 `147 passed`，但尚未提交或 push。下一步是形成并推送
+  新 source commit，随后复用该镜像和原数据资产重建两个受管容器。普通
+  Python/config 更新不重建镜像。
 
 以下 2026-08-10 段落保留迁移背景；与本节冲突时以本节及重新执行的只读检查
 为准。
@@ -118,8 +130,8 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 用途 | 账户/GPU | 容器 | 镜像 | 状态 |
 |---|---|---|---|---|
-| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | 待重建 |
-| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | 待重建 |
+| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | b39f 容器保留；smoke 无效，待新 release 重建 |
+| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | b39f 容器保留；smoke 无效，待新 release 重建 |
 
 B/C2镜像最后观察到的ID：
 
@@ -181,7 +193,7 @@ sha256:8e2ee36cae8c9916c6f98b2e29d7c0c9d8cde4d06daca31532f2f7ca47891a99
 代码：
 
 ```text
-/data/labs/lab0/docker_data/chx/code/GDRNPP-RGBD
+/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-<short-commit>
 ```
 
 已观察到 `lab0_chx` 使用lab0自有资源：
@@ -237,8 +249,10 @@ C1容器、日志、输出和权重是不可变实验依据，不用于覆盖式
 
 ### B：Patch-PnP-only
 
-- 一轮smoke已成功完成，退出码为0。
-- checkpoint隔离验证通过：只允许的Patch-PnP张量发生变化，冻结张量未变化。
+- 历史 Stage 3C 链曾有一轮 smoke 成功，checkpoint 隔离验证通过；这不替代
+  当前 managed release 的验收。
+- 当前 managed run `RUN-20260811-052852-smoke-s42-a01` 因只读 cache 无效，
+  尚未产生可接受的 managed smoke checkpoint。
 - 曾误同时启动smoke和formal；该次过早formal已终止，退出码143。
 - 无效输出已隔离到：
 
@@ -276,50 +290,19 @@ GPU0曾显示：
 具体研究任务，也不能仅凭路径断言是否位于Docker中。它们只是最后观察记录，
 不得在未重新检查PID、用户和cgroup时作为当前结论。
 
-## 一键脚本和常用命令
+## 当前受管入口
 
-在lab0中执行B：
-
-```bash
-cd /data/labs/lab0/docker_data/chx/code/GDRNPP-RGBD
-docker/l40/lab0_b.sh benchmark-status
-docker/l40/lab0_b.sh benchmark-watch
-```
-
-需要重新启动worker测试时：
+在各自确定的 detached release 目录中使用统一入口：
 
 ```bash
-docker/l40/lab0_b.sh benchmark-workers
+docker/l40/managed_experiment.sh lab0 EXP005 status
+docker/l40/managed_experiment.sh lab1 EXP009 status
 ```
 
-在lab1中执行C2：
-
-```bash
-cd /data/labs/lab1/docker_data/chx/code/GDRNPP-RGBD
-docker/l40/lab1_c2.sh benchmark-status
-docker/l40/lab1_c2.sh benchmark-watch
-```
-
-`benchmark-watch` 中按Ctrl-C只停止查看日志，不停止后台流水线。
-
-worker测试完成并正式冻结NUM_WORKERS之前，不运行：
-
-```bash
-docker/l40/lab0_b.sh formal
-docker/l40/lab1_c2.sh formal
-```
-
-正式启动后查看：
-
-```bash
-docker/l40/lab0_b.sh status
-docker/l40/lab0_b.sh watch
-```
-
-```bash
-docker/l40/lab1_c2.sh status
-docker/l40/lab1_c2.sh watch
-```
+新 source commit 到达服务器后，先重新执行 `prepare_release.sh`，再按
+`access → create → gate → smoke → audit48 → launch` 顺序执行。当前 b39f
+容器和无效 smoke 只用于保留证据，不能直接继续 audit/formal。详细命令见
+`research/RUNBOOK_CN.md`。
 
 ## 只读核验GPU、用户和Docker归属
 
@@ -378,20 +361,18 @@ done
 
 ## 下一步固定顺序
 
-1. 分别重新检查物理GPU0和GPU1的实时占用及进程归属。
-2. 若分配GPU仍被其他用户占用，保留证据并联系管理员；不要并发争抢资源。
-3. GPU1释放后，优先让现有C2流水线完成gate、smoke、隔离验证和NUM_WORKERS
-   benchmark。
-4. 根据benchmark结果固定C2的NUM_WORKERS；不改变batch size 48，不改变正式
-   实验的预注册种子。
-5. GPU0释放后完成B的同协议NUM_WORKERS benchmark并冻结其设置。
-6. 确认B与C2各自smoke通过、输出目录不存在冲突、GPU空闲后，才分别启动正式
-   40轮训练。
-7. 每个正式实验只使用一个固定种子，不进行随机种子重复，不临时启动其他实验。
-8. 训练过程中只通过status/watch查看；VPN断开不视为训练停止。
-9. 两个正式实验完成后再汇总BOP AR、ADD(-S)、逐物体结果和权重SHA-256。
-10. ADD结果路径匹配错误和重复警告过多的问题已知，但等当前正式训练结束后再
-    修复，避免中途改变运行代码。
+1. 本地提交并 push 已通过测试的 cache/home 与异常退出修复；不重建镜像。
+2. lab0/lab1 分别 checkout 新 detached release，执行 source/environment
+   binding；环境契约必须仍等于稳定镜像契约。
+3. 保留两个失败 run，删除并重建本项目的 `lab0_chx`/`lab1_chx` 容器，使新
+   home/cache 挂载生效；不删除数据、权重、baseline 或稳定镜像。
+4. 两端重新通过 gate 后，各创建唯一 run 重试 smoke；先确认训练退出码、
+   `model_epoch_001.pth` 和 checkpoint isolation 均通过。
+5. smoke 成功后运行 batch-48 audit；成功后才启动 fixed-seed Epoch 40 formal。
+6. GPU 占用只记录为非阻塞快照，不停止或修改其他用户进程；若本 run 实际
+   CUDA OOM，则保留失败 attempt 并按受管规则重试。
+7. 训练过程中只通过 status/watch 查看；VPN 断开不视为训练停止。
+8. 两个正式实验完成后汇总 BOP AR、ADD(-S)、逐物体结果和权重 SHA-256。
 
 ## 正式启动前验收条件
 
@@ -403,6 +384,6 @@ done
 - 对应角色smoke退出码为0；
 - checkpoint隔离验证通过；
 - NUM_WORKERS已由同batch协议测试并固定；
-- 物理GPU没有其他计算进程；
+- 已记录物理 GPU 占用快照；外部占用不自动阻断，实际 CUDA OOM 按失败规则处理；
 - 正式输出目录尚不存在，不会覆盖历史结果；
 - 使用预注册固定种子，且没有同时启动同角色的第二个formal。

@@ -37,6 +37,12 @@ runtime container does not need a `git` executable: it re-hashes the tracked
 snapshot, image ID and native artifacts. A missing Git client inside the stable
 environment image is therefore expected and does not require rebuilding it.
 
+The managed container mounts an account-local writable home and cache. The same
+external dataset cache is also mounted at `/workspace/gdrnpp/.cache` as a
+compatibility point for unchanged upstream dataset/evaluator code. This nested
+mount contains only ignored runtime cache files; the release source and all
+tracked Python/config files remain read-only and authoritative.
+
 Run `build_image.sh` only after an intentional Dockerfile, dependency, vendor,
 native extension or ABI change. Ordinary Python/config experiments reuse the
 existing image ID.

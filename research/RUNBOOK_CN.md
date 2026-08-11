@@ -100,6 +100,13 @@ native 输入不兼容时直接拒绝运行。
 snapshot；容器只验证该 snapshot、image ID 和 native artifacts，不要求镜像内
 安装 Git。普通 Python/config commit 不触发镜像重建。
 
+受管容器使用 `${root}/home` 作为账户本地可写 HOME，使用 `${root}/cache`
+作为可写 cache。为兼容仍默认写 `PROJ_ROOT/.cache` 的上游 dataset/evaluator，
+`${root}/cache/gdrnpp_datasets` 还会嵌套挂载到
+`/workspace/gdrnpp/.cache`。该位置只保存 Git 忽略的运行缓存，不改变只读
+release 中任何 tracked source 或 native artifact。gate 必须同时验证这些路径
+可写；不能通过取消 source 只读挂载来解决 cache 权限问题。
+
 ```bash
 docker/l40/managed_experiment.sh lab0 EXP005 access
 docker/l40/managed_experiment.sh lab0 EXP005 create

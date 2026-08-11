@@ -1,7 +1,8 @@
 # 当前研究状态
 
-最后核对：2026-08-11（本地工作区及用户提供的 lab0/lab1 清理结果）；C2 已
-完成并最小归档，旧容器已删除。服务器实时状态在实际启动前仍需重新检查。
+最后核对：2026-08-11（本地工作区及用户提供的 lab0/lab1 gate/smoke 结果）；
+C2 已完成并最小归档。EXP005/EXP009 第一次新架构 smoke 因只读 cache 基础
+设施问题无效，未产生 checkpoint 或科学结果。服务器实时状态仍需重新检查。
 
 ## 项目做到哪里
 
@@ -28,14 +29,16 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 
 1. 当前已构建镜像作为稳定 environment image 保留；后续确定 Git release 通过
    source/native overlay 复用它，不因普通 Python/config 更新重建镜像。
-2. 本地完成 source/environment 解耦修正并推送确定 commit 后，lab0 使用只读
-   release checkout 和现有镜像启动 seed `42` 的 EXP005/B managed formal。
+2. source/environment 解耦 release `b39f680...` 已在两端通过 gate；第一次
+   smoke 暴露只读 source cache 与异常退出传播问题。本地最小修复已通过完整
+   测试，待提交/push 新 source commit 后复用现有镜像重建容器并重试 smoke。
 3. C2 Epoch 40 已完成并最小归档；Epoch 40 checkpoint、完整日志和 BOP 已完成
    哈希核验，历史 ADD(-S) 未生成并明确记录为缺失。
 4. C1 formal checkpoint、日志和最终指标已完成外部只读复验；EXP007 的 C1
    8-target smoke 已通过，1,445-target full 与 B/C2 横向诊断仍待后续安排。
-5. lab0/lab1 旧容器与旧运行目录已清理；下一步以同一 environment image 和
-   确定 source commit 重建 `lab0_chx`/`lab1_chx`，分别运行 EXP005/EXP009。
+5. b39f 的 `lab0_chx`/`lab1_chx` 及两个失败 run 当前作为证据保留；新 commit
+   到达服务器后只删除并重建这两个本项目容器，不删除失败 run、数据、权重、
+   baseline 或稳定 environment image。
 6. EXP005/EXP009 使用统一入口、非覆盖 run 目录、精简日志和结构化指标。
 7. EXP005/EXP009 的 formal/audit/eval worker 固定为 `16`，smoke 为 `2`；不改
    历史 B/C2 配置。
@@ -43,7 +46,7 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 ## 已验证的本地状态
 
 - 历史验收实现及证据绑定 commit：`4edab641cbe0aa43e9220d92d4f785a2b920cb31`。
-- 研究相关测试：`142 passed`（含 source/environment 解耦、CPM、受管运行、实验
+- 研究相关测试：`147 passed`（含 source/environment 解耦、CPM、受管运行、实验
   管理与历史验收基础设施）。
 - B 和 C2 正式 config preflight：PASS。
 - 官方初始化权重 SHA-256：
@@ -64,7 +67,11 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 ## 已知记录问题
 
 - Docker 历史构建记录中的 `43 passed` 是当时快照；当前本地研究测试基线为
-  `144 passed`。
+  `147 passed`。
+- EXP005/EXP009 的 2026-08-11 首次 managed smoke 都因只读 dataset cache
+  基础设施错误无效；训练入口吞异常后 postprocess 报缺少
+  `model_epoch_001.pth`。两次 run 无 checkpoint/指标，不属于科学失败，且不可
+  覆盖或删除。
 - EXP-000～009 已纳入统一 experiment 索引；EXP008 已完成且筛选失败，EXP005
   和 EXP009 均已获 formal 授权。
 - C1 正式 raw checkpoint/日志保存在外部 Windows 路径；仓库只跟踪复验记录
