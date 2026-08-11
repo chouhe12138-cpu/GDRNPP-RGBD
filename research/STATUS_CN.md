@@ -36,9 +36,10 @@ Epoch 40 的同协议横向诊断尚未全部完成。
    哈希核验，历史 ADD(-S) 未生成并明确记录为缺失。
 4. C1 formal checkpoint、日志和最终指标已完成外部只读复验；EXP007 的 C1
    8-target smoke 已通过，1,445-target full 与 B/C2 横向诊断仍待后续安排。
-5. b39f 的 `lab0_chx`/`lab1_chx` 及两个失败 run 当前作为证据保留；新 commit
-   到达服务器后只删除并重建这两个本项目容器，不删除失败 run、数据、权重、
-   baseline 或稳定 environment image。
+5. 两个 b39f 失败 run 继续保留；旧容器已删除。dcf 第一次重建因只读 source
+   内缺少 `.cache` mountpoint 而在容器进程启动前失败，没有产生新 run。本地
+   mountpoint 修复通过测试后，待新 commit 到达服务器再重建；不删除失败 run、
+   数据、权重、baseline 或稳定 environment image。
 6. EXP005/EXP009 使用统一入口、非覆盖 run 目录、精简日志和结构化指标。
 7. EXP005/EXP009 的 formal/audit/eval worker 固定为 `16`，smoke 为 `2`；不改
    历史 B/C2 配置。

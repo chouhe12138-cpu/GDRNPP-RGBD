@@ -198,6 +198,7 @@ create_container() {
         "${root}/cache/gdrnpp_datasets" \
         "${root}/audit" \
         "${home_dir}/.cache" \
+        "${repo_root}/.cache" \
         "${output_root_host}"
     gpu_uuid="$(nvidia-smi -i "${gpu_id}" --query-gpu=uuid --format=csv,noheader)"
     "${docker_bin}" run -d \

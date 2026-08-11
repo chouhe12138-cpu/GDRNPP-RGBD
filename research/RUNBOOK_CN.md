@@ -105,7 +105,9 @@ snapshot；容器只验证该 snapshot、image ID 和 native artifacts，不要�
 `${root}/cache/gdrnpp_datasets` 还会嵌套挂载到
 `/workspace/gdrnpp/.cache`。该位置只保存 Git 忽略的运行缓存，不改变只读
 release 中任何 tracked source 或 native artifact。gate 必须同时验证这些路径
-可写；不能通过取消 source 只读挂载来解决 cache 权限问题。
+可写。launcher 会在 `docker run` 前创建 release 侧 Git 忽略的空 `.cache`
+挂载点，避免 Docker 尝试在只读父挂载中创建它；不能通过取消 source 只读
+挂载来解决 cache 权限问题。
 
 ```bash
 docker/l40/managed_experiment.sh lab0 EXP005 access

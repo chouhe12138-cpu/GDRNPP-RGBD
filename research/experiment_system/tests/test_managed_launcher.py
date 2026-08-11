@@ -14,6 +14,7 @@ def test_managed_launcher_uses_writable_account_local_home_and_dataset_cache():
         in source
     )
     assert '"${root}/cache/gdrnpp_datasets"' in source
+    assert '"${repo_root}/.cache"' in source
     assert 'test -w \\${GDRN_DATASET_CACHE_DIR}' in source
     assert (
         '--mount "type=bind,src=${root}/cache/gdrnpp_datasets,'

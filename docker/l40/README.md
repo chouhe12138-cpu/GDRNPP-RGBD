@@ -41,7 +41,9 @@ The managed container mounts an account-local writable home and cache. The same
 external dataset cache is also mounted at `/workspace/gdrnpp/.cache` as a
 compatibility point for unchanged upstream dataset/evaluator code. This nested
 mount contains only ignored runtime cache files; the release source and all
-tracked Python/config files remain read-only and authoritative.
+tracked Python/config files remain read-only and authoritative. The launcher
+creates the empty, Git-ignored release-side `.cache` mountpoint before Docker
+applies the read-only source mount; Docker never needs to modify that mount.
 
 Run `build_image.sh` only after an intentional Dockerfile, dependency, vendor,
 native extension or ABI change. Ordinary Python/config experiments reuse the

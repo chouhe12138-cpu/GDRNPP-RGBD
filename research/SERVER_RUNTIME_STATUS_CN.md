@@ -16,9 +16,13 @@
   `RUN-20260811-052906-smoke-s42-a01`。dataset cache 错误指向只读 source
   release，训练异常又被 Loguru decorator 吞掉，因而未生成 checkpoint，最后
   表面记录为 `POSTPROCESS_ERROR`。这不是 EXP005 或 CPM 的科学失败。
-- 两个失败 run 必须保留。当前 b39f 容器不得直接继续 audit/formal；应先完成
-  本地 cache/home 与异常退出修复、测试和新 Git release，再重建容器并用新
-  run_id 重试 smoke。无需重建 environment image。
+- 两个失败 run 必须保留。修复 commit `dcf6d57e694229f2e723f3389a171d5cf603dcfe`
+  的 detached release 已在两端通过 prepare/access；旧 b39f 容器已删除。
+- 第一次 dcf 容器重建在实验进程启动前失败：Docker 无法在只读 source mount
+  内自动创建原本不存在的 `/workspace/gdrnpp/.cache` 嵌套挂载点。未创建新的
+  run，也不构成实验失败。当前本地已增加“在 docker run 前创建 Git 忽略空
+  mountpoint”的最小修复并通过 `147 passed`，尚待提交/push 后再次重建。
+  无需重建 environment image。
 - 两端旧历史 outputs/logs/cache/audit/runtime/releases/code 已在重建前清理；
   lab1 的 `chx_old_20260801` 已删除。数据集、官方权重和 official baseline
   保留。
@@ -27,9 +31,9 @@
 - 稳定 environment image 仍为
   `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`，
   build-source 为 `35313ae3d4139a559a97c01b2d3ee007dc16604c`。
-- 当前本地修复已通过 `147 passed`，但尚未提交或 push。下一步是形成并推送
-  新 source commit，随后复用该镜像和原数据资产重建两个受管容器。普通
-  Python/config 更新不重建镜像。
+- 当前第二个本地 mountpoint 修复已通过 `147 passed`，但尚未提交或 push。
+  下一步是形成并推送新 source commit，随后复用该镜像和原数据资产重建两个
+  受管容器。普通 Python/config 更新不重建镜像。
 
 以下 2026-08-10 段落保留迁移背景；与本节冲突时以本节及重新执行的只读检查
 为准。
@@ -130,8 +134,8 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 用途 | 账户/GPU | 容器 | 镜像 | 状态 |
 |---|---|---|---|---|
-| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | b39f 容器保留；smoke 无效，待新 release 重建 |
-| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | b39f 容器保留；smoke 无效，待新 release 重建 |
+| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | 旧容器已删；dcf 创建失败，待 mountpoint 修复后重建 |
+| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | 旧容器已删；dcf 创建失败，待 mountpoint 修复后重建 |
 
 B/C2镜像最后观察到的ID：
 
