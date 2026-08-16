@@ -4,9 +4,9 @@
   "title": "Correspondence-Aware Moment Pose Head（CPM-Head）",
   "stage": "Stage 4 / CPM",
   "role": "CPM",
-  "status": "AUTHORIZED",
+  "status": "RUNNING",
   "legacy_import": false,
-  "decision": "AUTHORIZED_C2_ARCHIVE_GATE_SATISFIED_FIXED_SEED_42",
+  "decision": "FORMAL_RUNNING_AFTER_MANAGED_GATE_SMOKE_AUDIT_PASS",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
@@ -68,7 +68,17 @@
     "formal_config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/train.py",
     "smoke_config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/smoke.py",
     "eval_config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/eval.py",
+    "formal_output": "server:/data/labs/lab1/docker_data/chx/outputs/experiments/EXP-20260809-009-cpm-head",
     "moment_audit": "research/cpm_head/MOMENT_AUDIT_20260809_CN.md",
-    "local_validation": "research/cpm_head/LOCAL_CHAIN_20260809.json"
+    "local_validation": "research/cpm_head/LOCAL_CHAIN_20260809.json",
+    "formal_source_git_commit": "652d7fd9d38f8ea5cea0c5a98cc9477b66623180",
+    "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee",
+    "validated_runs": [
+      "RUN-20260811-061226-smoke-s42-a01",
+      "RUN-20260811-062736-audit-s42-a01"
+    ],
+    "formal_run_identity": "PENDING_SERVER_READ_ONLY_VERIFICATION",
+    "epoch_030_preview_diagnostic": "output/EXP-20260809-009-cpm-head/diagnostic/E30_PREVIEW/full",
+    "epoch_030_checkpoint_sha256": "d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0"
   }
 }

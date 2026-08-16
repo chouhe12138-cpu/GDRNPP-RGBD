@@ -1,5 +1,5 @@
 {
-  "experiment_count": 10,
+  "experiment_count": 11,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -52,13 +52,13 @@
       "title": "冻结 Patch-PnP 的 XYZ 利用诊断"
     },
     {
-      "decision": "MANAGED_FORMAL_AUTHORIZED_WITH_FIXED_SEED_42",
+      "decision": "COMPLETE_MATCHED_CONTROL_FIXED_EPOCH_040",
       "experiment_id": "EXP-20260731-005-pnp-only-control",
       "legacy_import": true,
       "metadata_path": "research/experiments/EXP-20260731-005-pnp-only-control/EXPERIMENT.json",
       "role": "B",
       "stage": "Stage 3C0 / B",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "Patch-PnP-only 适应对照"
     },
     {
@@ -92,14 +92,24 @@
       "title": "Patch-PnP 与质量/覆盖模块联合适应 C2"
     },
     {
-      "decision": "AUTHORIZED_C2_ARCHIVE_GATE_SATISFIED_FIXED_SEED_42",
+      "decision": "FORMAL_RUNNING_AFTER_MANAGED_GATE_SMOKE_AUDIT_PASS",
       "experiment_id": "EXP-20260809-009-cpm-head",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260809-009-cpm-head/EXPERIMENT.json",
       "role": "CPM",
       "stage": "Stage 4 / CPM",
-      "status": "AUTHORIZED",
+      "status": "RUNNING",
       "title": "Correspondence-Aware Moment Pose Head（CPM-Head）"
+    },
+    {
+      "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_COMPLETION",
+      "experiment_id": "EXP-20260816-010-cpm-official-lr-control",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260816-010-cpm-official-lr-control/EXPERIMENT.json",
+      "role": "CPM-LR-control",
+      "stage": "Stage 4 / CPM optimization control",
+      "status": "AUTHORIZED",
+      "title": "CPM-Head 官方量级学习率受控实验"
     }
   ],
   "schema_version": 1

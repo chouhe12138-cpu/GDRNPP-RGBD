@@ -1,6 +1,6 @@
 # EXP-20260809-009 — CPM-Head
 
-状态：`AUTHORIZED — SERVER GATE PASS, SMOKE INFRASTRUCTURE RETRY REQUIRED`
+状态：`FORMAL RUNNING — MANAGED GATE, SMOKE AND AUDIT PASS`
 
 ## 研究问题
 
@@ -66,6 +66,81 @@ release snapshot、17 个 native artifacts、CUDA/L40 环境、experiment regist
 该 run 没有 checkpoint、指标或机制诊断结果，不构成 CPM 科学失败。原目录
 保持不覆盖；修复可写 cache/home 和异常退出传播后创建新的唯一 run 重试。
 
+## 2026-08-11 有效 managed 验收与正式启动
+
+最终服务器身份为：
+
+```text
+source_git_commit:        652d7fd9d38f8ea5cea0c5a98cc9477b66623180
+environment_image_id:     sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee
+environment_build_source: 35313ae3d4139a559a97c01b2d3ee007dc16604c
+seed:                     42
+machine/container/GPU:    lab1 / lab1_chx / physical GPU 1
+```
+
+source snapshot、17 个 native artifacts、CUDA/L40、registry、CPM full-forward
+与参数隔离 gate 全部 PASS。有效且非覆盖的验收 run 为：
+
+```text
+smoke: RUN-20260811-061226-smoke-s42-a01 — COMPLETE, exit 0
+audit: RUN-20260811-062736-audit-s42-a01 — COMPLETE（用户回传）
+```
+
+smoke 完成 1 epoch / 2047 iterations，生成并记录
+`checkpoints/model_epoch_001.pth`。audit 使用 batch-48 对应配置；两者只证明
+训练与产物链可执行，不证明 CPM 的核心假设成立。
+
+用户随后确认 EXP009 formal 已在同一冻结 release、镜像和容器中启动。当前交接
+尚无 formal `run_id`、后台 PID 或当前 epoch，因此实验 metadata 只记录
+`RUNNING`，精确身份必须在后续从只读服务器状态补齐。
+
+## Epoch 30 高覆盖预览诊断（非正式结论）
+
+外部 Epoch 30 checkpoint 完整可读，大小 `387752090` bytes，SHA-256：
+
+```text
+d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0
+```
+
+它包含 model、optimizer 和 scheduler，记录 Epoch 30 / iteration 191939。基于
+1,445 targets × 19 conditions 的预览诊断位于 Git 忽略的
+`output/EXP-20260809-009-cpm-head/diagnostic/E30_PREVIEW/full`。baseline BOP AR
+`0.5994556` 与训练时 Epoch 30 的 `0.5994625` 一致。该 run 仅因 baseline
+translation re-entry 最大误差 `0.000320 m` 高于旧 QC 容差 `0.00005 m` 被标记
+QC FAILED；样本数量完整、没有意外非有限值且诊断未改变 checkpoint，因此可作
+机制预览，但不能替代固定 Epoch 40 正式诊断。
+
+关键 BOP AR：
+
+| 条件 | BOP AR |
+|---|---:|
+| baseline | 0.59946 |
+| GT-XYZ alpha 0.25 / 0.50 / 0.75 / 1.00 | 0.56205 / 0.46897 / 0.37097 / 0.30820 |
+| XYZ permutation | 0.14534 |
+| ROI permutation | 0.37114 |
+| Region disruption / mean Region | 0.18668 / 0.18765 |
+| coverage-only | 0.00000 |
+| CXU-null | 0.15855 |
+
+直接支持的事实是：当前 CPM 确实依赖 XYZ、ROI、object-space Region partition
+和二阶 cross-covariance；coverage-only 不能维持 pose；更准确 XYZ 没有被稳定
+转化为更好 pose，反而随 alpha 增大持续变差。它不直接证明学习率、moment
+尺度、Region/XYZ 不一致或低阶矩表达不足中的哪一个是根因。
+
+EXP009 使用 `8e-5`，而 CPM 头是新随机初始化的 822,281 参数模块；因此“学习率
+过低导致优化不足”是合理但未证明的工程假设。EXP010 作为严格匹配控制，只把
+学习率改为 `8e-4`，用于隔离这个解释。若 EXP010 仍不能改善固定 Epoch 40 的
+性能和机制响应，应停止用学习率解释 EXP009，再检查 joint-moment 表达与
+Region-conditioned aggregation 本身。
+
+早期某次 Epoch 35 传输尚未完成时不能读取；后续完整文件为 `387752090` bytes，
+SHA-256 `44129bc8ebd32bb99627fcd4170138a2afd3b32bdf17c39d0236724a81d4b196`，
+并已用于预览诊断。它仍不替代固定 Epoch 40 正式结果。
+
 ## 结果与结论
 
-`PENDING`。
+`PENDING FORMAL EPOCH 40`。不得从 smoke/audit loss、LM-O 中间 checkpoint 或
+当前 GPU 占用推导方法有效性。正式 Epoch 40 完成后，必须同时核验 BOP、
+ADD(-S)、per-object 与预注册信息流诊断；CPM 失败时的结论边界仍仅限于“当前
+Region-conditioned low-order joint moments 不足”，不能推出 2D–3D
+correspondence 不重要。

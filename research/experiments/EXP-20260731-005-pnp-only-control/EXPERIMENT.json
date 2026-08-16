@@ -4,9 +4,9 @@
   "title": "Patch-PnP-only 适应对照",
   "stage": "Stage 3C0 / B",
   "role": "B",
-  "status": "AUTHORIZED",
+  "status": "COMPLETE",
   "legacy_import": true,
-  "decision": "MANAGED_FORMAL_AUTHORIZED_WITH_FIXED_SEED_42",
+  "decision": "COMPLETE_MATCHED_CONTROL_FIXED_EPOCH_040",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
@@ -26,8 +26,30 @@
     "record": "RECORD.md",
     "stage_protocol": "research/stages/STAGE_03C0_PNP_ADAPTATION_CONTROL.md",
     "local_pilot": "output/EXP-20260731-005/pnp_only_local",
-    "formal_output": "server:output/stage3c/B_patch_pnp",
+    "formal_output": "server:/data/labs/lab0/docker_data/chx/outputs/experiments/EXP-20260731-005-pnp-only-control",
     "managed_formal_config": "configs/gdrn/lmo_pbr/research/exp005_pnp_control/train.py",
+    "formal_source_git_commit": "652d7fd9d38f8ea5cea0c5a98cc9477b66623180",
+    "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee",
+    "validated_runs": [
+      "RUN-20260811-061212-smoke-s42-a01",
+      "RUN-20260811-062719-audit-s42-a01"
+    ],
+    "formal_run_identity": "RUN-20260811-063606-formal-s42-a01",
+    "fixed_epoch_040_results": {
+      "bop19_ar_macro": 0.6919123414071512,
+      "add_s_0.1d_macro_object": 0.5065743944636678,
+      "per_object_add_s_0.1d": {
+        "1": 0.5257142857142857,
+        "5": 0.8140703517587939,
+        "6": 0.4619883040935672,
+        "8": 0.815,
+        "9": 0.07777777777777778,
+        "10": 0.4111111111111111,
+        "11": 0.75,
+        "12": 0.215
+      }
+    },
+    "external_checkpoint_transfer": "IN_PROGRESS_VERIFY_AFTER_COMPLETION",
     "historical_seed_note": "Existing legacy/local/failed runs retain their recorded seeds; new managed runs use seed 42."
   }
 }

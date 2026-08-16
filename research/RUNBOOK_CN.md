@@ -31,6 +31,14 @@ checkpoint 和服务器控制脚本默认只读。
 - 正式实验绑定完整 40 位 commit SHA，不依赖“当时 main 大概是什么”。
 - 普通 Python、config 和实验入口变化不重建镜像。只有 Dockerfile、锁定依赖、
   vendor、C++/CUDA native/ABI 变化才允许重建 environment image。
+- lab0 与 lab1 必须从 Gitee 获取同一个确定 commit，分别建立独立、detached、
+  只读 release。两台机器执行代码内容相同，差别只允许来自明确的 EXP 身份、
+  config、物理 GPU 和各自非覆盖 output；不得维护 lab0/lab1 两套源码。
+- dataset、初始化权重、checkpoint、output、cache 和机器挂载路径保留在各服务器
+  Git 之外。它们由 path profile、manifest 和哈希绑定，不因源码一致而复制进 Git。
+- 已启动的旧 run 永远绑定其原 release commit；新 commit 建新 release，不在旧
+  release 上 pull、checkout 或覆盖。不同 commit 的实验可以同时存在，但每个 run
+  必须能从 manifest 唯一还原自己的 source 与 environment 身份。
 
 服务器获取新版本前先执行：
 
@@ -47,7 +55,7 @@ git switch --detach <40位commit>
 git rev-parse HEAD
 ```
 
-不得在正在运行旧实验的代码目录中 pull 或切换版本。EXP005/EXP009 使用
+不得在正在运行旧实验的代码目录中 pull 或切换版本。受管实验使用
 `releases/GDRNPP-RGBD-<short-commit>` 全新 clone，并 checkout 指定 commit；
 旧 dirty repo 和运行目录保持不动。
 
@@ -76,10 +84,10 @@ git rev-parse HEAD
 - `summarize`：读取标准化指标并执行预注册 gate。
 - `verify`：校验 manifest、哈希、参数隔离和产物完整性。
 
-C2 已完成 Epoch 40 并按历史最小证据归档；新的 EXP005/EXP009 run 使用受管
+C2 已完成 Epoch 40 并按历史最小证据归档；新的 EXP005/EXP009/EXP010 run 使用受管
 入口，不复用已删除的旧 C2 容器或输出目录。
 
-## EXP005 / EXP009 受管入口
+## EXP005 / EXP009 / EXP010 受管入口
 
 新 run 的随机种子统一固定为 `42`。run ID 的 UTC 时间只负责目录唯一性，不
 参与随机数初始化。历史 run 保留原 seed。
@@ -142,8 +150,13 @@ docker/l40/managed_experiment.sh lab1 EXP009 launch
 成功训练后执行：
 
 ```bash
-docker/l40/managed_experiment.sh <lab0|lab1> <EXP005|EXP009> finalize
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP005|EXP009|EXP010> finalize
 ```
+
+EXP010 metadata 状态为 `AUTHORIZED`。EXP005/B 固定 Epoch 40 已完成；EXP010
+可在 lab0 与 lab1 的 EXP009 并行，最终比较仍等待两者固定 Epoch 40。它必须
+建立新的确定 commit release，复用同一稳定 environment image；不修改或续用
+EXP009 的 release、checkpoint 或 output。
 
 正式日志只保存 setup、每 500 iteration/epoch 的关键 loss、checkpoint、评估、
 warning 和异常。完整配置、环境、指标和 warning 计数分别保存为结构化文件；

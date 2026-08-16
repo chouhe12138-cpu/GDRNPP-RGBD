@@ -1,6 +1,6 @@
 # EXP-20260731-005 — Patch-PnP-Only Adaptation Control
 
-Status: `LOCAL PILOT PASS — MANAGED FORMAL AUTHORIZED, SERVER SMOKE RETRY REQUIRED`
+Status: `FORMAL COMPLETE — FIXED EPOCH 40 MATCHED CONTROL`
 
 ## Managed formal protocol update
 
@@ -88,18 +88,60 @@ postprocess 继续查找不存在的 `model_epoch_001.pth`，最终表面状态�
 证据，不计入 EXP005 结果。修复仅允许提供外置可写 cache/home，并让训练异常
 正确返回非零；不得修改模型、loss 或正式实验定义。
 
+## 2026-08-11 有效 managed 验收与正式启动
+
+最终服务器 release 和环境身份为：
+
+```text
+source_git_commit:        652d7fd9d38f8ea5cea0c5a98cc9477b66623180
+environment_image_id:     sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee
+environment_build_source: 35313ae3d4139a559a97c01b2d3ee007dc16604c
+seed:                     42
+machine/container/GPU:    lab0 / lab0_chx / physical GPU 0
+```
+
+source snapshot、native、环境、数据、registry 与 EXP005 isolation gate 全部
+PASS。新受管运行没有覆盖第一次失败目录：
+
+```text
+smoke: RUN-20260811-061212-smoke-s42-a01 — COMPLETE, exit 0
+audit: RUN-20260811-062719-audit-s42-a01 — COMPLETE, exit 0
+```
+
+smoke 完成 1 epoch / 2047 iterations，生成并记录
+`checkpoints/model_epoch_001.pth`；audit 使用 batch-48 对应配置并完成 169
+iterations。两者只证明当前 release 下训练、checkpoint 和受管产物链可执行，
+不构成正式性能结果。
+
+## 2026-08-15 固定 Epoch 40 结果
+
+正式 run 为 `RUN-20260811-063606-formal-s42-a01`。原始 console 记录训练自然
+到达 Epoch 40 / iteration `255919/255920`，写出 `model_epoch_040.pth`，并复用
+同一周期的最终评估。固定结果为：
+
+| 指标 | 结果 |
+|---|---:|
+| BOP AR | 0.6919123414 |
+| ADD(-S)@0.1d macro-object | 0.5065743945 |
+
+逐物体 ADD(-S)@0.1d 为：obj 1 `0.525714`、5 `0.814070`、6 `0.461988`、
+8 `0.815000`、9 `0.077778`、10 `0.411111`、11 `0.750000`、12 `0.215000`。
+Epoch 15 的中间 BOP AR 虽更高，但不用于选模；正式比较只使用固定 Epoch 40。
+
+外部 Windows 副本 `E:\\6D姿态估计\\EXP-005\\model_epoch_040.pth` 当前仍在
+下载。下载完成前不记录临时大小或哈希，也不将中途 `torch.load` 失败解释为
+服务器 checkpoint 损坏；完成后再与服务器原文件核对 SHA-256 并严格加载。
+
 ## Conclusion
 
 ```text
 LOCAL_PIPELINE_AND_ISOLATION = PASS
 ```
 
-This proves that the data path, online XYZ renderer, 8 GB training setup,
-gradient accumulation, checkpointing, and PnP-only isolation work. It does
-not prove pose improvement. The final C1 protocol freezes Patch-PnP, so the
-formal PnP-only run is deferred unless C2 later unfreezes Patch-PnP; in that
-case B uses all 50 PBR scenes and the same 40-epoch LM-O evaluation budget as
-C2.
+The matched 40-epoch control completed. Its fixed Epoch 40 result is close to
+the public official baseline, so retraining Patch-PnP alone provides no large
+explanation for a future CPM gain. B is retained as a matched-training control,
+not presented as an external competing method or a method contribution.
 
 Artifacts:
 

@@ -36,12 +36,15 @@ pose-aggregation diagnostic has produced a PASS/PARTIAL/FAIL result.
 | 2 | Causally separate GDRNPP mask, XYZ, reliability, and aggregation bottlenecks | COMPLETE — PASS, XYZ geometry primary |
 | 3A | Build a scene-disjoint PBR validation protocol and run leakage-marked calibration | COMPLETE — CALIBRATION_MISMATCH |
 | 3B | Test whether frozen Patch-PnP converts controlled XYZ improvements into pose gains | COMPLETE — PATCH_PNP_UNDERUTILIZATION |
-| 3C-0 | Patch-PnP-only same-budget control, required only if C2 unfreezes Patch-PnP | LOCAL PILOT PASS — CONDITIONAL |
+| 3C-0 | Patch-PnP-only same-budget control, required once C2 unfreezes Patch-PnP | EXP005 FORMAL COMPLETE |
 | 3C-1 | Freeze all official parameters and train one identity-initialized quality/coverage module | FORMAL COMPLETE — C1_SCREEN_FAIL |
-| 3C-2 | Jointly adapt Patch-PnP and the new module only if C1 cannot adapt | TRIGGERED — RUNTIME GATE PENDING |
+| 3C-2 | Jointly adapt Patch-PnP and the new module only if C1 cannot adapt | FORMAL COMPLETE — C2_SCREEN_FAIL |
+| 4 | Test whether Region-conditioned low-order 2D–3D joint moments improve direct pose-head geometry consumption | EXP009 FORMAL RUNNING |
+| 4C | Test whether EXP009 is optimization-limited by its fine-tuning-scale learning rate | EXP010 AUTHORIZED |
 
-Only the active stage may be executed.  A completed Stage 1 does not authorize
-Stage 2.
+Historical stage completion does not by itself authorize a new architecture.
+Each experiment still requires its own frozen protocol and managed run
+identity.
 
 ## Asset and Reproducibility Policy
 
@@ -67,10 +70,40 @@ Stage 1: COMPLETE — FAIL
 Stage 2: COMPLETE — PASS (XYZ GEOMETRY)
 Stage 3A: COMPLETE — CALIBRATION_MISMATCH
 Stage 3B: COMPLETE — PATCH_PNP_UNDERUTILIZATION
-Stage 3C-0: LOCAL PILOT PASS — CONDITIONAL B CONTROL
+Stage 3C-0: EXP005/B FORMAL COMPLETE
 Stage 3C-1: FORMAL COMPLETE — C1_SCREEN_FAIL
-Stage 3C-2: TRIGGERED — RUNTIME GATE PENDING
+Stage 3C-2: FORMAL COMPLETE — C2_SCREEN_FAIL
+Stage 4: EXP009/CPM FORMAL RUNNING
+Stage 4C: EXP010/CPM-LR CONTROL AUTHORIZED
 ```
+
+EXP010 is a matched optimization control, not a second pose-head proposal. It
+inherits EXP009 and changes only the experiment identity/output path and Ranger
+learning rate (`8e-5` to `8e-4`). It starts fresh from the official checkpoint
+and is authorized after EXP005 fixed Epoch 40 completion. EXP009 and EXP010
+may run concurrently on their assigned GPUs; final comparison waits for both
+fixed Epoch 40 results and diagnostics. Its result can test whether EXP009 was
+optimization-limited; it cannot by itself validate or reject low-order joint
+moments or 2D–3D correspondence in general.
+
+## 2026-08-11 — Stage 3C closure and Stage 4 execution
+
+- C2 completed 40 epochs. Its best BOP AR was Epoch 35 `0.6935201845`; fixed
+  Epoch 40 was `0.6930057670`. Both missed the pre-registered `+0.50 pp` BOP
+  gate. Historical ADD(-S) macro/per-object evidence was not produced and
+  remains missing, so the frozen conclusion is `C2_SCREEN_FAIL`.
+- Mandatory matched control EXP005/B and EXP009/CPM passed managed gate,
+  smoke, and audit under source commit
+  `652d7fd9d38f8ea5cea0c5a98cc9477b66623180`, stable environment image
+  `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`,
+  and seed `42`.
+- The user confirmed both formal runs are active. Their exact formal `run_id`
+  was not included in this handoff and must be recovered from read-only run
+  metadata. Neither intermediate LM-O checkpoints nor smoke/audit losses may
+  be used for model selection or scientific conclusions.
+- CPM tests only whether Region-conditioned low-order joint moments are
+  sufficient for the proposed mechanism. A negative CPM result would not show
+  that 2D–3D correspondence itself is unimportant.
 
 ## 2026-07-31 — Stage 3B result
 

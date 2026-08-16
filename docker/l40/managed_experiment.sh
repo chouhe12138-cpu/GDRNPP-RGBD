@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "usage: $0 lab0|lab1 EXP005|EXP009 access|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
+    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010 access|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
     exit 2
 }
 
@@ -38,6 +38,11 @@ case "${experiment}" in
         config_root="configs/gdrn/lmo_pbr/research/exp009_cpm_head"
         isolation_role="CPM"
         ;;
+    EXP010)
+        experiment_id="EXP-20260816-010-cpm-official-lr-control"
+        config_root="configs/gdrn/lmo_pbr/research/exp010_cpm_official_lr_control"
+        isolation_role="CPM"
+        ;;
     *) usage ;;
 esac
 
@@ -64,6 +69,19 @@ output_root_container="/workspace/gdrnpp/output/experiments"
 log_root="${root}/logs/managed/${experiment_id}"
 official_container="/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth"
 self="${repo_root}/docker/l40/managed_experiment.sh"
+experiment_metadata="${repo_root}/research/experiments/${experiment_id}/EXPERIMENT.json"
+
+require_run_authorization() {
+    local experiment_status
+    experiment_status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${experiment_metadata}")"
+    case "${experiment_status}" in
+        AUTHORIZED|RUNNING) ;;
+        *)
+            echo "FAIL: ${experiment_id} status is ${experiment_status}; mutating/run command requires AUTHORIZED or RUNNING" >&2
+            exit 1
+            ;;
+    esac
+}
 
 container_exists() {
     "${docker_bin}" container inspect "${container}" >/dev/null 2>&1
@@ -439,18 +457,19 @@ finalize_run() {
 
 case "${command}" in
     access) access_check ;;
-    create) create_container ;;
-    gate) gate ;;
-    smoke) launch_once smoke ;;
+    create) require_run_authorization; create_container ;;
+    gate) require_run_authorization; gate ;;
+    smoke) require_run_authorization; launch_once smoke ;;
     audit48)
+        require_run_authorization
         require_complete smoke
         launch_once audit
         ;;
-    launch) start_supervisor ;;
+    launch) require_run_authorization; start_supervisor ;;
     status) show_status ;;
     watch) watch_latest ;;
-    finalize) finalize_run ;;
-    _launch-formal-once) launch_once formal ;;
-    _supervise-formal) supervise_formal ;;
+    finalize) require_run_authorization; finalize_run ;;
+    _launch-formal-once) require_run_authorization; launch_once formal ;;
+    _supervise-formal) require_run_authorization; supervise_formal ;;
     *) usage ;;
 esac

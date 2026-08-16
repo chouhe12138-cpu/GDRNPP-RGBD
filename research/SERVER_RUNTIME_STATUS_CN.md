@@ -1,28 +1,46 @@
 # GDRNPP 服务器运行环境与实验进度交接
 
-最后更新：2026-08-11
+最后更新：2026-08-16
+
+## 2026-08-16 更新
+
+- EXP005/B formal run `RUN-20260811-063606-formal-s42-a01` 已自然完成固定
+  Epoch 40：BOP AR `0.6919123414`、ADD(-S) `0.5065743945`。
+- 外部 Windows checkpoint 副本仍在下载；完成后再与服务器原文件核对哈希，
+  下载中的临时文件不解释为权重损坏。
+- EXP010 已授权在 lab0 使用新的确定 Git release 启动。它与 lab1 的 EXP009
+  可以并行；最终比较等待两者固定 Epoch 40。
+- 启动 EXP010 前只替换项目自己的 `lab0_chx` 容器；EXP005 output、旧 release、
+  数据、权重、稳定 environment image 和其他用户资源全部保留。
 
 ## 2026-08-11 当前状态
 
 - C2 已自然完成 Epoch 40，固定 Epoch 40 BOP AR 为 `0.6930057670`；筛选结论
   为 `C2_SCREEN_FAIL`。Epoch 40 checkpoint、完整日志和 BOP JSON 已在本地与
   服务器完成 SHA-256 对照，历史 ADD(-S) 保持缺失。
-- 清理完成后，两端已 checkout detached source release
-  `b39f68092de2609b7ee1726811c9ee965e606328`，复用同一个稳定 environment
-  image 重建了 `lab0_chx`/`lab1_chx`。两端 source snapshot、native、环境、
-  registry 和角色 preflight gate 均通过。
-- 两端第一次 managed smoke 已结束但均为无效基础设施运行：EXP005 run
+- 当前正式运行使用同一个 detached、只读 source release：
+  `652d7fd9d38f8ea5cea0c5a98cc9477b66623180`。`lab0_chx` 在物理 GPU 0
+  运行 EXP005/B，`lab1_chx` 在物理 GPU 1 运行 EXP009/CPM。
+- 两端 source snapshot、native、环境、registry、数据与角色 gate 均通过；有效
+  smoke 与 audit 也已完成。用户已确认两个 formal 均在运行中，但尚未回传精确
+  formal `run_id`、后台 PID 和当前 epoch。本文不伪造这些身份，训练结束后必须
+  从 `latest_formal_run.path`、run manifest 和 run state 补齐。
+- 两端第一次 managed smoke 均为无效基础设施运行：EXP005 run
   `RUN-20260811-052852-smoke-s42-a01`、EXP009 run
   `RUN-20260811-052906-smoke-s42-a01`。dataset cache 错误指向只读 source
   release，训练异常又被 Loguru decorator 吞掉，因而未生成 checkpoint，最后
   表面记录为 `POSTPROCESS_ERROR`。这不是 EXP005 或 CPM 的科学失败。
 - 两个失败 run 必须保留。修复 commit `dcf6d57e694229f2e723f3389a171d5cf603dcfe`
-  的 detached release 已在两端通过 prepare/access；旧 b39f 容器已删除。
-- 第一次 dcf 容器重建在实验进程启动前失败：Docker 无法在只读 source mount
+  的第一次容器重建在实验进程启动前失败：Docker 无法在只读 source mount
   内自动创建原本不存在的 `/workspace/gdrnpp/.cache` 嵌套挂载点。未创建新的
-  run，也不构成实验失败。当前本地已增加“在 docker run 前创建 Git 忽略空
-  mountpoint”的最小修复并通过 `147 passed`，尚待提交/push 后再次重建。
-  无需重建 environment image。
+  run，也不构成实验失败。最终 `652d7fd...` 修复在 `docker run` 前创建 Git
+  忽略 mountpoint，已通过本地 `147 passed` 和两端实际容器 gate。
+- 有效 EXP005 smoke/audit 分别为
+  `RUN-20260811-061212-smoke-s42-a01`、
+  `RUN-20260811-062719-audit-s42-a01`；有效 EXP009 smoke/audit 分别为
+  `RUN-20260811-061226-smoke-s42-a01`、
+  `RUN-20260811-062736-audit-s42-a01`。用户回传四者均完成；两个 smoke 均生成
+  `checkpoints/model_epoch_001.pth`。
 - 两端旧历史 outputs/logs/cache/audit/runtime/releases/code 已在重建前清理；
   lab1 的 `chx_old_20260801` 已删除。数据集、官方权重和 official baseline
   保留。
@@ -31,9 +49,8 @@
 - 稳定 environment image 仍为
   `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`，
   build-source 为 `35313ae3d4139a559a97c01b2d3ee007dc16604c`。
-- 当前第二个本地 mountpoint 修复已通过 `147 passed`，但尚未提交或 push。
-  下一步是形成并推送新 source commit，随后复用该镜像和原数据资产重建两个
-  受管容器。普通 Python/config 更新不重建镜像。
+- source commit 与 image build-source 分别记录，不要求相等。当前正式训练冻结
+  release、容器和镜像；不得在运行目录 pull、修改文件或替换环境。
 
 以下 2026-08-10 段落保留迁移背景；与本节冲突时以本节及重新执行的只读检查
 为准。
@@ -134,8 +151,8 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 用途 | 账户/GPU | 容器 | 镜像 | 状态 |
 |---|---|---|---|---|
-| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | 旧容器已删；dcf 创建失败，待 mountpoint 修复后重建 |
-| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | 旧容器已删；dcf 创建失败，待 mountpoint 修复后重建 |
+| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | `652d7fd...` formal Epoch 40 完成；待替换为 EXP010 容器 |
+| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | `652d7fd...` gate/smoke/audit PASS；formal 运行中 |
 
 B/C2镜像最后观察到的ID：
 
@@ -164,7 +181,7 @@ sha256:8e2ee36cae8c9916c6f98b2e29d7c0c9d8cde4d06daca31532f2f7ca47891a99
 代码：
 
 ```text
-/data/labs/lab1/docker_data/chx/releases/GDRNPP-RGBD-<short-commit>
+/data/labs/lab1/docker_data/chx/releases/GDRNPP-RGBD-652d7fd9d38f
 ```
 
 主要资源：
@@ -197,7 +214,7 @@ sha256:8e2ee36cae8c9916c6f98b2e29d7c0c9d8cde4d06daca31532f2f7ca47891a99
 代码：
 
 ```text
-/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-<short-commit>
+/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-652d7fd9d38f
 ```
 
 已观察到 `lab0_chx` 使用lab0自有资源：
@@ -231,7 +248,10 @@ branch:     main
 ```
 
 - 个人WSL工作区是代码修改和提交的来源。
-- 服务器只执行pull、Docker构建和实验，不在服务器提交或push。
+- 服务器只执行 `fetch`、确定 commit 的 detached checkout、只读 release 准备与
+  实验，不在服务器提交或 push，也不在活动 release 中直接 pull。普通
+  Python/config 更新复用稳定 environment image；只有环境依赖、native/ABI 或
+  Dockerfile 变化才重新构建镜像。
 - Gitee HTTPS凭据由用户交互输入，不写入脚本或仓库。
 - 服务器存在未提交修改时先运行 `git status --short`；不得reset或覆盖。lab1
   曾观察到 `train_stage3c1.py` 有本地修改，后续必须重新核验其是否仍存在。
@@ -253,10 +273,11 @@ C1容器、日志、输出和权重是不可变实验依据，不用于覆盖式
 
 ### B：Patch-PnP-only
 
-- 历史 Stage 3C 链曾有一轮 smoke 成功，checkpoint 隔离验证通过；这不替代
-  当前 managed release 的验收。
-- 当前 managed run `RUN-20260811-052852-smoke-s42-a01` 因只读 cache 无效，
-  尚未产生可接受的 managed smoke checkpoint。
+- 历史 Stage 3C 链曾有一轮 smoke 成功，checkpoint 隔离验证通过；当前
+  `652d7fd...` managed release 已重新完成独立验收。
+- `RUN-20260811-052852-smoke-s42-a01` 因只读 cache 无效，只作为基础设施证据。
+- 有效 smoke `RUN-20260811-061212-smoke-s42-a01` 与 audit
+  `RUN-20260811-062719-audit-s42-a01` 已完成，smoke checkpoint 已生成。
 - 曾误同时启动smoke和formal；该次过早formal已终止，退出码143。
 - 无效输出已隔离到：
 
@@ -265,9 +286,17 @@ C1容器、日志、输出和权重是不可变实验依据，不用于覆盖式
 ```
 
 - 该次过早formal不计入实验结果。
-- 有效正式B训练尚未开始。
-- NUM_WORKERS benchmark尚未产生可采用的推荐结果；GPU0最后观察到被其他用户
-  进程占用。重新开始前先检查是否仍有旧的后台等待器。
+- 用户已确认有效正式 B 训练正在 `lab0_chx` 中运行；正式 `run_id` 尚待从
+  `latest_formal_run.path` 核验。正式结果固定使用 Epoch 40。
+
+### EXP009：CPM-Head
+
+- `RUN-20260811-052906-smoke-s42-a01` 因同一只读 cache 问题无效，不构成 CPM
+  科学失败。
+- 有效 smoke `RUN-20260811-061226-smoke-s42-a01` 与 audit
+  `RUN-20260811-062736-audit-s42-a01` 已完成，smoke checkpoint 已生成。
+- 用户已确认 formal 正在 `lab1_chx` 中运行；正式 `run_id` 尚待从
+  `latest_formal_run.path` 核验。不得使用 LM-O 中间 checkpoint 选模。
 
 ### C2：Patch-PnP + 质量/覆盖联合训练
 
@@ -303,10 +332,17 @@ docker/l40/managed_experiment.sh lab0 EXP005 status
 docker/l40/managed_experiment.sh lab1 EXP009 status
 ```
 
-新 source commit 到达服务器后，先重新执行 `prepare_release.sh`，再按
-`access → create → gate → smoke → audit48 → launch` 顺序执行。当前 b39f
-容器和无效 smoke 只用于保留证据，不能直接继续 audit/formal。详细命令见
-`research/RUNBOOK_CN.md`。
+当前 formal 已启动，只允许只读查看状态和日志；不要重新执行 `launch`，不要在
+release 目录 pull 或修改，不要替换容器或镜像。精确日志指针如下：
+
+```text
+/data/labs/lab0/docker_data/chx/logs/managed/EXP-20260731-005-pnp-only-control/latest_formal_run.path
+/data/labs/lab1/docker_data/chx/logs/managed/EXP-20260809-009-cpm-head/latest_formal_run.path
+```
+
+每个 run 内以 `meta/run_manifest.json`、`meta/run_state.json`、
+`meta/launcher_status.json`、`train/epoch_summary.jsonl`、`train/console.log` 和
+`checkpoints/` 为正式依据。详细只读命令见 `research/RUNBOOK_CN.md`。
 
 ## 只读核验GPU、用户和Docker归属
 

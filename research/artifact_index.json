@@ -37,7 +37,8 @@
       "artifacts": [
         {"mode": "local_pilot", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-005/pnp_only_local"},
         {"mode": "legacy_formal_path", "status": "UNUSED_READ_ONLY", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp"},
-        {"mode": "managed_formal", "status": "AUTHORIZED", "storage": "lab0", "locator": "output/experiments/EXP-20260731-005-pnp-only-control/<run_id>"},
+        {"mode": "managed_formal", "status": "COMPLETE", "storage": "lab0", "locator": "output/experiments/EXP-20260731-005-pnp-only-control/RUN-20260811-063606-formal-s42-a01", "fixed_checkpoint": "epoch_040", "evidence": "research/experiments/EXP-20260731-005-pnp-only-control/RECORD.md"},
+        {"mode": "formal_transfer", "status": "IN_PROGRESS_VERIFY_AFTER_COMPLETION", "storage": "external_windows", "locator": "E:\\6D姿态估计\\EXP-005", "evidence": "research/experiments/EXP-20260731-005-pnp-only-control/RECORD.md"},
         {"mode": "formal", "status": "INVALID", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp_INVALID_EARLY_20260805_234436"}
       ]
     },
@@ -69,7 +70,14 @@
       "experiment_id": "EXP-20260809-009-cpm-head",
       "artifacts": [
         {"mode": "local_engineering_chain", "status": "COMPLETE", "storage": "local", "locator": "output/cpm_head", "checkpoint_sha256": "e3d431c40eaf6354c5d21d18cb3d06534524ffbfedb9648be1c329492f7774a3", "evidence": "research/cpm_head/LOCAL_CHAIN_20260809.json"},
+        {"mode": "epoch_030_diagnostic_preview", "status": "COMPLETE_WITH_QC_REENTRY_TOLERANCE_WARNING", "storage": "local_ignored_output", "locator": "output/EXP-20260809-009-cpm-head/diagnostic/E30_PREVIEW/full", "checkpoint_sha256": "d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0", "evidence": "research/experiments/EXP-20260809-009-cpm-head/RECORD.md"},
         {"mode": "managed_formal", "status": "AUTHORIZED_AFTER_C2_ARCHIVE", "storage": "lab1", "locator": "output/experiments/EXP-20260809-009-cpm-head/<run_id>"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260816-010-cpm-official-lr-control",
+      "artifacts": [
+        {"mode": "managed_formal", "status": "AUTHORIZED", "storage": "lab0", "locator": "output/experiments/EXP-20260816-010-cpm-official-lr-control/<run_id>"}
       ]
     }
   ]

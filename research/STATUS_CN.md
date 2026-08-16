@@ -1,8 +1,7 @@
 # 当前研究状态
 
-最后核对：2026-08-11（本地工作区及用户提供的 lab0/lab1 gate/smoke 结果）；
-C2 已完成并最小归档。EXP005/EXP009 第一次新架构 smoke 因只读 cache 基础
-设施问题无效，未产生 checkpoint 或科学结果。服务器实时状态仍需重新检查。
+最后核对：2026-08-16。EXP005/B 已完成固定 Epoch 40；EXP009/CPM 仍待固定
+Epoch 40 收尾；EXP010 已获准在 lab0 使用新的确定 Git release 启动。
 
 ## 项目做到哪里
 
@@ -11,10 +10,11 @@ Stage 1:   COMPLETE — FAIL
 Stage 2:   COMPLETE — PASS（XYZ GEOMETRY）
 Stage 3A:  COMPLETE — CALIBRATION_MISMATCH
 Stage 3B:  COMPLETE — PATCH_PNP_UNDERUTILIZATION
-Stage 3C0: LOCAL PILOT PASS — EXP005/B FORMAL AUTHORIZED
+Stage 3C0: EXP005/B FORMAL COMPLETE
 Stage 3C1: FORMAL COMPLETE — C1_SCREEN_FAIL
 Stage 3C2: FORMAL COMPLETE — C2_SCREEN_FAIL
-Stage 4:   CPM LOCAL ENGINEERING PASS — FORMAL AUTHORIZED
+Stage 4:   EXP009/CPM FORMAL RUNNING
+Stage 4C:  EXP010/CPM-LR CONTROL AUTHORIZED
 ```
 
 Stage 2 证明预测 XYZ 几何是主要因果瓶颈。Stage 3B 进一步确认，官方冻结
@@ -27,26 +27,32 @@ Epoch 40 的同协议横向诊断尚未全部完成。
 
 ## 当前任务
 
-1. 当前已构建镜像作为稳定 environment image 保留；后续确定 Git release 通过
-   source/native overlay 复用它，不因普通 Python/config 更新重建镜像。
-2. source/environment 解耦 release `b39f680...` 已在两端通过 gate；第一次
-   smoke 暴露只读 source cache 与异常退出传播问题。本地最小修复已通过完整
-   测试，待提交/push 新 source commit 后复用现有镜像重建容器并重试 smoke。
+1. EXP005/B 的正式 run `RUN-20260811-063606-formal-s42-a01` 已完成；EXP009
+   继续绑定旧 release `652d7fd9d38f8ea5cea0c5a98cc9477b66623180`。EXP010
+   使用新 release 在 lab0 启动，不修改旧 release 或 output。
+2. 两者共用稳定 environment image
+   `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`；
+   image build-source 与实验 source commit 独立记录，普通 Python/config 更新
+   不触发镜像重建。
 3. C2 Epoch 40 已完成并最小归档；Epoch 40 checkpoint、完整日志和 BOP 已完成
    哈希核验，历史 ADD(-S) 未生成并明确记录为缺失。
 4. C1 formal checkpoint、日志和最终指标已完成外部只读复验；EXP007 的 C1
    8-target smoke 已通过，1,445-target full 与 B/C2 横向诊断仍待后续安排。
-5. 两个 b39f 失败 run 继续保留；旧容器已删除。dcf 第一次重建因只读 source
-   内缺少 `.cache` mountpoint 而在容器进程启动前失败，没有产生新 run。本地
-   mountpoint 修复通过测试后，待新 commit 到达服务器再重建；不删除失败 run、
-   数据、权重、baseline 或稳定 environment image。
-6. EXP005/EXP009 使用统一入口、非覆盖 run 目录、精简日志和结构化指标。
-7. EXP005/EXP009 的 formal/audit/eval worker 固定为 `16`，smoke 为 `2`；不改
+5. 两个 `b39f680...` smoke 失败 run 继续保留为基础设施证据；`dcf6d57...`
+   重建失败发生在容器进程启动前，没有产生实验 run。二者均不计入模型结果。
+6. `652d7fd...` 下两实验的 gate、smoke 和 audit 已通过；正式结果必须使用固定
+   Epoch 40，禁止根据 LM-O test 中间 checkpoint 选模。
+7. EXP005/EXP009 使用统一入口、非覆盖 run 目录、精简日志和结构化指标。
+8. EXP005/EXP009 的 formal/audit/eval worker 固定为 `16`，smoke 为 `2`；不改
    历史 B/C2 配置。
+9. EXP010 已注册并授权为 EXP009 的严格学习率控制：从官方 checkpoint 重新
+   开始，唯一科学变量是 `lr 8e-5 → 8e-4`。EXP009 与 EXP010 可以并行；最终
+   比较等待两者固定 Epoch 40 评估和诊断完成。
 
 ## 已验证的本地状态
 
 - 历史验收实现及证据绑定 commit：`4edab641cbe0aa43e9220d92d4f785a2b920cb31`。
+- 正式运行源码 commit：`652d7fd9d38f8ea5cea0c5a98cc9477b66623180`。
 - 研究相关测试：`147 passed`（含 source/environment 解耦、CPM、受管运行、实验
   管理与历史验收基础设施）。
 - B 和 C2 正式 config preflight：PASS。
@@ -64,9 +70,18 @@ Epoch 40 的同协议横向诊断尚未全部完成。
   1-epoch local chain 的构建、迁移、forward/backward、保存/严格重载、标准
   evaluator 及 8-target × 19-condition diagnostic 均通过。该结果仅为工程验收，
   不构成方法有效性结论。
+- `652d7fd...` 服务器有效运行：EXP005 smoke
+  `RUN-20260811-061212-smoke-s42-a01`、audit
+  `RUN-20260811-062719-audit-s42-a01`；EXP009 smoke
+  `RUN-20260811-061226-smoke-s42-a01`、audit
+  `RUN-20260811-062736-audit-s42-a01`。四个 run 均由用户回传为完成，smoke
+  均生成并记录 `checkpoints/model_epoch_001.pth`。
 
 ## 已知记录问题
 
+- EXP005 固定 Epoch 40 的 BOP AR 为 `0.6919123414`、ADD(-S) 为
+  `0.5065743945`。外部 checkpoint 副本仍在下载，完成后再核验哈希和严格加载；
+  下载中的临时文件不解释为 checkpoint 损坏。
 - Docker 历史构建记录中的 `43 passed` 是当时快照；当前本地研究测试基线为
   `147 passed`。
 - EXP005/EXP009 的 2026-08-11 首次 managed smoke 都因只读 dataset cache
@@ -74,7 +89,8 @@ Epoch 40 的同协议横向诊断尚未全部完成。
   `model_epoch_001.pth`。两次 run 无 checkpoint/指标，不属于科学失败，且不可
   覆盖或删除。
 - EXP-000～009 已纳入统一 experiment 索引；EXP008 已完成且筛选失败，EXP005
-  和 EXP009 均已获 formal 授权。
+  和 EXP009 已通过正式运行前 gate 并由用户确认为 formal 运行中。精确 formal
+  `run_id` 尚未回传，不应从启动时间推测。
 - C1 正式 raw checkpoint/日志保存在外部 Windows 路径；仓库只跟踪复验记录
   和哈希，不复制大文件。完整 raw evaluator 目录仍未复制。
 - C1/C2 历史自动 ADD(-S) 查找器曾不兼容 evaluator 的冒号目录/文件名；C2

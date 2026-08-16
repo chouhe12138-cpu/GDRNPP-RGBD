@@ -1,7 +1,7 @@
 # Stage 3C 实验信息看板
 
-最后更新：2026-08-09
-结果截止：C1 Epoch 40（正式完成）；C2 Epoch 30（运行中）
+最后更新：2026-08-16
+结果截止：C1/C2/B Epoch 40；EXP009 待收尾，EXP010 已授权
 
 本文件是用于快速查看的简洁状态页。正式协议和证据链接见
 [实验记录与协议](#实验记录与协议)。
@@ -9,12 +9,11 @@
 ## 当前状态
 
 ```text
-当前实验：C2联合适应正在运行；B formal暂不启动
-当前进度：C2下载日志到Epoch 33，周期评估到Epoch 30
-当前判断：C1_SCREEN_FAIL；C2尚无checkpoint通过全部门槛
-当前最佳：C2按BOP主指标为Epoch 25（69.2738%）
-后续安排：保持C2原运行链到Epoch 40，再确定最终结论和是否取消B
-正式种子：20260731；每个正式实验只使用一个固定种子
+当前实验：EXP005/B 已完成；EXP009/CPM 待固定Epoch 40；EXP010 已授权
+当前判断：C1_SCREEN_FAIL；C2_SCREEN_FAIL；B matched control 已完成
+C2结果：BOP最佳Epoch 35为69.3520%，固定Epoch 40为69.3006%，均未过门槛
+后续安排：lab0 启动EXP010；最终比较等待EXP009/EXP010固定Epoch 40
+种子边界：历史C1/C2保留原seed；新managed B/CPM固定seed=42
 ```
 
 ## 实验定义
@@ -23,8 +22,8 @@
 |---|---|---|---|---|
 | A | 官方基线评估 | 无 | 提供所有后续实验的统一参考指标 | 已完成 |
 | C1 | 质量/覆盖模块独立训练实验 | 质量/覆盖模块 | 判断冻结Patch-PnP时，仅调整region特征是否有效 | 正式完成；失败 |
-| B | Patch-PnP姿态头适应实验 | Patch-PnP | 判断原始姿态头重新适应是否足够 | 已触发；运行门准备 |
-| C2 | Patch-PnP＋质量/覆盖联合适应实验 | Patch-PnP和质量/覆盖模块 | 判断模块是否需要联合适应及其相对B的额外贡献 | 正在运行；评估到Epoch 30 |
+| B | Patch-PnP姿态头适应实验 | Patch-PnP | 判断原始姿态头重新适应是否足够 | EXP005 formal完成 |
+| C2 | Patch-PnP＋质量/覆盖联合适应实验 | Patch-PnP和质量/覆盖模块 | 判断模块是否需要联合适应及其相对B的额外贡献 | 正式完成；失败 |
 
 保留编号是为了兼容现有协议和输出目录。文档首次提到实验时，应同时写出编号和
 完整实验名称。
@@ -52,8 +51,9 @@
 | C1：模块独立训练，Epoch 30 | 68.9670 | -0.0745 | 50.37 | -0.49 | 4/8 | 暂定失败 |
 | C1：模块独立训练，Epoch 35 | 68.9751 | -0.0664 | 50.59 | -0.27 | 4/8 | 暂定失败 |
 | C1：模块独立训练，Epoch 40 | 68.9742 | -0.0674 | 50.57 | -0.29 | 4/8 | 正式失败 |
-| B：姿态头适应实验 | 待执行 | — | 待执行 | — | — | 已触发 |
-| C2：联合适应，当前BOP最佳Epoch 25 | 69.2738 | +0.2323 | 未取得macro | — | 未取得 | 运行中；BOP门槛未通过 |
+| B：姿态头适应实验，固定Epoch 40 | 69.1912 | +0.1497 | 50.66 | -0.20 | 4/8 | matched control完成 |
+| C2：联合适应，BOP最佳Epoch 35 | 69.3520 | +0.3105 | 未取得macro | — | 未取得 | 未过BOP门槛 |
+| C2：联合适应，固定Epoch 40 | 69.3006 | +0.2591 | 历史证据缺失 | — | 未取得 | `C2_SCREEN_FAIL` |
 
 冻结的通过门槛为：
 
@@ -62,7 +62,27 @@
 - 至少`5/8`物体非负。
 
 三项必须全部通过。C1固定Epoch 40三项均未通过；其最佳Epoch 5也未通过
-BOP和ADD门槛，因此最终结论为`C1_SCREEN_FAIL`。
+BOP和ADD门槛，因此最终结论为`C1_SCREEN_FAIL`。C2固定Epoch 40和其BOP
+最佳Epoch 35均未通过BOP门槛；历史下载证据没有ADD(-S)宏平均或逐物体结果，
+保持为缺失，不能用BOP `ad`替代，因此结论为`C2_SCREEN_FAIL`。
+
+## Stage 4 衔接：EXP009/CPM
+
+EXP009 不属于旧质量/覆盖 C1/C2 模块的延伸，而是基于已完成诊断重新定义的
+姿态头实验。它保持 backbone 和 geometry head 冻结，在可学习压缩之前显式
+编码可见支持上的 Region-conditioned 2D–3D 低阶联合矩，并以 EXP005/B 作为
+mandatory matched-training-protocol 对照。
+
+```text
+EXP005/B:   lab0_chx / physical GPU 0 / formal complete
+EXP009/CPM: lab1_chx / physical GPU 1 / formal running
+source:     652d7fd9d38f8ea5cea0c5a98cc9477b66623180
+seed:       42
+selection:  fixed Epoch 40 only
+```
+
+两者 gate、smoke 和 audit 已通过。EXP005 固定 E40 已形成 matched-control
+结果；EXP009/EXP010 的方法比较仍等待各自固定 Epoch 40。
 
 <details>
 <summary>C1 Epoch 20逐物体ADD(-S)@0.1d</summary>

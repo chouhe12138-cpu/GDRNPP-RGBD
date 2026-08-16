@@ -1,270 +1,136 @@
-# GDRNPP-RGBD Research Handoff
+# GDRNPP 研究交接
 
-Last updated: 2026-08-06
+最后更新：2026-08-16
 
-Current L40 accounts, GPUs, Docker containers, data paths, runtime state, and
-next server actions are recorded in
-`research/SERVER_RUNTIME_STATUS_CN.md`. Read that file before any server-side
-setup or formal B/C2 execution. Historical migration, image-build, and C1
-environment details remain in `research/SERVER_MIGRATION_HANDOFF.md`.
+本文件只提供新对话需要的当前摘要。稳定工作规则见根目录 `AGENTS.md`，当前
+研究事实见 `research/STATUS_CN.md`，服务器动态事实见
+`research/SERVER_RUNTIME_STATUS_CN.md`。不要用本摘要替代原始实验产物、run
+manifest、实验 `RECORD.md` 或 stage 协议。
 
-## Start Here
-
-Repository:
-
-```text
-/home/wsluser/GDRNPP-RGBD
-```
-
-Read this file, then inspect `git status` before doing any work.  The worktree
-contains intentional uncommitted research files and pre-existing changes; do
-not reset, clean, overwrite, or commit them without confirming scope.
-
-Current research state:
-
-```text
-Stage 1:  COMPLETE — FAIL
-Stage 2:  COMPLETE — PASS (XYZ GEOMETRY)
-Stage 3A: COMPLETE — CALIBRATION_MISMATCH (NOT FORMAL VALIDATION)
-Stage 3B: COMPLETE — PATCH_PNP_UNDERUTILIZATION
-Stage 3C-0: LOCAL PILOT PASS — RETAINED AS CONDITIONAL B CONTROL
-Stage 3C-1: FORMAL COMPLETE — C1_SCREEN_FAIL
-Next controls: B PATCH-PNP / C2 JOINT — RUNTIME GATES PENDING
-```
-
-Experiment-budget rule: use one pre-registered seed per formal experiment.
-Do not schedule confirmation runs that differ only by random seed.  Spare GPU
-capacity is reserved for causally matched controls, key ablations, and
-cross-dataset validation.
-
-A single lightweight quality/coverage residual-attention architecture
-completed its formal L40 run.  Fixed epoch 40 scored 68.9742% BOP AR and
-50.57% ADD(-S), with 4/8 objects nonnegative, so C1 failed all final gates.
-The analysis is recorded in
-`research/experiments/EXP-20260731-006-quality-coverage/RECORD.md`.
-The compact A/C1/B/C2 experiment matrix, current results, and network diagrams
-are in `research/STAGE_03C_EXPERIMENT_OVERVIEW.md`.
-
-## Stage 1 — Pose Aggregation Diagnostic
-
-Protocol: official ConvNeXt-Base GDRNPP, LM-O BOP19, 1,445 targets, GT boxes,
-RGB only, one shared network forward.
-
-Key result:
-
-| Method | BOP AR (%) | ADD(-S) (%) |
-|---|---:|---:|
-| Patch-PnP | 69.021 | 50.242 |
-| RANSAC-EPnP | 69.594 | 53.080 |
-| Current reliability Top-50% | 68.719 | 51.696 |
-
-RANSAC gives a small, object-dependent gain but improves/ties only 5/8 objects.
-The mask × region reliability proxy is rejected.
-
-Evidence:
-
-```text
-research/experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/
-output/EXP-20260730-001/full/
-```
-
-## Stage 2 — Causal Oracle Diagnostic
-
-The same LM-O protocol was frozen and decomposed into mask, XYZ, reliability,
-aggregation, and axis oracles.  Test depth/masks/poses were oracle-only and
-must never be described as deployable RGB input.
-
-Formal decision:
-
-```text
-PASS — predicted dense XYZ geometry is the primary causal bottleneck.
-```
-
-Key result:
-
-| Method | BOP AR (%) | ADD(-S) (%) |
-|---|---:|---:|
-| Patch-PnP | 69.021 | 50.242 |
-| Pred XYZ + Pred visible | 69.594 | 53.080 |
-| Pred XYZ + GT visible | 69.142 | 54.256 |
-| GT XYZ + GT visible | 100.000 | 100.000 |
-| True-XYZ-error Top-50% | 68.820 | 52.042 |
-| Oracle best R/t axes | 72.614 | 61.107 |
-
-GT XYZ closes 97.49% of the complete oracle gap and is non-negative on 8/8
-objects.  GT mask is neutral.  Even retaining the 50% lowest true-XYZ-error
-points hurts LM-O, showing that pointwise accuracy alone is insufficient;
-coverage and conditioning matter.  Axis-wise Patch-PnP/RANSAC selection is a
-strong secondary signal (+3.020 BOP AR, +8.028 ADD(-S)) but fails the frozen
-30% oracle-gap-closure primary gate.
-
-Evidence:
-
-```text
-research/experiments/EXP-20260731-002-gdrnpp-causal-oracle/
-research/stages/STAGE_02_GDRNPP_CAUSAL_ORACLE.md
-output/EXP-20260731-002/full/oracle_summary.json
-```
-
-## Stage 3A — PBR Validation Infrastructure
-
-Dataset facts:
-
-- Dataset root: `/home/wsluser/Datasets/BOP_DATASETS`.
-- VOC root: `/home/wsluser/Datasets/VOC`.
-- All 50 PBR scenes / 50,000 images are extracted and deep-verified.
-- PBR contains 749,600 annotations and 1,499,200 full/visible mask paths.
-- The eight LM-O objects contribute 399,950 PBR annotations.
-- VOC2012 contains 17,125 JPEGs and 538 verified table backgrounds.
-- Repository dataset paths are symbolic links; no dataset was copied.
-
-Historical Stage 3A calibration split (not used by the final C1 training
-protocol):
-
-```text
-Train scenes:       00–11 and 15–49 = 47,000 images
-Validation reserve: 12–14           =  3,000 images
-Tracked diagnostic subset:          =  1,500 images
-Local calibration subset:           =    300 images
-```
-
-The official checkpoint may already have trained on validation scenes.  The
-current PBR result is calibration only, not held-out validation and not model
-selection evidence.
-
-Calibration result, 300 images / 2,087 valid instances:
-
-| Method | ADD(-S) (%) |
-|---|---:|
-| Patch-PnP | 81.696 |
-| Pred XYZ + Pred visible | 80.307 |
-| Pred XYZ + GT visible | 80.498 |
-| GT XYZ + GT visible | 99.952 |
-| True-XYZ-error Top-50% | 84.236 |
-| Oracle best R/t axes | 85.721 |
-
-Frozen decision:
-
-```text
-CALIBRATION_MISMATCH
-```
-
-- GT XYZ improves by 19.454 points, 0.546 below the frozen 20-point threshold.
-- GT mask is neutral at +0.192 points.
-- Axis Oracle improves by 4.025 points, 0.975 below the 5-point threshold.
-- True-error Top-50% improves PBR by +3.833 but hurt LM-O by -1.799.
-- PBR median normalized XYZ error is 0.929% diameter versus 5.010% on LM-O.
-- PBR boundary XYZ error is 2.977 mm versus 1.382 mm in the interior.
-
-The cross-domain hypothesis is therefore:
-
-> Correspondence aggregation must jointly balance coordinate precision and
-> geometric coverage.  Scalar reliability alone does not transfer from clean
-> synthetic data to real occlusion.
-
-Evidence:
-
-```text
-research/experiments/EXP-20260731-003-pbr-validation-calibration/
-research/stages/STAGE_03A_PBR_VALIDATION_CALIBRATION.md
-research/splits/lmo_pbr_stage3_scene_split.json
-output/EXP-20260731-003/calibration300/calibration_summary.json
-```
-
-## Verification
-
-Current test command:
+## 接管顺序
 
 ```bash
 cd /home/wsluser/GDRNPP-RGBD
-PYTHONPATH=/home/wsluser/GDRNPP-RGBD \
-PYTHONPYCACHEPREFIX=/tmp/gdrnpp-pycache \
-conda run -n pytorch22 python -m pytest -q \
-  -o cache_dir=/tmp/gdrnpp-pytest-cache \
-  research/quality_coverage/tests \
-  research/pnp_control/tests \
-  research/pose_head_utilization/tests \
-  research/pbr_validation/tests \
-  research/oracle_diagnostic/tests \
-  research/pose_aggregation/tests
+git status --short --branch
+git rev-parse HEAD
 ```
 
-Current result including the experiment-management, Stage 3C runtime, and
-pose-head diagnostic coverage: `100 passed` (verified 2026-08-08 in Conda
-`pytorch22`).
-
-Official checkpoint SHA-256:
+然后依次阅读：
 
 ```text
-bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c
+AGENTS.md
+README_CN.md
+research/STATUS_CN.md
+research/SERVER_RUNTIME_STATUS_CN.md
+research/RESEARCH_PLAN.md
+research/POSE_HEAD_DIAGNOSTIC_HANDOFF_CN.md
+research/STAGE_03C_EXPERIMENT_OVERVIEW.md
 ```
 
-## Stage 3B — Frozen Pose-Head Utilization
+只有追溯镜像构建、旧容器迁移或 C1 历史环境时，才读取
+`research/SERVER_MIGRATION_HANDOFF.md`。
 
-The full 1,445-target diagnostic and all 10 BOP19 evaluations completed.
-
-| Path | ADD(-S), alpha 0 | ADD(-S), alpha 1 | BOP AR, alpha 0 | BOP AR, alpha 1 |
-|---|---:|---:|---:|---:|
-| Direct Patch-PnP | 50.242% | 49.550% | 69.021% | 68.324% |
-| Diagnostic RANSAC | 53.841% | 99.377% | 69.255% | 99.377% |
-
-Decision:
+## 当前研究状态
 
 ```text
-PATCH_PNP_UNDERUTILIZATION
+Stage 1:   COMPLETE — FAIL
+Stage 2:   COMPLETE — PASS（XYZ GEOMETRY）
+Stage 3A:  COMPLETE — CALIBRATION_MISMATCH
+Stage 3B:  COMPLETE — PATCH_PNP_UNDERUTILIZATION
+Stage 3C0: EXP005/B FORMAL COMPLETE
+Stage 3C1: FORMAL COMPLETE — C1_SCREEN_FAIL
+Stage 3C2: FORMAL COMPLETE — C2_SCREEN_FAIL
+Stage 4:   EXP009/CPM FORMAL RUNNING
+Stage 4C:  EXP010/CPM-LR CONTROL AUTHORIZED
 ```
 
-RANSAC improves monotonically and on 8/8 objects; Patch-PnP is not monotonic
-and is non-negative on only 5/8. The official direct head therefore does not
-convert improved XYZ into better `R,t`. RANSAC remains diagnostic only.
+已经由实验直接支持的主线事实是：预测 XYZ 是重要因果瓶颈；官方 direct
+Patch-PnP 无法稳定把受控改善的 XYZ 转化为更好的 `R,t`；官方姿态头的信息流
+诊断还显示 Region 输入占主导、XYZ 响应不稳定，ROI 2D 配对信息在现有压缩链中
+快速衰减。对 shortcut 或具体内部机制的解释仍是机制假设，不是事实。
 
-Evidence:
+C1 和 C2 均已完成并未通过冻结筛选门槛。C2 固定 Epoch 40 BOP AR 为
+`0.6930057670`，历史 ADD(-S) 证据缺失，不能用 BOP `ad` 替代。EXP005/B 是
+mandatory matched-training-protocol 对照；EXP009/CPM 测试 Region-conditioned
+低阶 2D–3D 联合矩是否足以改善 direct pose regression 的几何消费。
+
+## 当前正式实验
+
+两项正式实验均固定 seed `42`、40 epoch，并只以 Epoch 40 作正式比较：
+
+| 实验 | 账户/物理 GPU | 容器 | 当前状态 |
+|---|---|---|---|
+| EXP005/B | lab0 / GPU 0 | `lab0_chx` | formal 完成；E40 BOP 0.691912、ADD(-S) 0.506574 |
+| EXP009/CPM | lab1 / GPU 1 | `lab1_chx` | gate、smoke、audit PASS；formal 运行中 |
+
+冻结 source release：
 
 ```text
-research/experiments/EXP-20260731-004-gdrnpp-pose-head-utilization/
-research/stages/STAGE_03B_POSE_HEAD_UTILIZATION_DIAGNOSTIC.md
-output/EXP-20260731-004/full/utilization_summary.json
+652d7fd9d38f8ea5cea0c5a98cc9477b66623180
 ```
 
-## Stage 3C-0 — Patch-PnP Adaptation Control
-
-The required control now exists and its local pilot passed:
+共用稳定 environment image：
 
 ```text
-data:               8,192 instances, 1,024 per object
-physical/effective: batch 4 / 48
-execution:          2,048 micro-batches, 171 optimizer updates
-peak memory:        4,820 MiB
-total-loss trend:   -5.41% first-to-last-quarter median
-checkpoint reload:  PASS
-changed tensors:    17 pnp_net, 0 frozen
+sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee
 ```
 
-Evidence:
+image build-source 为 `35313ae3d4139a559a97c01b2d3ee007dc16604c`；它与实验
+source commit 分别记录，不要求相等。
+
+有效受管运行：
 
 ```text
-research/stages/STAGE_03C0_PNP_ADAPTATION_CONTROL.md
-research/experiments/EXP-20260731-005-pnp-only-control/
-research/pnp_control/
-output/EXP-20260731-005/pnp_only_local/
+EXP005 smoke: RUN-20260811-061212-smoke-s42-a01
+EXP005 audit: RUN-20260811-062719-audit-s42-a01
+EXP009 smoke: RUN-20260811-061226-smoke-s42-a01
+EXP009 audit: RUN-20260811-062736-audit-s42-a01
 ```
 
-The earlier five-epoch/47-scene control protocol was superseded by the
-user-selected full protocol on 2026-07-31. Stage 3C-0 is now the conditional B
-control and is run only if C2 unfreezes Patch-PnP.
+EXP005 formal run 已确认为 `RUN-20260811-063606-formal-s42-a01`；EXP009 最终
+状态仍须从服务器只读指针和 run metadata 核验。
 
-## Stage 3C-1 — Quality/Coverage Attention
+## 必须保留的失败证据
 
-The C1 implementation keeps official XYZ values, input dimensions, and direct
-`R,t`. It adds identity-initialized residual reweighting of the existing 64
-region-attention maps. The backbone, geometry head, and Patch-PnP are frozen;
-only the new module is trained.
+以下两个 `b39f680...` smoke 因 dataset cache 写入只读 source 失败，且旧入口
+吞掉异常，最终表现为缺少 checkpoint：
 
-Formal protocol: all 50 PBR scenes, 40 epochs, batch 48, LM-O GT-box
-evaluation after every five completed epochs, direct `R,t`, and best-one plus
-latest-two checkpoint retention.
+```text
+EXP005: RUN-20260811-052852-smoke-s42-a01
+EXP009: RUN-20260811-052906-smoke-s42-a01
+```
 
-The local and container gates passed and the formal 40-epoch run completed.
-The final result is `C1_SCREEN_FAIL`.  This triggers the matched B
-(Patch-PnP-only) and C2 (Patch-PnP plus quality/coverage) controls, both
-independently initialized from the official checkpoint with seed `20260731`.
+它们没有 checkpoint、指标或科学结论，只是无效基础设施运行，不能覆盖、删除
+或解释为模型失败。`dcf6d57...` 的首次容器创建也因缺少只读 source 内的嵌套
+`.cache` mountpoint 而在容器进程启动前失败，没有生成实验 run。最终修复位于
+`652d7fd...`，无需重建 environment image。
+
+## 训练结束后的下一步
+
+1. 先只读核验两项 formal 的 `run_id`、source commit、image ID、resolved
+   config、seed、run state、epoch 和 checkpoint 清单。
+2. 等固定 Epoch 40 checkpoint 完成后，分别运行明确 checkpoint 的 eval；不从
+   LM-O test 中间 checkpoint 选择最佳模型。
+3. 保存 BOP AR、ADD(-S)@0.1d macro-object、per-object 和结构化指标；原始结果
+   不覆盖，重新核验结果单独记录。
+4. 对 EXP005、EXP009 运行同协议信息流诊断，再判断 CPM 的机制假设；最终精度
+   不能代替机制验收。
+5. 所有结论以原始产物与哈希、run manifest、标准化指标、实验 RECORD、stage
+   协议的顺序解决冲突。
+
+EXP010 已建立并获准作为 EXP009 的严格优化控制。其 CPM 结构、数据、
+official 初始化、loss、warmup、seed 与 40-epoch 协议均继承 EXP009，只把 Ranger
+学习率从 `8e-5` 改为 `8e-4`。它可在 lab0 与 lab1 的 EXP009 并行运行；最终
+结论必须等待两者固定 Epoch 40。
+
+正式训练期间不得 pull 或修改 release，不得重建/替换容器和镜像，不得覆盖
+output，也不得停止其他用户进程。用户在服务器终端执行命令并回传输出；Agent
+不主动 SSH。
+
+## 本地验证基线
+
+- 当前正式源码提交：`652d7fd9d38f8ea5cea0c5a98cc9477b66623180`。
+- 本地研究测试基线：`147 passed`。
+- 官方初始化权重 SHA-256：
+  `bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c`。
+- EXP009 参数量：`822,281`；本地完整工程链已通过，但不构成方法有效性结论。
