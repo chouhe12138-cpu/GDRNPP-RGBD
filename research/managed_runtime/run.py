@@ -35,7 +35,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--mode", choices=("smoke", "audit", "formal"), required=True)
-    parser.add_argument("--isolation-role", choices=("B", "CPM"), required=True)
+    parser.add_argument(
+        "--isolation-role", choices=("B", "CPM", "PNP_REPLACEMENT"), required=True
+    )
     parser.add_argument("--official", type=Path, required=True)
     parser.add_argument("--cuda-device", default="0")
     return parser.parse_args()

@@ -54,7 +54,7 @@ def compare_states(role: str, official, trained) -> dict[str, object]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("role", choices=("B", "C2", "CPM"))
+    parser.add_argument("role", choices=("B", "C2", "CPM", "PNP_REPLACEMENT"))
     parser.add_argument("--official", type=Path, required=True)
     parser.add_argument("--trained", type=Path, required=True)
     return parser.parse_args()
@@ -66,7 +66,8 @@ def main() -> int:
     trained = load_state(args.trained)
     result = compare_states(args.role, official, trained)
     unexpected_removed = result["removed"]
-    if args.role == "CPM":
+    replacement_roles = {"CPM", "PNP_REPLACEMENT"}
+    if args.role in replacement_roles:
         unexpected_removed = [
             name for name in result["removed"] if not name.startswith("pnp_net.")
         ]
@@ -81,12 +82,14 @@ def main() -> int:
         or not all(name.startswith("quality_coverage_net.") for name in result["added"])
     ):
         raise RuntimeError(f"C2 added unexpected tensors: {result['added']}")
-    if args.role == "CPM" and (
+    if args.role in replacement_roles and (
         not result["added"]
         or not all(name.startswith("pnp_net.") for name in result["added"])
         or not all(name.startswith("pnp_net.") for name in result["removed"])
     ):
-        raise RuntimeError(f"CPM changed unexpected checkpoint tensors: {result}")
+        raise RuntimeError(
+            f"PnP replacement changed unexpected checkpoint tensors: {result}"
+        )
     result.update(
         {
             "status": "PASS",

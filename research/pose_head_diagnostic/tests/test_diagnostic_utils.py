@@ -20,11 +20,21 @@ from research.pose_head_diagnostic.diagnostic_utils import (
     response_metrics,
     tensor_state_sha256,
 )
-from research.pose_head_diagnostic.run_statistical_diagnostic import POSE_METRICS
+from research.pose_head_diagnostic.run_statistical_diagnostic import (
+    POSE_METRICS,
+    build_gt_region_posterior,
+    classify_factorial_result,
+    factorial_summary,
+    region_consistency_statistics,
+)
 from research.pose_head_diagnostic.run_information_flow import (
     CPM_EXTRA_CONDITIONS,
+    CPM_XYZ_REGION_2X2_CONDITIONS,
+    CPM_XYZ_REGION_ALPHA_CONDITIONS,
     apply_cpm_diagnostic_intervention,
     apply_cpm_moment_intervention,
+    apply_cpm_xyz_region_intervention,
+    cpm_xyz_region_condition,
     conditions_for_model,
 )
 from research.pose_head_diagnostic.revalidate_full import assess_full_quality_control
@@ -135,6 +145,101 @@ class DiagnosticUtilsTest(unittest.TestCase):
         )
         torch.testing.assert_close(no_cross_raw[..., :15], raw[..., :15])
         self.assertEqual(int(torch.count_nonzero(no_cross_raw[..., 15:21])), 0)
+
+    def test_cpm_xyz_region_factorial_changes_only_requested_sources(self):
+        cpm = CorrespondenceAwareMomentPnPNet()
+        model = SimpleNamespace(pnp_net=cpm)
+        self.assertEqual(
+            conditions_for_model(model, "cpm_xyz_region_2x2"),
+            CPM_XYZ_REGION_2X2_CONDITIONS,
+        )
+        self.assertEqual(
+            conditions_for_model(model, "cpm_xyz_region_alpha_sweep"),
+            CPM_XYZ_REGION_ALPHA_CONDITIONS,
+        )
+        self.assertEqual(cpm_xyz_region_condition("gt_xyz_gt_region"), (1.0, "gt"))
+        self.assertEqual(
+            cpm_xyz_region_condition("xyz_alpha_050_pred_region"), (0.5, "pred")
+        )
+
+        pred_region = np.full((3, 4, 4), 0.25, dtype=np.float32)
+        gt_region = np.zeros_like(pred_region)
+        gt_region[..., 2] = 1.0
+        for condition in CPM_XYZ_REGION_2X2_CONDITIONS:
+            xyz, roi, region = apply_cpm_xyz_region_intervention(
+                self.xyz,
+                self.gt,
+                self.roi,
+                pred_region,
+                gt_region,
+                self.support,
+                condition,
+            )
+            alpha, region_source = cpm_xyz_region_condition(condition)
+            expected_xyz = (
+                (1.0 - alpha) * self.xyz[self.support]
+                + alpha * self.gt[self.support]
+            )
+            np.testing.assert_allclose(xyz[self.support], expected_xyz)
+            np.testing.assert_array_equal(xyz[~self.support], self.xyz[~self.support])
+            np.testing.assert_array_equal(roi, self.roi)
+            np.testing.assert_array_equal(
+                region[self.support],
+                (gt_region if region_source == "gt" else pred_region)[self.support],
+            )
+            np.testing.assert_array_equal(
+                region[~self.support], pred_region[~self.support]
+            )
+
+    def test_gt_region_reuses_training_definition_and_reports_agreement(self):
+        gt_xyz_m = np.zeros((2, 3, 3), dtype=np.float32)
+        support = np.zeros((2, 3), dtype=bool)
+        support[0, :2] = True
+        gt_xyz_m[0, 0] = [0.1, 0.0, 0.0]
+        gt_xyz_m[0, 1] = [0.0, 0.2, 0.0]
+        fps = np.asarray(
+            [[0.1, 0.0, 0.0], [0.0, 0.2, 0.0], [1.0, 1.0, 1.0]],
+            dtype=np.float32,
+        )
+        posterior, labels = build_gt_region_posterior(
+            gt_xyz_m, fps, support, num_regions=3
+        )
+        np.testing.assert_array_equal(labels[support], [1, 2])
+        np.testing.assert_array_equal(posterior[support], [[1, 0, 0], [0, 1, 0]])
+        self.assertEqual(int(np.count_nonzero(posterior[~support])), 0)
+        stats = region_consistency_statistics(posterior, labels, support)
+        self.assertEqual(stats["support_points"], 2)
+        self.assertEqual(stats["argmax_matches"], 2)
+        self.assertEqual(stats["gt_probability_sum"], 2.0)
+        self.assertEqual(stats["posterior_sum_max_error"], 0.0)
+
+    def test_factorial_summary_and_preregistered_decision(self):
+        names = {
+            "pred_xyz_pred_region": 0.50,
+            "gt_xyz_pred_region": 0.40,
+            "pred_xyz_gt_region": 0.52,
+            "gt_xyz_gt_region": 0.51,
+        }
+        add_summary = {
+            name: {
+                "macro_object": value,
+                "micro_target": value,
+                "per_object": {f"obj{i}": value for i in range(8)},
+            }
+            for name, value in names.items()
+        }
+        bop_scores = {
+            "pred_xyz_pred_region": 0.60,
+            "gt_xyz_pred_region": 0.50,
+            "pred_xyz_gt_region": 0.61,
+            "gt_xyz_gt_region": 0.60,
+        }
+        summary = factorial_summary(add_summary, bop_scores)
+        self.assertAlmostEqual(
+            summary["add_s_0.1d_macro_object"]["interaction"], 0.09
+        )
+        self.assertEqual(summary["positive_per_object_add_s_interactions"], 8)
+        self.assertEqual(classify_factorial_result(summary), "MISMATCH_IMPORTANT")
 
     def test_statistical_summary(self):
         summary = summarize_values(

@@ -87,6 +87,23 @@ CPM_XYZ_ALPHA_CONDITIONS = {
 }
 CPM_MOMENT_CONDITIONS = ("coverage_only", "cxu_null")
 CPM_EXTRA_CONDITIONS = tuple(CPM_XYZ_ALPHA_CONDITIONS) + CPM_MOMENT_CONDITIONS
+CPM_XYZ_REGION_2X2_CONDITIONS = (
+    "pred_xyz_pred_region",
+    "gt_xyz_pred_region",
+    "pred_xyz_gt_region",
+    "gt_xyz_gt_region",
+)
+CPM_XYZ_REGION_ALPHA_VALUES = (0.0, 0.25, 0.50, 0.75, 1.0)
+CPM_XYZ_REGION_ALPHA_CONDITIONS = tuple(
+    f"xyz_alpha_{int(round(alpha * 100)):03d}_{region_source}_region"
+    for region_source in ("pred", "gt")
+    for alpha in CPM_XYZ_REGION_ALPHA_VALUES
+)
+CPM_CONDITION_SETS = (
+    "legacy",
+    "cpm_xyz_region_2x2",
+    "cpm_xyz_region_alpha_sweep",
+)
 
 
 def layers_for_model(model) -> tuple[str, ...]:
@@ -99,12 +116,63 @@ def layers_for_model(model) -> tuple[str, ...]:
     )
 
 
-def conditions_for_model(model) -> tuple[str, ...]:
+def conditions_for_model(model, condition_set: str = "legacy") -> tuple[str, ...]:
     """Keep the frozen ConvPnP protocol unchanged and extend only CPM."""
 
+    if condition_set not in CPM_CONDITION_SETS:
+        raise ValueError(f"Unknown diagnostic condition set: {condition_set}")
+    if condition_set != "legacy":
+        if not isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet):
+            raise ValueError(f"{condition_set} requires a CPM pose head")
+        return (
+            CPM_XYZ_REGION_2X2_CONDITIONS
+            if condition_set == "cpm_xyz_region_2x2"
+            else CPM_XYZ_REGION_ALPHA_CONDITIONS
+        )
     if isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet):
         return CONDITIONS + CPM_EXTRA_CONDITIONS
     return CONDITIONS
+
+
+def cpm_xyz_region_condition(condition: str) -> tuple[float, str]:
+    """Resolve a preregistered XYZ alpha and Region source."""
+
+    endpoints = {
+        "pred_xyz_pred_region": (0.0, "pred"),
+        "gt_xyz_pred_region": (1.0, "pred"),
+        "pred_xyz_gt_region": (0.0, "gt"),
+        "gt_xyz_gt_region": (1.0, "gt"),
+    }
+    if condition in endpoints:
+        return endpoints[condition]
+    for alpha in CPM_XYZ_REGION_ALPHA_VALUES:
+        token = int(round(alpha * 100))
+        for region_source in ("pred", "gt"):
+            if condition == f"xyz_alpha_{token:03d}_{region_source}_region":
+                return alpha, region_source
+    raise ValueError(f"Unknown CPM XYZ/Region condition: {condition}")
+
+
+def apply_cpm_xyz_region_intervention(
+    xyz: np.ndarray,
+    gt_xyz: np.ndarray,
+    roi_2d: np.ndarray,
+    pred_region: np.ndarray,
+    gt_region: np.ndarray,
+    support: np.ndarray,
+    condition: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Change only XYZ and/or Region on the frozen diagnostic support."""
+
+    alpha, region_source = cpm_xyz_region_condition(condition)
+    xyz_out = np.asarray(xyz).copy()
+    gt = np.asarray(gt_xyz)
+    mask = np.asarray(support, dtype=bool)
+    xyz_out[mask] = (1.0 - alpha) * xyz_out[mask] + alpha * gt[mask]
+    region_out = np.asarray(pred_region).copy()
+    if region_source == "gt":
+        region_out[mask] = np.asarray(gt_region)[mask]
+    return xyz_out, np.asarray(roi_2d).copy(), region_out
 
 
 def apply_cpm_diagnostic_intervention(

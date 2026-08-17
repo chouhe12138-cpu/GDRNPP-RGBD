@@ -241,15 +241,31 @@ def get_pnp_net(cfg):
             num_regions=g_head_cfg.NUM_REGIONS,
             mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
         )
-    elif pnp_head_type == "CorrespondenceAwareMomentPnPNet":
+    elif pnp_head_type in [
+        "CorrespondenceAwareMomentPnPNet",
+        "HierarchicalCorrespondencePnPNet",
+    ]:
         if loss_cfg.XYZ_LOSS_TYPE not in ["MSE", "L1", "L2", "SmoothL1"]:
-            raise ValueError("CPM requires three-channel regression XYZ")
+            raise ValueError(f"{pnp_head_type} requires three-channel regression XYZ")
         if not pnp_net_cfg.WITH_2D_COORD or pnp_net_cfg.COORD_2D_TYPE != "abs":
-            raise ValueError("CPM requires absolute ROI 2D coordinates")
-        if not pnp_net_cfg.REGION_ATTENTION:
-            raise ValueError("CPM requires the foreground Region posterior")
-        if pnp_net_cfg.MASK_ATTENTION != "mul":
-            raise ValueError("CPM requires predicted visible-mask support")
+            raise ValueError(f"{pnp_head_type} requires absolute ROI 2D coordinates")
+        if pnp_head_type == "CorrespondenceAwareMomentPnPNet":
+            if not pnp_net_cfg.REGION_ATTENTION:
+                raise ValueError("CPM requires the foreground Region posterior")
+            if pnp_net_cfg.MASK_ATTENTION != "mul":
+                raise ValueError("CPM requires predicted visible-mask support")
+        else:
+            if pnp_net_cfg.MASK_ATTENTION != "mul":
+                raise ValueError(
+                    "Hierarchical correspondence head requires multiplicative "
+                    "predicted visible-mask support"
+                )
+            uses_region = bool(pnp_net_init_cfg.get("use_region_aux", True))
+            if bool(pnp_net_cfg.REGION_ATTENTION) != uses_region:
+                raise ValueError(
+                    "Hierarchical correspondence Region input must match "
+                    "INIT_CFG.use_region_aux"
+                )
         pnp_net_init_cfg.update(
             rot_dim=rot_dim,
             num_regions=g_head_cfg.NUM_REGIONS,

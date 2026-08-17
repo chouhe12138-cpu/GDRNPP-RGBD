@@ -31,6 +31,7 @@ from .heads.top_down_doublemask_xyz_region_head import (
 from .heads.conv_mask_xyz_region_head import ConvMaskXyzRegionHead
 from .heads.conv_pnp_net import ConvPnPNet
 from .heads.cpm_pnp_net import CorrespondenceAwareMomentPnPNet
+from .heads.hierarchical_corr_pnp_net import HierarchicalCorrespondencePnPNet
 from .heads.conv_pnp_net_no_region import ConvPnPNetNoRegion
 from .heads.conv_pnp_net_cls import ConvPnPNetCls
 from .heads.point_pnp_net import SimplePointPnPNet
@@ -89,6 +90,7 @@ HEADS = {
     # pnp net
     "ConvPnPNet": ConvPnPNet,
     "CorrespondenceAwareMomentPnPNet": CorrespondenceAwareMomentPnPNet,
+    "HierarchicalCorrespondencePnPNet": HierarchicalCorrespondencePnPNet,
     "ConvPnPNetNoRegion": ConvPnPNetNoRegion,
     "ConvPnPNetCls": ConvPnPNetCls,
     "SimplePointPnPNet": SimplePointPnPNet,

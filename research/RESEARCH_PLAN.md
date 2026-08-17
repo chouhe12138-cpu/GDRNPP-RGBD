@@ -1,6 +1,6 @@
 # GDRNPP Pose-Aggregation Research Plan
 
-Current handoff and exact experiment state: `research/HANDOFF.md`.
+Current verified experiment state: `research/STATUS_CN.md`.
 
 ## Objective
 
@@ -39,8 +39,8 @@ pose-aggregation diagnostic has produced a PASS/PARTIAL/FAIL result.
 | 3C-0 | Patch-PnP-only same-budget control, required once C2 unfreezes Patch-PnP | EXP005 FORMAL COMPLETE |
 | 3C-1 | Freeze all official parameters and train one identity-initialized quality/coverage module | FORMAL COMPLETE — C1_SCREEN_FAIL |
 | 3C-2 | Jointly adapt Patch-PnP and the new module only if C1 cannot adapt | FORMAL COMPLETE — C2_SCREEN_FAIL |
-| 4 | Test whether Region-conditioned low-order 2D–3D joint moments improve direct pose-head geometry consumption | EXP009 FORMAL RUNNING |
-| 4C | Test whether EXP009 is optimization-limited by its fine-tuning-scale learning rate | EXP010 AUTHORIZED |
+| 4 | Test whether Region-conditioned low-order 2D–3D joint moments improve direct pose-head geometry consumption | EXP009 FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL |
+| 4C | Test whether EXP009 is optimization-limited by its fine-tuning-scale learning rate | EXP010 AUTHORIZED; ACCESS PASS; NO FORMAL RUN RECORDED |
 
 Historical stage completion does not by itself authorize a new architecture.
 Each experiment still requires its own frozen protocol and managed run
@@ -73,18 +73,31 @@ Stage 3B: COMPLETE — PATCH_PNP_UNDERUTILIZATION
 Stage 3C-0: EXP005/B FORMAL COMPLETE
 Stage 3C-1: FORMAL COMPLETE — C1_SCREEN_FAIL
 Stage 3C-2: FORMAL COMPLETE — C2_SCREEN_FAIL
-Stage 4: EXP009/CPM FORMAL RUNNING
-Stage 4C: EXP010/CPM-LR CONTROL AUTHORIZED
+Stage 4: EXP009/CPM FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
+Stage 4C: EXP010/CPM-LR CONTROL AUTHORIZED — ACCESS PASS ONLY
 ```
 
 EXP010 is a matched optimization control, not a second pose-head proposal. It
 inherits EXP009 and changes only the experiment identity/output path and Ranger
 learning rate (`8e-5` to `8e-4`). It starts fresh from the official checkpoint
-and is authorized after EXP005 fixed Epoch 40 completion. EXP009 and EXP010
-may run concurrently on their assigned GPUs; final comparison waits for both
-fixed Epoch 40 results and diagnostics. Its result can test whether EXP009 was
+and is authorized after EXP005 fixed Epoch 40 completion. EXP009 fixed Epoch 40
+is now complete; the matched learning-rate comparison waits for EXP010 fixed
+Epoch 40 and same-protocol diagnostics. Its result can test whether EXP009 was
 optimization-limited; it cannot by itself validate or reject low-order joint
 moments or 2D–3D correspondence in general.
+
+## 2026-08-18 — EXP012 correspondence-preserving pose head
+
+- EXP007、EXP009 与 EXP011 支持下一步优先检验 correspondence 的局部建模与
+  渐进聚合，而不是继续在输入端增加固定低阶压缩；这仍是研究动机，不是方法结论。
+- EXP012 保留 dense metric XYZ↔absolute ROI2D 配对，在全局压缩前使用轻量局部
+  residual blocks，并以 fine/mid summary 和 high-level 4×4 grid 形成 pose 表示。
+- Pred Region 只作为零启动辅助残差，不参与分组；rot6d、translation、loss、
+  frozen geometry 与 official 初始化保持不变。
+- 当前只完成本地工程 preflight；固定 Epoch 40 的 BOP/ADD(-S)/per-object 结果
+  产生前，不对结构有效性下结论。
+- 用户于 2026-08-18 授权 EXP012 在服务器 access/create 与 CUDA gate 通过后直接
+  formal，不执行 smoke/audit48；这是运行路径授权，不是服务器运行完成证据。
 
 ## 2026-08-11 — Stage 3C closure and Stage 4 execution
 
@@ -97,10 +110,14 @@ moments or 2D–3D correspondence in general.
   `652d7fd9d38f8ea5cea0c5a98cc9477b66623180`, stable environment image
   `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`,
   and seed `42`.
-- The user confirmed both formal runs are active. Their exact formal `run_id`
-  was not included in this handoff and must be recovered from read-only run
-  metadata. Neither intermediate LM-O checkpoints nor smoke/audit losses may
-  be used for model selection or scientific conclusions.
+- EXP005 formal later completed as `RUN-20260811-063606-formal-s42-a01`.
+  EXP009 formal was `RUN-20260811-063626-formal-s42-a01`. After earlier
+  interrupted resume attempts, an external fixed Epoch 40 checkpoint and its
+  BOP evaluation were recovered and verified: BOP AR `0.5983921569`, ADD(-S)
+  target-micro `0.3806228374`, macro-object `0.3768665461` derived from the
+  logged per-object recalls, and `2/8` nonnegative objects. All three frozen
+  gates fail, so the result is `CPM_SCREEN_FAIL`. EXP011 later completed the
+  fixed-E40 mechanism diagnostic with decision `MISMATCH_IMPORTANT`.
 - CPM tests only whether Region-conditioned low-order joint moments are
   sufficient for the proposed mechanism. A negative CPM result would not show
   that 2D–3D correspondence itself is unimportant.

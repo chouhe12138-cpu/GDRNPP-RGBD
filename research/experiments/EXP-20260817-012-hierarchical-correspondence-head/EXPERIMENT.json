@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260817-012-hierarchical-correspondence-head",
+  "title": "层级密集 Correspondence Pose Head",
+  "stage": "Stage 4E / correspondence-preserving pose head",
+  "role": "hierarchical-correspondence-head",
+  "status": "AUTHORIZED",
+  "legacy_import": false,
+  "decision": "AUTHORIZED_LOCAL_PREFLIGHT_PASS_NO_SERVER_RUN",
+  "protocol": {
+    "research_question": "在任何全局压缩前保留逐像素 XYZ-ROI2D 配对并学习局部关系、随后进行层级空间聚合，能否改善固定 geometry 输出的姿态信息消费？",
+    "parent_evidence": [
+      "EXP-20260804-007-pose-head-information-flow",
+      "EXP-20260809-009-cpm-head",
+      "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic"
+    ],
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "fixed_checkpoint": "epoch_040",
+    "checkpoint_selection": "fixed_epoch_040_only",
+    "test_set_model_selection": false,
+    "initialization": "official_checkpoint_fresh_start",
+    "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+    "trainable_modules": [
+      "pnp_net"
+    ],
+    "frozen_modules": [
+      "backbone",
+      "geometry_head"
+    ],
+    "optimizer": {
+      "type": "Ranger",
+      "lr": 0.0008,
+      "weight_decay": 0.01,
+      "warmup_iters": 200
+    },
+    "model": {
+      "pose_head": "HierarchicalCorrespondencePnPNet",
+      "input": "metric_XYZ3_plus_absolute_ROI2D2",
+      "local_encoding": "three_scale_depthwise_local_residual",
+      "aggregation": "fine_mean_plus_mid_mean_plus_high_4x4_grid",
+      "region": "zero_start_auxiliary_residual_not_pooling",
+      "visible_mask": "multiplicative_before_any_learned_spatial_mixing",
+      "pose_decoder": "2208-256-256-shared",
+      "rotation": "allo_rot6d",
+      "translation": "centroid_z",
+      "trainable_parameters": 868746,
+      "fvcore_supported_flops_per_64x64_sample": 178333952,
+      "loss": "official_GDRNPP_pose_losses"
+    },
+    "comparison": {
+      "primary_controls": [
+        "EXP-20260729-000-official-gdrnpp-baseline",
+        "EXP-20260731-005-pnp-only-control"
+      ],
+      "checkpoint_selection": "fixed_epoch_040_only"
+    },
+    "metrics": [
+      "bop19_ar_macro",
+      "add_s_0.1d_macro_object",
+      "per_object"
+    ],
+    "gate": {
+      "minimum_bop19_ar_macro_delta": 0.005,
+      "minimum_add_s_0.1d_macro_object_delta": 0.01,
+      "minimum_nonnegative_objects": 5
+    },
+    "run_order": [
+      "gate",
+      "formal"
+    ]
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/train.py",
+    "smoke_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/smoke.py",
+    "audit_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/audit48.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/eval.py",
+    "preflight": "research/next_pose_head/preflight.py",
+    "formal_output": "server:/data/labs/lab1/docker_data/chx/outputs/experiments/EXP-20260817-012-hierarchical-correspondence-head",
+    "local_preflight": {
+      "status": "PASS",
+      "devices": [
+        "cpu",
+        "cuda:0 RTX 4060 Laptop GPU"
+      ],
+      "official_shared_tensors": 375,
+      "legacy_pnp_tensors_filtered": 17,
+      "new_pose_head_tensors": 49,
+      "trainable_parameters": 868746,
+      "checkpoint_round_trip": true,
+      "optimizer_step": true,
+      "cuda_full_forward_backward": true
+    },
+    "server_access_create_gate_formal": "NOT_RUN"
+  }
+}

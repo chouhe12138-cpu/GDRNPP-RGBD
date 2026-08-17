@@ -25,11 +25,12 @@ def test_future_smoke_template_is_small_and_has_no_evaluation():
     assert cfg.TEST.EVAL_PERIOD == 0
 
 
-def test_managed_exp005_exp009_and_exp010_configs_use_fixed_seed_42():
+def test_managed_pose_head_configs_use_fixed_seed_42():
     for experiment_dir in (
         "exp005_pnp_control",
         "exp009_cpm_head",
         "exp010_cpm_official_lr_control",
+        "exp012_hierarchical_corr_head",
     ):
         formal = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "train.py"))
         smoke = Config.fromfile(str(CONFIG_ROOT / experiment_dir / "smoke.py"))

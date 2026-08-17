@@ -4,9 +4,9 @@
   "title": "Correspondence-Aware Moment Pose Head（CPM-Head）",
   "stage": "Stage 4 / CPM",
   "role": "CPM",
-  "status": "RUNNING",
+  "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "FORMAL_RUNNING_AFTER_MANAGED_GATE_SMOKE_AUDIT_PASS",
+  "decision": "COMPLETE_FIXED_EPOCH_040_SCREEN_FAIL_DIAGNOSTIC_MISMATCH_IMPORTANT",
   "protocol": {
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
@@ -77,8 +77,86 @@
       "RUN-20260811-061226-smoke-s42-a01",
       "RUN-20260811-062736-audit-s42-a01"
     ],
-    "formal_run_identity": "PENDING_SERVER_READ_ONLY_VERIFICATION",
+    "formal_run_identity": "RUN-20260811-063626-formal-s42-a01",
+    "interrupted_resume_evidence": {
+      "status": "INTERRUPTED",
+      "last_logged_epoch": 38,
+      "last_logged_iteration": 243123,
+      "total_iterations": 255920,
+      "last_recorded_error": "CUDA error: unspecified launch failure"
+    },
     "epoch_030_preview_diagnostic": "output/EXP-20260809-009-cpm-head/diagnostic/E30_PREVIEW/full",
-    "epoch_030_checkpoint_sha256": "d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0"
+    "epoch_030_checkpoint_sha256": "d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0",
+    "epoch_035_external_checkpoint": {
+      "locator": "E:\\6D姿态估计\\EXP-009\\model_epoch_035.pth",
+      "size_bytes": 387752090,
+      "sha256": "44129bc8ebd32bb99627fcd4170138a2afd3b32bdf17c39d0236724a81d4b196",
+      "epoch": 35,
+      "iteration": 223929,
+      "model_tensors": 384,
+      "optimizer_present": true,
+      "scheduler_present": true,
+      "bop19_ar_macro": 0.5994232987312572,
+      "add_s_0.1d_target_micro": 0.386159169550173,
+      "metric_semantics_correction": "training EVAL_SUMMARY loads BOP ADD score recall, which is target-micro"
+    },
+    "fixed_epoch_040": {
+      "checkpoint": {
+        "locator": "E:\\6D姿态估计\\EXP-009\\model_epoch_040.pth",
+        "size_bytes": 387752090,
+        "sha256": "d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d",
+        "epoch": 40,
+        "iteration": 255919,
+        "model_tensors": 384,
+        "optimizer_present": true,
+        "scheduler_present": true,
+        "server_original_sha256_available": false
+      },
+      "bop19": {
+        "bop19_ar_macro": 0.5983921568627452,
+        "bop19_ar_ad": 0.17508650519031144,
+        "bop19_ar_mspd": 0.8433217993079586,
+        "bop19_ar_mssd": 0.5456055363321799,
+        "bop19_ar_reS": 0.4412918108419839,
+        "bop19_ar_teS": 0.6920415224913494,
+        "bop19_ar_vsd": 0.40624913494809684,
+        "scores_sha256": "2e9c8fa5e13118451d9dd8cdfc68e5f7cad351aa5b82185eb92cf700cb938448",
+        "evaluation_log_sha256": "6bd26586475138a92180ca9057f02c261fbcf643ecd9ca71a03f7815ec330e8f",
+        "training_console_sha256": "258be3940b53012abb5099ee4582a75923df306e2bba994917d82502e26547e0"
+      },
+      "add_s_0.1d_target_micro": 0.3806228373702422,
+      "add_s_0.1d_macro_object_derived_from_logged_per_object": 0.37686654607624587,
+      "per_object_add_s_0.1d": {
+        "1": 0.18285714285714286,
+        "5": 0.6030150753768844,
+        "6": 0.27485380116959063,
+        "8": 0.67,
+        "9": 0.15,
+        "10": 0.2777777777777778,
+        "11": 0.5214285714285715,
+        "12": 0.335
+      },
+      "nonnegative_objects_vs_official": 2,
+      "mechanism_diagnostic": {
+        "experiment_id": "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic",
+        "status": "COMPLETE",
+        "decision": "MISMATCH_IMPORTANT",
+        "run_id": "RUN-20260817-023144-full-s20260817-a02",
+        "factorial_summary_sha256": "7e85f802600ad46f14532f36586a79da6396760dad5e1c4aba91e0089d58d811"
+      },
+      "gate": {
+        "bop": "FAIL",
+        "add_s": "FAIL",
+        "nonnegative_objects": "FAIL",
+        "overall": "FAIL"
+      },
+      "training_completion_evidence": {
+        "final_logged_iteration": 255919,
+        "total_iterations": 255920,
+        "progress_percent": 100.0,
+        "checkpoint_save_logged": true,
+        "final_eval_reused_periodic_epoch": 40
+      }
+    }
   }
 }

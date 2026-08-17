@@ -13,5 +13,7 @@
 | EXP-20260731-006-quality-coverage | Stage 3C1 | C1 | COMPLETE | 质量/覆盖残差注意力 C1 |
 | EXP-20260804-007-pose-head-information-flow | Stage 3C mechanism diagnostic | official/C1/B/C2 diagnostic | RUNNING | Patch-PnP 姿态头信息流全量统计诊断 |
 | EXP-20260805-008-stage3c2-joint-adaptation | Stage 3C2 | C2 | COMPLETE | Patch-PnP 与质量/覆盖模块联合适应 C2 |
-| EXP-20260809-009-cpm-head | Stage 4 / CPM | CPM | RUNNING | Correspondence-Aware Moment Pose Head（CPM-Head） |
+| EXP-20260809-009-cpm-head | Stage 4 / CPM | CPM | COMPLETE | Correspondence-Aware Moment Pose Head（CPM-Head） |
 | EXP-20260816-010-cpm-official-lr-control | Stage 4 / CPM optimization control | CPM-LR-control | AUTHORIZED | CPM-Head 官方量级学习率受控实验 |
+| EXP-20260817-011-cpm-xyz-region-consistency-diagnostic | Stage 4 / CPM mechanism diagnostic | diagnostic | COMPLETE | CPM XYZ–Region 一致性固定权重诊断 |
+| EXP-20260817-012-hierarchical-correspondence-head | Stage 4E / correspondence-preserving pose head | hierarchical-correspondence-head | AUTHORIZED | 层级密集 Correspondence Pose Head |

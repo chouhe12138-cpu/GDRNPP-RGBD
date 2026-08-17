@@ -1,5 +1,5 @@
 {
-  "experiment_count": 11,
+  "experiment_count": 13,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -92,17 +92,17 @@
       "title": "Patch-PnP 与质量/覆盖模块联合适应 C2"
     },
     {
-      "decision": "FORMAL_RUNNING_AFTER_MANAGED_GATE_SMOKE_AUDIT_PASS",
+      "decision": "COMPLETE_FIXED_EPOCH_040_SCREEN_FAIL_DIAGNOSTIC_MISMATCH_IMPORTANT",
       "experiment_id": "EXP-20260809-009-cpm-head",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260809-009-cpm-head/EXPERIMENT.json",
       "role": "CPM",
       "stage": "Stage 4 / CPM",
-      "status": "RUNNING",
+      "status": "COMPLETE",
       "title": "Correspondence-Aware Moment Pose Head（CPM-Head）"
     },
     {
-      "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_COMPLETION",
+      "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_ACCESS_PASS_FORMAL_NOT_STARTED_OR_VERIFIED",
       "experiment_id": "EXP-20260816-010-cpm-official-lr-control",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260816-010-cpm-official-lr-control/EXPERIMENT.json",
@@ -110,6 +110,26 @@
       "stage": "Stage 4 / CPM optimization control",
       "status": "AUTHORIZED",
       "title": "CPM-Head 官方量级学习率受控实验"
+    },
+    {
+      "decision": "MISMATCH_IMPORTANT",
+      "experiment_id": "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/EXPERIMENT.json",
+      "role": "diagnostic",
+      "stage": "Stage 4 / CPM mechanism diagnostic",
+      "status": "COMPLETE",
+      "title": "CPM XYZ–Region 一致性固定权重诊断"
+    },
+    {
+      "decision": "AUTHORIZED_LOCAL_PREFLIGHT_PASS_NO_SERVER_RUN",
+      "experiment_id": "EXP-20260817-012-hierarchical-correspondence-head",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/EXPERIMENT.json",
+      "role": "hierarchical-correspondence-head",
+      "stage": "Stage 4E / correspondence-preserving pose head",
+      "status": "AUTHORIZED",
+      "title": "层级密集 Correspondence Pose Head"
     }
   ],
   "schema_version": 1

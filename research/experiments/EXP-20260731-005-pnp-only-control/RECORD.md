@@ -128,9 +128,16 @@ iterations。两者只证明当前 release 下训练、checkpoint 和受管产�
 8 `0.815000`、9 `0.077778`、10 `0.411111`、11 `0.750000`、12 `0.215000`。
 Epoch 15 的中间 BOP AR 虽更高，但不用于选模；正式比较只使用固定 Epoch 40。
 
-外部 Windows 副本 `E:\\6D姿态估计\\EXP-005\\model_epoch_040.pth` 当前仍在
-下载。下载完成前不记录临时大小或哈希，也不将中途 `torch.load` 失败解释为
-服务器 checkpoint 损坏；完成后再与服务器原文件核对 SHA-256 并严格加载。
+外部 Windows 副本 `E:\\6D姿态估计\\EXP-005\\model_epoch_040.pth` 已完成
+下载，大小 `519078612` bytes，SHA-256 为：
+
+```text
+39c0128526f68cf9c4f7a1780ff095e71be8cdada186136eb8699d99d68d009e
+```
+
+本地 `torch.load` 读取成功：Epoch 40、iteration `255919`，包含 optimizer、
+scheduler 和 392 个模型张量。当前没有服务器端原文件 SHA-256，因此只记录
+“本地副本完整可读”，不记录“已与服务器哈希一致”。
 
 ## Conclusion
 

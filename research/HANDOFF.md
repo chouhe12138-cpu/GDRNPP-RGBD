@@ -1,6 +1,6 @@
 # GDRNPP 研究交接
 
-最后更新：2026-08-16
+最后更新：2026-08-18
 
 本文件只提供新对话需要的当前摘要。稳定工作规则见根目录 `AGENTS.md`，当前
 研究事实见 `research/STATUS_CN.md`，服务器动态事实见
@@ -40,8 +40,10 @@ Stage 3B:  COMPLETE — PATCH_PNP_UNDERUTILIZATION
 Stage 3C0: EXP005/B FORMAL COMPLETE
 Stage 3C1: FORMAL COMPLETE — C1_SCREEN_FAIL
 Stage 3C2: FORMAL COMPLETE — C2_SCREEN_FAIL
-Stage 4:   EXP009/CPM FORMAL RUNNING
+Stage 4:   EXP009/CPM FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
 Stage 4C:  EXP010/CPM-LR CONTROL AUTHORIZED
+Stage 4D:  EXP011/CPM XYZ-REGION DIAGNOSTIC COMPLETE — MISMATCH_IMPORTANT
+Stage 4E:  EXP012/HIERARCHICAL CORRESPONDENCE HEAD AUTHORIZED — LOCAL PREFLIGHT PASS
 ```
 
 已经由实验直接支持的主线事实是：预测 XYZ 是重要因果瓶颈；官方 direct
@@ -61,7 +63,7 @@ mandatory matched-training-protocol 对照；EXP009/CPM 测试 Region-conditione
 | 实验 | 账户/物理 GPU | 容器 | 当前状态 |
 |---|---|---|---|
 | EXP005/B | lab0 / GPU 0 | `lab0_chx` | formal 完成；E40 BOP 0.691912、ADD(-S) 0.506574 |
-| EXP009/CPM | lab1 / GPU 1 | `lab1_chx` | gate、smoke、audit PASS；formal 运行中 |
+| EXP009/CPM | lab1 / GPU 1 | `lab1_chx` | E40完成；BOP 0.598392、ADD(-S) 0.380623；筛选失败 |
 
 冻结 source release：
 
@@ -87,8 +89,9 @@ EXP009 smoke: RUN-20260811-061226-smoke-s42-a01
 EXP009 audit: RUN-20260811-062736-audit-s42-a01
 ```
 
-EXP005 formal run 已确认为 `RUN-20260811-063606-formal-s42-a01`；EXP009 最终
-状态仍须从服务器只读指针和 run metadata 核验。
+EXP005 formal run 已确认为 `RUN-20260811-063606-formal-s42-a01`；EXP009 formal
+run 为 `RUN-20260811-063626-formal-s42-a01`，外部固定 E40 checkpoint 已读取并
+完成 BOP 与 ADD(-S) 评估。服务器实时状态仍须重新只读核验。
 
 ## 必须保留的失败证据
 
@@ -105,23 +108,25 @@ EXP009: RUN-20260811-052906-smoke-s42-a01
 `.cache` mountpoint 而在容器进程启动前失败，没有生成实验 run。最终修复位于
 `652d7fd...`，无需重建 environment image。
 
-## 训练结束后的下一步
+## 固定 Epoch 40 后的下一步
 
-1. 先只读核验两项 formal 的 `run_id`、source commit、image ID、resolved
-   config、seed、run state、epoch 和 checkpoint 清单。
-2. 等固定 Epoch 40 checkpoint 完成后，分别运行明确 checkpoint 的 eval；不从
-   LM-O test 中间 checkpoint 选择最佳模型。
-3. 保存 BOP AR、ADD(-S)@0.1d macro-object、per-object 和结构化指标；原始结果
-   不覆盖，重新核验结果单独记录。
-4. 对 EXP005、EXP009 运行同协议信息流诊断，再判断 CPM 的机制假设；最终精度
+1. 继续只读核验两项 formal 的 run state、checkpoint 清单和服务器原文件哈希；
+   当前外部副本哈希不写成服务器两端一致。
+2. 对 EXP005、EXP009 运行同协议信息流诊断，再判断 CPM 的机制假设；最终精度
    不能代替机制验收。
-5. 所有结论以原始产物与哈希、run manifest、标准化指标、实验 RECORD、stage
+3. 完成 EXP010 固定 E40 后进行匹配学习率比较。
+4. 所有结论以原始产物与哈希、run manifest、标准化指标、实验 RECORD、stage
    协议的顺序解决冲突。
 
 EXP010 已建立并获准作为 EXP009 的严格优化控制。其 CPM 结构、数据、
 official 初始化、loss、warmup、seed 与 40-epoch 协议均继承 EXP009，只把 Ranger
-学习率从 `8e-5` 改为 `8e-4`。它可在 lab0 与 lab1 的 EXP009 并行运行；最终
-结论必须等待两者固定 Epoch 40。
+学习率从 `8e-5` 改为 `8e-4`。EXP009 固定 E40 已具备；最终匹配结论等待
+EXP010 固定 E40 和同协议诊断。
+
+EXP012 已注册为下一代 correspondence-preserving pose head。它保留逐像素
+XYZ↔ROI2D，在全局压缩前进行局部与层级编码；Region 仅为零启动辅助残差，不
+定义 pooling。当前仅有本地 CPU/CUDA preflight、单步 optimizer 和 strict checkpoint
+roundtrip PASS，没有任何服务器 run 或性能结论。原始协议见 EXP012 RECORD。
 
 正式训练期间不得 pull 或修改 release，不得重建/替换容器和镜像，不得覆盖
 output，也不得停止其他用户进程。用户在服务器终端执行命令并回传输出；Agent

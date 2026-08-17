@@ -38,7 +38,7 @@
         {"mode": "local_pilot", "status": "COMPLETE", "storage": "local", "locator": "output/EXP-20260731-005/pnp_only_local"},
         {"mode": "legacy_formal_path", "status": "UNUSED_READ_ONLY", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp"},
         {"mode": "managed_formal", "status": "COMPLETE", "storage": "lab0", "locator": "output/experiments/EXP-20260731-005-pnp-only-control/RUN-20260811-063606-formal-s42-a01", "fixed_checkpoint": "epoch_040", "evidence": "research/experiments/EXP-20260731-005-pnp-only-control/RECORD.md"},
-        {"mode": "formal_transfer", "status": "IN_PROGRESS_VERIFY_AFTER_COMPLETION", "storage": "external_windows", "locator": "E:\\6D姿态估计\\EXP-005", "evidence": "research/experiments/EXP-20260731-005-pnp-only-control/RECORD.md"},
+        {"mode": "formal_transfer", "status": "COMPLETE_LOCAL_READABLE_SERVER_HASH_NOT_AVAILABLE", "storage": "external_windows", "locator": "E:\\6D姿态估计\\EXP-005\\model_epoch_040.pth", "checkpoint_sha256": "39c0128526f68cf9c4f7a1780ff095e71be8cdada186136eb8699d99d68d009e", "evidence": "research/experiments/EXP-20260731-005-pnp-only-control/RECORD.md"},
         {"mode": "formal", "status": "INVALID", "storage": "lab0", "locator": "output/stage3c/B_patch_pnp_INVALID_EARLY_20260805_234436"}
       ]
     },
@@ -60,7 +60,7 @@
     {
       "experiment_id": "EXP-20260805-008-stage3c2-joint-adaptation",
       "artifacts": [
-        {"mode": "formal", "status": "RUNNING", "storage": "lab1", "locator": "output/stage3c/C2_joint"},
+        {"mode": "formal", "status": "COMPLETE", "storage": "lab1", "locator": "output/stage3c/C2_joint"},
         {"mode": "smoke", "status": "PENDING_OR_COMPLETE_RECHECK_REQUIRED", "storage": "lab1", "locator": "output/stage3c_smoke/C2_joint"},
         {"mode": "formal_handoff_snapshot", "status": "RUNNING_EPOCH_024", "storage": "external_windows", "locator": "E:\\6D姿态估计\\C2_handoff_20260808", "git_commit": "24a1d7aa7159cfc8113f4cfe8c11bbd2ce3ba290", "evidence": "research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/REVALIDATION_20260808.json"},
         {"mode": "formal_evaluation_snapshot", "status": "RUNNING_LOG_EPOCH_033_EVAL_EPOCH_030", "storage": "external_windows", "locator": "E:\\6D姿态估计\\C2", "git_commit": "24a1d7aa7159cfc8113f4cfe8c11bbd2ce3ba290", "evidence": "research/experiments/EXP-20260805-008-stage3c2-joint-adaptation/RESULTS.json"}
@@ -71,13 +71,32 @@
       "artifacts": [
         {"mode": "local_engineering_chain", "status": "COMPLETE", "storage": "local", "locator": "output/cpm_head", "checkpoint_sha256": "e3d431c40eaf6354c5d21d18cb3d06534524ffbfedb9648be1c329492f7774a3", "evidence": "research/cpm_head/LOCAL_CHAIN_20260809.json"},
         {"mode": "epoch_030_diagnostic_preview", "status": "COMPLETE_WITH_QC_REENTRY_TOLERANCE_WARNING", "storage": "local_ignored_output", "locator": "output/EXP-20260809-009-cpm-head/diagnostic/E30_PREVIEW/full", "checkpoint_sha256": "d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0", "evidence": "research/experiments/EXP-20260809-009-cpm-head/RECORD.md"},
-        {"mode": "managed_formal", "status": "AUTHORIZED_AFTER_C2_ARCHIVE", "storage": "lab1", "locator": "output/experiments/EXP-20260809-009-cpm-head/<run_id>"}
+        {"mode": "managed_formal", "status": "COMPLETE_FIXED_EPOCH_040_SCREEN_FAIL", "storage": "lab1", "locator": "output/experiments/EXP-20260809-009-cpm-head/RUN-20260811-063626-formal-s42-a01", "fixed_checkpoint": "epoch_040", "bop19_ar_macro": 0.5983921568627452, "add_s_0.1d_target_micro": 0.3806228373702422, "add_s_0.1d_macro_object_derived_from_logged_per_object": 0.37686654607624587, "nonnegative_objects": 2, "diagnostic_status": "COMPLETE_MISMATCH_IMPORTANT", "diagnostic_experiment_id": "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic", "evidence": "research/experiments/EXP-20260809-009-cpm-head/RECORD.md"},
+        {"mode": "formal_checkpoint_transfer", "status": "COMPLETE_EPOCH_040_LOCAL_READABLE_SERVER_HASH_NOT_AVAILABLE", "storage": "external_windows", "locator": "E:\\6D姿态估计\\EXP-009\\model_epoch_040.pth", "checkpoint_sha256": "d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d", "evidence": "research/experiments/EXP-20260809-009-cpm-head/RECORD.md"}
       ]
     },
     {
       "experiment_id": "EXP-20260816-010-cpm-official-lr-control",
       "artifacts": [
-        {"mode": "managed_formal", "status": "AUTHORIZED", "storage": "lab0", "locator": "output/experiments/EXP-20260816-010-cpm-official-lr-control/<run_id>"}
+        {"mode": "managed_access", "status": "PASS_FORMAL_NOT_RECORDED", "storage": "lab0", "locator": "release:29580f65abfeb7625bab252011c19399325b0fa2", "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee", "evidence": "research/experiments/EXP-20260816-010-cpm-official-lr-control/RECORD.md"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic",
+      "artifacts": [
+        {"mode": "smoke", "run_id": "RUN-20260817-014944-smoke-s20260817-a01", "status": "FAILED_QC_REENTRY_PRESERVED", "storage": "local_ignored_output", "locator": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/smoke-2x2", "checkpoint_sha256": "d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d", "quality_control_sha256": "2e6610512e63d3a272c9f67a3ef27aa929efa5220205c9f809d9e44ec7e352f2", "evidence": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md"},
+        {"mode": "smoke", "run_id": "RUN-20260817-015943-smoke-s20260817-a02", "status": "COMPLETE_QC_PASS", "storage": "local_ignored_output", "locator": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/smoke-2x2-a02", "checkpoint_sha256": "d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d", "quality_control_sha256": "fcdc9121fa28f55fe3dce25ec93ad853e1d256eddc09e16b6df09baabf02be02", "evidence": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md"},
+        {"mode": "audit80", "run_id": "RUN-20260817-020937-audit80-s20260817-a01", "status": "FAILED_QC_REENTRY_PRESERVED", "storage": "local_ignored_output", "locator": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/audit80-2x2-a01", "quality_control_sha256": "10f8f6b8b475d8d35c0fe6d058688f276c183c34a90a5b53a718b60ad82900e1", "evidence": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md"},
+        {"mode": "audit80", "run_id": "RUN-20260817-021155-audit80-s20260817-a02", "status": "COMPLETE_QC_PASS", "storage": "local_ignored_output", "locator": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/audit80-2x2-a02", "quality_control_sha256": "7181bf81519f3a3169df6ab94614da16127be79c8befc28bd74831c214d0e7b2", "evidence": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md"},
+        {"mode": "full", "run_id": "RUN-20260817-021333-full-s20260817-a01", "status": "FAILED_QC_CALIBRATION_FIELD_PRESERVED", "storage": "local_ignored_output", "locator": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/full-2x5-a01", "quality_control_sha256": "6a9a681e386eb9244995f0c314a7225f2a1e1060bc8d3494217a16a733c40a11", "evidence": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md"},
+        {"mode": "full", "run_id": "RUN-20260817-023144-full-s20260817-a02", "status": "COMPLETE_QC_PASS_MISMATCH_IMPORTANT", "storage": "local_ignored_output", "locator": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/full-2x5-a02", "quality_control_sha256": "843d0061c1379d4198d1660edd899bc564e8b5dae89096e4ca7faeb79aa06c83", "factorial_summary_sha256": "7e85f802600ad46f14532f36586a79da6396760dad5e1c4aba91e0089d58d811", "evidence": "research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260817-012-hierarchical-correspondence-head",
+      "artifacts": [
+        {"mode": "local_preflight", "status": "COMPLETE", "storage": "local", "locator": "research/next_pose_head/preflight.py", "official_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c", "evidence": "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md"},
+        {"mode": "managed_formal", "status": "AUTHORIZED_NOT_RUN", "storage": "lab1", "locator": "output/experiments/EXP-20260817-012-hierarchical-correspondence-head/<run>", "evidence": "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md"}
       ]
     }
   ]

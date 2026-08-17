@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic",
+  "title": "CPM XYZ–Region 一致性固定权重诊断",
+  "stage": "Stage 4 / CPM mechanism diagnostic",
+  "role": "diagnostic",
+  "status": "COMPLETE",
+  "legacy_import": false,
+  "decision": "MISMATCH_IMPORTANT",
+  "protocol": {
+    "research_question": "GT XYZ 与 predicted Region 的来源不一致，是否是既有 GT-XYZ oracle 性能恶化的重要原因？",
+    "parent_experiment": "EXP-20260809-009-cpm-head",
+    "training": false,
+    "fixed_checkpoint": "EXP009 epoch_040",
+    "checkpoint_sha256": "d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d",
+    "config": "configs/gdrn/lmo_pbr/research/exp009_cpm_head/eval.py",
+    "dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 20260817,
+    "precision": "FP32",
+    "reentry_tolerance": {
+      "raw_head_abs": 0.00005,
+      "rotation_matrix_abs": 0.0003,
+      "translation_m_abs": 0.00005,
+      "devices": ["cpu", "cuda"],
+      "policy": "advisory_non_blocking",
+      "authorization": "User authorized ignoring scientifically immaterial FP32 re-entry differences; exact model/checkpoint hashes remain blocking"
+    },
+    "fixed_inputs": [
+      "RGB and geometry-head predictions",
+      "predicted visible support intersected with GT-visible valid-depth support",
+      "ROI2D",
+      "GT bbox",
+      "checkpoint",
+      "evaluation protocol"
+    ],
+    "condition_sets": {
+      "cpm_xyz_region_2x2": [
+        "pred_xyz_pred_region",
+        "gt_xyz_pred_region",
+        "pred_xyz_gt_region",
+        "gt_xyz_gt_region"
+      ],
+      "cpm_xyz_region_alpha_sweep": {
+        "xyz_alpha": [0.0, 0.25, 0.5, 0.75, 1.0],
+        "region_source": ["pred", "gt"]
+      }
+    },
+    "gt_region_definition": "core.utils.data_utils.xyz_to_region(metric GT XYZ, data_ref fps64_and_center[:-1]); labels 1..64 converted to foreground one-hot on frozen support; predicted posterior retained outside support",
+    "run_sequence": [
+      "smoke: 8 targets, CPU FP32, 2x2",
+      "audit80: 80 targets, CUDA FP32, 2x2",
+      "full: 1445 targets, CUDA FP32, 2x5, BOP19 evaluation"
+    ],
+    "metrics": [
+      "bop19_ar_macro_and_components",
+      "add_s_0.1d_micro_target",
+      "add_s_0.1d_macro_object",
+      "per_object_add_s_0.1d",
+      "pose_and_cpm_layer_response",
+      "pred_gt_region_agreement"
+    ],
+    "factorial_definition": {
+      "gt_xyz_effect_under_pred_region": "M(GT XYZ, Pred Region) - M(Pred XYZ, Pred Region)",
+      "gt_xyz_effect_under_gt_region": "M(GT XYZ, GT Region) - M(Pred XYZ, GT Region)",
+      "interaction": "GT-XYZ effect under GT Region - GT-XYZ effect under Pred Region"
+    },
+    "interpretation_gate": {
+      "MISMATCH_IMPORTANT": "BOP19 and macro ADD(-S) both reproduce negative GT-XYZ effect under Pred Region, both interactions are positive with rescue ratio >= 0.5, and >= 5/8 objects have positive ADD(-S) interaction",
+      "MISMATCH_PARTIAL": "both degradations reproduce and both interactions are positive, but the strong gate is incomplete",
+      "MISMATCH_NOT_SUPPORTED": "degradation reproduces but GT Region does not attenuate it in both primary metrics",
+      "INCONCLUSIVE_MIXED": "degradation does not reproduce, metric signs conflict, full BOP19 is absent, or QC fails"
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "runner": "research/pose_head_diagnostic/run_statistical_diagnostic.py",
+    "interventions": "research/pose_head_diagnostic/run_information_flow.py",
+    "tests": "research/pose_head_diagnostic/tests/test_diagnostic_utils.py",
+    "outputs": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/<run>",
+    "run_evidence": {
+      "smoke_runs": [
+        {
+          "run_id": "RUN-20260817-014944-smoke-s20260817-a01",
+          "status": "FAILED_QC_PRESERVED",
+          "output": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/smoke-2x2",
+          "quality_control_sha256": "2e6610512e63d3a272c9f67a3ef27aa929efa5220205c9f809d9e44ec7e352f2"
+        },
+        {
+          "run_id": "RUN-20260817-015943-smoke-s20260817-a02",
+          "status": "COMPLETE_QC_PASS",
+          "output": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/smoke-2x2-a02",
+          "quality_control_sha256": "fcdc9121fa28f55fe3dce25ec93ad853e1d256eddc09e16b6df09baabf02be02"
+        }
+      ],
+      "audit80_runs": [
+        {
+          "run_id": "RUN-20260817-020937-audit80-s20260817-a01",
+          "status": "FAILED_QC_REENTRY_PRESERVED",
+          "output": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/audit80-2x2-a01",
+          "quality_control_sha256": "10f8f6b8b475d8d35c0fe6d058688f276c183c34a90a5b53a718b60ad82900e1"
+        },
+        {
+          "run_id": "RUN-20260817-021155-audit80-s20260817-a02",
+          "status": "COMPLETE_QC_PASS",
+          "output": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/audit80-2x2-a02",
+          "quality_control_sha256": "7181bf81519f3a3169df6ab94614da16127be79c8befc28bd74831c214d0e7b2"
+        }
+      ],
+      "full_runs": [
+        {
+          "run_id": "RUN-20260817-021333-full-s20260817-a01",
+          "status": "FAILED_QC_CALIBRATION_FIELD_PRESERVED",
+          "output": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/full-2x5-a01",
+          "quality_control_sha256": "6a9a681e386eb9244995f0c314a7225f2a1e1060bc8d3494217a16a733c40a11"
+        },
+        {
+          "run_id": "RUN-20260817-023144-full-s20260817-a02",
+          "status": "COMPLETE_QC_PASS",
+          "output": "output/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/full-2x5-a02",
+          "quality_control_sha256": "843d0061c1379d4198d1660edd899bc564e8b5dae89096e4ca7faeb79aa06c83",
+          "factorial_summary_sha256": "7e85f802600ad46f14532f36586a79da6396760dad5e1c4aba91e0089d58d811",
+          "decision": "MISMATCH_IMPORTANT"
+        }
+      ]
+    }
+  }
+}

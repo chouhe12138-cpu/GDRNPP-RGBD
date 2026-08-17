@@ -1,6 +1,6 @@
 # EXP-20260816-010 — CPM 官方量级学习率受控实验
 
-状态：`AUTHORIZED — 等待新 Git release 在 lab0 执行`
+状态：`AUTHORIZED — ACCESS PASS，尚无正式 run 证据`
 
 ## 研究问题
 
@@ -35,18 +35,20 @@ SOLVER.OPTIMIZER_CFG.lr
 
 ## 当前证据与结论边界
 
-- EXP009 Epoch 30 checkpoint 完整且可读，SHA-256 为
-  `d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0`。
+- EXP009 固定 Epoch 40 checkpoint 完整且可读，SHA-256 为
+  `d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d`；
+  固定 E40 BOP AR 为 `0.5983921569`，未通过 BOP gate。
 - Epoch 30 高覆盖预览诊断表明 CPM 确实使用 XYZ、ROI、Region 与 `CXU`，且
   coverage-only 退化为零；但更准确 XYZ 没有被转化为更好 pose，反而随 alpha
   增大持续下降。
-- 这能说明 EXP009 当前表现不理想，不能单独证明学习率就是原因。EXP010 才是
+- EXP009 固定 E40 的失败 BOP 结果不能单独证明学习率就是原因。EXP010 才是
   对优化不足解释的匹配控制。
-- EXP009 的完整 Epoch 35 权重已完成预览诊断；它仍不能替代固定 Epoch 40。
+- EXP009 固定 E40 ADD(-S) target-micro 为 `0.3806228374`，由逐物体值派生的
+  macro-object 为 `0.3768665461`，逐物体非负 `2/8`；EXP011 固定 E40 机制
+  诊断已完成，结论 `MISMATCH_IMPORTANT`。
 
-EXP009 的中间预览结果不是最终结论，但也不是 EXP010 启动的依赖。EXP009 与
-EXP010 可以分别在 lab1/GPU 1 和 lab0/GPU 0 并行；最终比较仍等待两者固定
-Epoch 40。
+EXP009 的固定 E40 BOP 结果已具备，EXP010 启动不再等待 EXP009。最终匹配
+比较仍等待 EXP010 固定 Epoch 40，并需补齐同协议指标与机制诊断。
 
 ## 启动授权
 
@@ -55,6 +57,19 @@ config diff 必须继续只包含身份、输出目录和学习率。新 run 创
 复用稳定 environment image，依次通过
 access、create、gate、smoke、audit48，再启动 formal。不得修改或复用 EXP009
 的运行目录。
+
+已回传的服务器 access 证据为：
+
+```text
+machine:              lab0
+physical GPU:         0
+source_git_commit:    29580f65abfeb7625bab252011c19399325b0fa2
+environment_image_id: sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee
+access:               PASS
+```
+
+当前没有 create、gate、smoke、audit 或 formal run 身份的回传证据，因此 EXP010
+仍记为 `AUTHORIZED`，不记为 `RUNNING`。
 
 ## 成功、失败与后续
 

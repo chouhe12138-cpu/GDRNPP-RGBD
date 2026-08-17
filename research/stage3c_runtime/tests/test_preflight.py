@@ -64,7 +64,8 @@ def test_checkpoint_isolation_detects_frozen_change():
     ]
 
 
-def test_checkpoint_isolation_classifies_cpm_pose_head_replacement():
+@pytest.mark.parametrize("role", ["CPM", "PNP_REPLACEMENT"])
+def test_checkpoint_isolation_classifies_pose_head_replacement(role):
     official = {
         "backbone.weight": torch.tensor([1.0]),
         "pnp_net.legacy.weight": torch.tensor([2.0]),
@@ -73,7 +74,7 @@ def test_checkpoint_isolation_classifies_cpm_pose_head_replacement():
         "backbone.weight": torch.tensor([1.0]),
         "pnp_net.moment_decoder.weight": torch.tensor([3.0]),
     }
-    result = compare_states("CPM", official, cpm)
+    result = compare_states(role, official, cpm)
     assert result["changed_frozen"] == []
     assert result["removed"] == ["pnp_net.legacy.weight"]
     assert result["added"] == ["pnp_net.moment_decoder.weight"]

@@ -6,7 +6,7 @@
   "role": "CPM-LR-control",
   "status": "AUTHORIZED",
   "legacy_import": false,
-  "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_COMPLETION",
+  "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_ACCESS_PASS_FORMAL_NOT_STARTED_OR_VERIFIED",
   "protocol": {
     "research_question": "EXP009 的欠佳结果是否受到新随机初始化 CPM 姿态头使用过低学习率的限制？",
     "single_changed_variable": "SOLVER.OPTIMIZER_CFG.lr: 8e-5 -> 8e-4",
@@ -74,7 +74,14 @@
     "smoke_config": "configs/gdrn/lmo_pbr/research/exp010_cpm_official_lr_control/smoke.py",
     "eval_config": "configs/gdrn/lmo_pbr/research/exp010_cpm_official_lr_control/eval.py",
     "formal_output": "server:/data/labs/lab0/docker_data/chx/outputs/experiments/EXP-20260816-010-cpm-official-lr-control",
-    "source_git_commit": "PENDING_FUTURE_RELEASE",
-    "environment_image_id": "PENDING_FUTURE_RELEASE"
+    "source_git_commit": "29580f65abfeb7625bab252011c19399325b0fa2",
+    "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee",
+    "server_access_check": {
+      "status": "PASS",
+      "machine": "lab0",
+      "physical_gpu": 0,
+      "formal_run_identity": "NOT_RECORDED",
+      "create_gate_smoke_audit_status": "NOT_RECORDED"
+    }
   }
 }

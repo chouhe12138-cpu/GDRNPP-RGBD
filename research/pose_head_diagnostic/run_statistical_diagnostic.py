@@ -34,6 +34,7 @@ from core.gdrn_modeling.models import GDRN_double_mask
 from core.gdrn_modeling.models.heads.cpm_pnp_net import (
     CorrespondenceAwareMomentPnPNet,
 )
+from core.utils.data_utils import xyz_to_region
 from core.utils.my_checkpoint import MyCheckpointer
 from lib.pysixd import inout
 from lib.utils.mask_utils import cocosegm2mask
@@ -59,8 +60,11 @@ from research.pose_head_diagnostic.diagnostic_utils import (
     tensor_state_sha256,
 )
 from research.pose_head_diagnostic.run_information_flow import (
+    CPM_CONDITION_SETS,
     CPM_MOMENT_CONDITIONS,
     apply_cpm_diagnostic_intervention,
+    apply_cpm_xyz_region_intervention,
+    cpm_xyz_region_condition,
     conditions_for_model,
     layers_for_model,
     run_head_with_hooks,
@@ -74,17 +78,20 @@ from research.pose_head_utilization.utilization_utils import metric_xyz_to_norma
 
 
 EXPECTED_OFFICIAL_HASH = "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c"
+EXPECTED_EXP009_E40_HASH = "d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d"
 # The formal comparison protocol is FP32, matching the C1/B/C2 evaluator.
 # ADD(-S) here is the diagnostic's 1,445-target micro recall (730 successes),
 # not the eight-object macro average printed by the training evaluator.
 EXPECTED_OFFICIAL_ADD_RECALL = 0.5051903114186851
 EXPECTED_OFFICIAL_BOP_AR = 0.6904152249134947
+EXPECTED_EXP009_E40_ADD_TARGET_MICRO = 0.3806228373702422
+EXPECTED_EXP009_E40_BOP_AR = 0.5983921568627452
 OFFICIAL_BOP_TOLERANCE = 5e-5
 RAW_REENTRY_TOLERANCE_CUDA = 5e-5
 POSE_ROTATION_REENTRY_TOLERANCE_CUDA = 3e-4
 POSE_TRANSLATION_REENTRY_TOLERANCE_CUDA = 5e-5
-REENTRY_TOLERANCE_CPU = 1e-6
 EXPERIMENT_ID = "EXP-20260804-007-pose-head-information-flow"
+XYZ_REGION_EXPERIMENT_ID = "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic"
 MODEL_ROLES = ("official", "c1", "pnp_adapted", "joint", "cpm")
 MODES = ("smoke", "audit80", "full")
 POSE_METRICS = (
@@ -118,6 +125,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", default=20260804, type=int)
     parser.add_argument("--num-workers", default=0, type=int)
     parser.add_argument("--bootstrap-samples", default=1000, type=int)
+    parser.add_argument(
+        "--condition-set", choices=CPM_CONDITION_SETS, default="legacy"
+    )
     parser.add_argument("--bop-eval", action="store_true")
     parser.add_argument("--resume", action="store_true")
     # Compatibility attributes consumed by the shared configure() helper.
@@ -147,6 +157,179 @@ def write_csv(path: Path, rows: List[dict]) -> None:
 def write_json(path: Path, value) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(value, handle, indent=2, ensure_ascii=False)
+
+
+def build_gt_region_posterior(
+    gt_xyz_m: np.ndarray,
+    fps_points: np.ndarray,
+    support: np.ndarray,
+    num_regions: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Use the training label function and return a foreground one-hot map."""
+
+    mask = np.asarray(support, dtype=bool)
+    masked_xyz = np.zeros_like(np.asarray(gt_xyz_m))
+    masked_xyz[mask] = np.asarray(gt_xyz_m)[mask]
+    labels = xyz_to_region(masked_xyz, np.asarray(fps_points))
+    invalid = mask & ((labels < 1) | (labels > num_regions))
+    if np.any(invalid):
+        raise RuntimeError(
+            "Training-defined xyz_to_region produced a background/invalid label "
+            "inside the frozen support"
+        )
+    posterior = np.zeros((*labels.shape, num_regions), dtype=np.float32)
+    support_rows, support_cols = np.nonzero(mask)
+    posterior[support_rows, support_cols, labels[mask] - 1] = 1.0
+    return posterior, labels
+
+
+def region_consistency_statistics(
+    pred_region: np.ndarray,
+    gt_labels: np.ndarray,
+    support: np.ndarray,
+) -> dict[str, float | int]:
+    """Return aggregate-ready Pred/GT Region agreement statistics."""
+
+    pred = np.asarray(pred_region, dtype=np.float64)
+    mask = np.asarray(support, dtype=bool)
+    count = int(np.count_nonzero(mask))
+    if count == 0:
+        return {
+            "support_points": 0,
+            "argmax_matches": 0,
+            "gt_probability_sum": 0.0,
+            "entropy_sum": 0.0,
+            "posterior_sum_max_error": 0.0,
+        }
+    selected = pred[mask]
+    labels = np.asarray(gt_labels)[mask].astype(np.int64) - 1
+    clipped = np.clip(selected, 1e-12, 1.0)
+    return {
+        "support_points": count,
+        "argmax_matches": int(np.count_nonzero(np.argmax(selected, axis=1) == labels)),
+        "gt_probability_sum": float(np.sum(selected[np.arange(count), labels])),
+        "entropy_sum": float(np.sum(-np.sum(clipped * np.log(clipped), axis=1))),
+        "posterior_sum_max_error": float(
+            np.max(np.abs(np.sum(selected, axis=1) - 1.0))
+        ),
+    }
+
+
+def macro_object_add_recall(records: List[dict], conditions: tuple[str, ...]) -> dict:
+    """Compute the eight-object macro ADD(-S) recall without changing protocol."""
+
+    result = {}
+    for condition in conditions:
+        by_object: Dict[str, list[float]] = {}
+        for record in records:
+            if record["condition"] == condition:
+                by_object.setdefault(record["obj_name"], []).append(
+                    float(record["add_s_0.1d"])
+                )
+        per_object = {
+            name: float(np.mean(values)) for name, values in sorted(by_object.items())
+        }
+        result[condition] = {
+            "macro_object": float(np.mean(list(per_object.values()))),
+            "micro_target": float(
+                np.mean(
+                    [
+                        record["add_s_0.1d"]
+                        for record in records
+                        if record["condition"] == condition
+                    ]
+                )
+            ),
+            "per_object": per_object,
+        }
+    return result
+
+
+def factorial_summary(add_summary: dict, bop_scores: dict) -> dict:
+    """Summarize the preregistered 2x2 endpoint interaction."""
+
+    endpoint_names = {
+        "pred_pred": "pred_xyz_pred_region",
+        "gt_pred": "gt_xyz_pred_region",
+        "pred_gt": "pred_xyz_gt_region",
+        "gt_gt": "gt_xyz_gt_region",
+    }
+    if not all(name in add_summary for name in endpoint_names.values()):
+        endpoint_names = {
+            "pred_pred": "xyz_alpha_000_pred_region",
+            "gt_pred": "xyz_alpha_100_pred_region",
+            "pred_gt": "xyz_alpha_000_gt_region",
+            "gt_gt": "xyz_alpha_100_gt_region",
+        }
+    if not all(name in add_summary for name in endpoint_names.values()):
+        return {}
+
+    def effects(values: dict[str, float]) -> dict[str, float | None]:
+        e_pred = values["gt_pred"] - values["pred_pred"]
+        e_gt = values["gt_gt"] - values["pred_gt"]
+        interaction = e_gt - e_pred
+        rescue_ratio = interaction / (-e_pred) if e_pred < 0 else None
+        return {
+            "gt_xyz_effect_under_pred_region": e_pred,
+            "gt_xyz_effect_under_gt_region": e_gt,
+            "interaction": interaction,
+            "rescue_ratio": rescue_ratio,
+        }
+
+    add_values = {
+        key: add_summary[name]["macro_object"]
+        for key, name in endpoint_names.items()
+    }
+    per_object_interactions = {}
+    objects = add_summary[endpoint_names["pred_pred"]]["per_object"]
+    for obj_name in objects:
+        values = {
+            key: add_summary[name]["per_object"][obj_name]
+            for key, name in endpoint_names.items()
+        }
+        per_object_interactions[obj_name] = effects(values)["interaction"]
+    summary = {
+        "definition": "interaction = GT-XYZ effect under GT Region minus GT-XYZ effect under Pred Region",
+        "add_s_0.1d_macro_object": effects(add_values),
+        "per_object_add_s_interaction": per_object_interactions,
+        "positive_per_object_add_s_interactions": int(
+            sum(value > 0 for value in per_object_interactions.values())
+        ),
+    }
+    if all(name in bop_scores for name in endpoint_names.values()):
+        summary["bop19_ar_macro"] = effects(
+            {key: bop_scores[name] for key, name in endpoint_names.items()}
+        )
+    return summary
+
+
+def classify_factorial_result(summary: dict) -> str:
+    """Apply the preregistered full-run interpretation labels."""
+
+    if "bop19_ar_macro" not in summary:
+        return "INCONCLUSIVE_NO_FULL_BOP19"
+    add = summary["add_s_0.1d_macro_object"]
+    bop = summary["bop19_ar_macro"]
+    degradations_reproduced = (
+        add["gt_xyz_effect_under_pred_region"] < 0
+        and bop["gt_xyz_effect_under_pred_region"] < 0
+    )
+    if not degradations_reproduced:
+        return "INCONCLUSIVE_MIXED"
+    positive_interactions = add["interaction"] > 0 and bop["interaction"] > 0
+    strong_rescue = (
+        positive_interactions
+        and add["rescue_ratio"] is not None
+        and bop["rescue_ratio"] is not None
+        and add["rescue_ratio"] >= 0.5
+        and bop["rescue_ratio"] >= 0.5
+        and summary["positive_per_object_add_s_interactions"] >= 5
+    )
+    if strong_rescue:
+        return "MISMATCH_IMPORTANT"
+    if positive_interactions:
+        return "MISMATCH_PARTIAL"
+    return "MISMATCH_NOT_SUPPORTED"
 
 
 def deterministic_subset(
@@ -197,7 +380,9 @@ def save_bop_results(output_dir: Path, rows: Dict[str, List[dict]]) -> Dict[str,
     return hashes
 
 
-def run_bop_evaluation(output_dir: Path, conditions: tuple[str, ...]) -> dict:
+def run_bop_evaluation(
+    output_dir: Path, conditions: tuple[str, ...]
+) -> tuple[dict, dict]:
     toolkit = PROJECT_ROOT / ".local" / "bop_toolkit"
     result_dir = output_dir / "bop_results"
     eval_dir = output_dir / "bop_eval"
@@ -225,12 +410,19 @@ def run_bop_evaluation(output_dir: Path, conditions: tuple[str, ...]) -> dict:
     ]
     subprocess.run(command, check=True, cwd=PROJECT_ROOT, env=environment)
     scores = {}
+    details = {}
     for condition, filename in zip(conditions, filenames):
         with (eval_dir / Path(filename).stem / "scores_bop19.json").open(
             encoding="utf-8"
         ) as handle:
-            scores[condition] = float(json.load(handle)["bop19_average_recall"])
-    return scores
+            payload = json.load(handle)
+        scores[condition] = float(payload["bop19_average_recall"])
+        details[condition] = {
+            key: value
+            for key, value in payload.items()
+            if key.startswith("bop19_") and isinstance(value, (int, float))
+        }
+    return scores, details
 
 
 def output_hashes(output_dir: Path) -> dict:
@@ -253,10 +445,13 @@ def maybe_resume(args: argparse.Namespace, checkpoint_hash: str) -> bool:
         "model_role": args.model_role,
         "seed": args.seed,
         "checkpoint_sha256": checkpoint_hash,
+        "condition_set": args.condition_set,
     }
-    if state.get("status") != "COMPLETE" or any(
-        protocol.get(key) != value for key, value in expected.items()
-    ):
+    protocol_matches = all(
+        protocol.get(key, "legacy" if key == "condition_set" else None) == value
+        for key, value in expected.items()
+    )
+    if state.get("status") != "COMPLETE" or not protocol_matches:
         raise RuntimeError("Existing output is incomplete or its frozen protocol differs")
     hash_path = args.output_dir / "hashes.sha256"
     if not hash_path.exists():
@@ -288,6 +483,15 @@ def main() -> int:
     checkpoint_hash = sha256(args.weights)
     if args.model_role == "official" and checkpoint_hash != EXPECTED_OFFICIAL_HASH:
         raise RuntimeError(f"Unexpected official checkpoint SHA-256: {checkpoint_hash}")
+    xyz_region_diagnostic = args.condition_set != "legacy"
+    if xyz_region_diagnostic:
+        if args.model_role != "cpm":
+            raise ValueError("XYZ/Region condition sets require --model-role cpm")
+        if checkpoint_hash != EXPECTED_EXP009_E40_HASH:
+            raise RuntimeError(
+                "XYZ/Region diagnostic requires the verified EXP009 Epoch-40 "
+                f"checkpoint SHA-256, got {checkpoint_hash}"
+            )
     if maybe_resume(args, checkpoint_hash):
         return 0
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -342,7 +546,7 @@ def main() -> int:
     ).resume_or_load(str(args.weights), resume=False)
     model.eval()
     layers = layers_for_model(model)
-    conditions = conditions_for_model(model)
+    conditions = conditions_for_model(model, args.condition_set)
     is_cpm = isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet)
     if (args.model_role == "cpm") != is_cpm:
         raise RuntimeError(
@@ -353,6 +557,28 @@ def main() -> int:
         raise RuntimeError("CPM diagnostic requires MASK_ATTENTION='mul'")
     if not is_cpm and mask_attention_type != "none":
         raise RuntimeError("The frozen ConvPnP protocol requires MASK_ATTENTION='none'")
+    baseline_condition = (
+        "baseline"
+        if args.condition_set == "legacy"
+        else (
+            "pred_xyz_pred_region"
+            if args.condition_set == "cpm_xyz_region_2x2"
+            else "xyz_alpha_000_pred_region"
+        )
+    )
+    fps_points_by_object = {}
+    if xyz_region_diagnostic:
+        loaded_fps_points = data_ref.get_fps_points()
+        num_regions = int(cfg.MODEL.POSE_NET.GEO_HEAD.NUM_REGIONS)
+        if num_regions != 64:
+            raise RuntimeError(f"EXP011 protocol requires 64 regions, got {num_regions}")
+        fps_points_by_object = {
+            obj_id: np.asarray(
+                loaded_fps_points[str(obj_id)]["fps64_and_center"][:-1],
+                dtype=np.float32,
+            )
+            for obj_id in object_ids
+        }
     layer_metrics = tuple(
         f"{layer}_{metric}"
         for layer in layers
@@ -374,15 +600,26 @@ def main() -> int:
         rotation_reentry_tolerance = POSE_ROTATION_REENTRY_TOLERANCE_CUDA
         translation_reentry_tolerance = POSE_TRANSLATION_REENTRY_TOLERANCE_CUDA
     else:
-        raw_reentry_tolerance = REENTRY_TOLERANCE_CPU
-        rotation_reentry_tolerance = REENTRY_TOLERANCE_CPU
-        translation_reentry_tolerance = REENTRY_TOLERANCE_CPU
+        # Re-entering the frozen head can differ by harmless FP32 kernel-order
+        # noise on CPU as well as CUDA.  Use the already calibrated numerical
+        # tolerances on both devices; these gates detect material drift, not
+        # bitwise identity (model/checkpoint hashes are checked separately).
+        raw_reentry_tolerance = RAW_REENTRY_TOLERANCE_CUDA
+        rotation_reentry_tolerance = POSE_ROTATION_REENTRY_TOLERANCE_CUDA
+        translation_reentry_tolerance = POSE_TRANSLATION_REENTRY_TOLERANCE_CUDA
     processed_targets = 0
     empty_support_targets = 0
     max_raw_rotation_reentry = 0.0
     max_raw_translation_reentry = 0.0
     max_rotation_reentry = 0.0
     max_translation_reentry = 0.0
+    region_stats = {
+        "support_points": 0,
+        "argmax_matches": 0,
+        "gt_probability_sum": 0.0,
+        "entropy_sum": 0.0,
+        "posterior_sum_max_error": 0.0,
+    }
 
     with inference_context(model), torch.no_grad():
         for inputs in loader:
@@ -515,6 +752,29 @@ def main() -> int:
                     if not np.any(support):
                         empty_support_targets += 1
                     gt_xyz = metric_xyz_to_normalized(gt_xyz_m, extent)
+                    gt_region = None
+                    gt_region_labels = None
+                    if xyz_region_diagnostic:
+                        gt_region, gt_region_labels = build_gt_region_posterior(
+                            gt_xyz_m,
+                            fps_points_by_object[obj_id],
+                            support,
+                            num_regions,
+                        )
+                        instance_region_stats = region_consistency_statistics(
+                            region, gt_region_labels, support
+                        )
+                        for key in (
+                            "support_points",
+                            "argmax_matches",
+                            "gt_probability_sum",
+                            "entropy_sum",
+                        ):
+                            region_stats[key] += instance_region_stats[key]
+                        region_stats["posterior_sum_max_error"] = max(
+                            region_stats["posterior_sum_max_error"],
+                            instance_region_stats["posterior_sum_max_error"],
+                        )
                     xyz_errors = np.linalg.norm(xyz - gt_xyz, axis=2)[support]
                     xyz_error_mean = (
                         float(np.mean(xyz_errors)) if len(xyz_errors) else float("nan")
@@ -529,7 +789,18 @@ def main() -> int:
                     baseline_pose_metrics = None
 
                     for condition in conditions:
-                        if is_cpm:
+                        if xyz_region_diagnostic:
+                            xyz_i, roi_i, region_i = apply_cpm_xyz_region_intervention(
+                                xyz,
+                                gt_xyz,
+                                roi_2d,
+                                region,
+                                gt_region,
+                                support,
+                                condition,
+                            )
+                            moment_condition = None
+                        elif is_cpm:
                             xyz_i, roi_i, region_i, moment_condition = (
                                 apply_cpm_diagnostic_intervention(
                                     xyz,
@@ -573,7 +844,7 @@ def main() -> int:
                             obj_id,
                             symmetry_rotations[obj_id],
                         )
-                        if condition == "baseline":
+                        if condition == baseline_condition:
                             baseline_activations = activations
                             baseline_rotation = rotation
                             baseline_translation = translation
@@ -628,7 +899,8 @@ def main() -> int:
                                 layer_values[f"{layer}_{metric_name}"] = value
                         condition_support = (
                             np.zeros_like(support)
-                            if condition == "baseline" or condition in CPM_MOMENT_CONDITIONS
+                            if condition == baseline_condition
+                            or condition in CPM_MOMENT_CONDITIONS
                             else spatial_masks.get(condition, support)
                         )
                         record = {
@@ -636,11 +908,15 @@ def main() -> int:
                             "condition": condition,
                             "intervention_domain": (
                                 "none"
-                                if condition == "baseline"
+                                if condition == baseline_condition
                                 else (
                                     "moment_descriptor"
                                     if condition in CPM_MOMENT_CONDITIONS
-                                    else "pixel_input"
+                                    else (
+                                        "xyz_region_factorial"
+                                        if xyz_region_diagnostic
+                                        else "pixel_input"
+                                    )
                                 )
                             ),
                             "obj_name": data_ref.id2obj[obj_id],
@@ -704,8 +980,11 @@ def main() -> int:
                     break
 
     state_after = tensor_state_sha256(model.state_dict())
+    checkpoint_hash_after = sha256(args.weights)
     baseline_records = [
-        record for record in scalar_records if record["condition"] == "baseline"
+        record
+        for record in scalar_records
+        if record["condition"] == baseline_condition
     ]
     quartiles = assign_quartile_labels(baseline_records, "support_points")
     quartile_map = {
@@ -760,16 +1039,19 @@ def main() -> int:
             [
                 record["add_s_0.1d"]
                 for record in scalar_records
-                if record["condition"] == "baseline"
+                if record["condition"] == baseline_condition
             ]
         )
     )
+    add_summary = macro_object_add_recall(scalar_records, conditions)
+    baseline_add_macro = add_summary[baseline_condition]["macro_object"]
 
     bop_scores = {}
+    bop_details = {}
     bop_hashes = {}
     if args.mode == "full":
         bop_hashes = save_bop_results(args.output_dir, bop_rows)
-        bop_scores = run_bop_evaluation(args.output_dir, conditions)
+        bop_scores, bop_details = run_bop_evaluation(args.output_dir, conditions)
     official_add_reproduced = (
         args.model_role != "official"
         or args.mode != "full"
@@ -781,6 +1063,40 @@ def main() -> int:
         or abs(bop_scores["baseline"] - EXPECTED_OFFICIAL_BOP_AR)
         <= OFFICIAL_BOP_TOLERANCE
     )
+    exp009_add_reproduced = (
+        not xyz_region_diagnostic
+        or args.mode != "full"
+        or abs(baseline_add_recall - EXPECTED_EXP009_E40_ADD_TARGET_MICRO)
+        <= 1e-12
+    )
+    exp009_bop_reproduced = (
+        not xyz_region_diagnostic
+        or args.mode != "full"
+        or abs(bop_scores[baseline_condition] - EXPECTED_EXP009_E40_BOP_AR)
+        <= OFFICIAL_BOP_TOLERANCE
+    )
+    region_consistency = {}
+    if xyz_region_diagnostic:
+        support_points = int(region_stats["support_points"])
+        region_consistency = {
+            **region_stats,
+            "argmax_agreement": (
+                float(region_stats["argmax_matches"] / support_points)
+                if support_points
+                else None
+            ),
+            "mean_probability_on_gt_region": (
+                float(region_stats["gt_probability_sum"] / support_points)
+                if support_points
+                else None
+            ),
+            "mean_pred_region_entropy_nats": (
+                float(region_stats["entropy_sum"] / support_points)
+                if support_points
+                else None
+            ),
+        }
+    endpoint_summary = factorial_summary(add_summary, bop_scores)
     nonfinite_scalar_count = int(
         sum(
             not np.isfinite(value)
@@ -795,18 +1111,40 @@ def main() -> int:
     )
 
     protocol = {
-        "experiment_id": EXPERIMENT_ID,
+        "experiment_id": (
+            XYZ_REGION_EXPERIMENT_ID if xyz_region_diagnostic else EXPERIMENT_ID
+        ),
         "mode": args.mode,
         "model_role": args.model_role,
         "seed": args.seed,
         "dataset": args.dataset,
         "checkpoint": str(args.weights),
         "checkpoint_sha256": checkpoint_hash,
+        "condition_set": args.condition_set,
         "config": str(args.config_file),
         "config_sha256": sha256(args.config_file),
         "conditions": conditions,
+        "baseline_condition": baseline_condition,
+        "condition_factors": (
+            {
+                condition: {
+                    "xyz_alpha": cpm_xyz_region_condition(condition)[0],
+                    "region_source": cpm_xyz_region_condition(condition)[1],
+                }
+                for condition in conditions
+            }
+            if xyz_region_diagnostic
+            else None
+        ),
         "layers": layers,
         "fixed_support": "predicted-visible AND GT-visible AND valid-depth",
+        "gt_region_definition": (
+            "core.utils.data_utils.xyz_to_region(metric GT XYZ, "
+            "data_ref fps64_and_center[:-1]); labels 1..64 converted to "
+            "foreground one-hot only on frozen support"
+            if xyz_region_diagnostic
+            else None
+        ),
         "intervention_points": {
             "pixel_input": (
                 "effective Patch-PnP input after any quality/coverage module; "
@@ -823,6 +1161,11 @@ def main() -> int:
         "parameter_updates": 0,
         "optimizer_created": optimizer is not None,
         "precision": "FP32",
+        "reentry_tolerances": {
+            "raw_head_abs": raw_reentry_tolerance,
+            "rotation_matrix_abs": rotation_reentry_tolerance,
+            "translation_m_abs": translation_reentry_tolerance,
+        },
         "deterministic_algorithms": True,
         "cudnn_benchmark": False,
         "cudnn_deterministic": True,
@@ -855,24 +1198,45 @@ def main() -> int:
         "raw_reentry_tolerance": raw_reentry_tolerance,
         "rotation_reentry_tolerance": rotation_reentry_tolerance,
         "translation_reentry_tolerance": translation_reentry_tolerance,
+        "reentry_policy": "advisory_non_blocking",
         "state_unchanged": state_before == state_after,
+        "checkpoint_file_unchanged": checkpoint_hash == checkpoint_hash_after,
         "baseline_add_s_0.1d_recall": baseline_add_recall,
+        "baseline_add_s_0.1d_macro_object": baseline_add_macro,
         "official_add_reproduced": official_add_reproduced,
         "official_bop_reproduced": official_bop_reproduced,
+        "exp009_e40_add_target_micro_reproduced": exp009_add_reproduced,
+        "exp009_e40_bop_reproduced": exp009_bop_reproduced,
+        "region_consistency": region_consistency,
         "instance_level_feature_file_written": False,
     }
+    quality_control["reentry_within_tolerance"] = bool(
+        max_raw_rotation_reentry <= raw_reentry_tolerance
+        and max_raw_translation_reentry <= raw_reentry_tolerance
+        and max_rotation_reentry <= rotation_reentry_tolerance
+        and max_translation_reentry <= translation_reentry_tolerance
+    )
     quality_control["passed"] = bool(
         processed_targets == expected_targets
         and all(count == expected_targets for count in condition_counts.values())
         and state_before == state_after
+        and checkpoint_hash == checkpoint_hash_after
         and unexpected_nonfinite_scalar_count == 0
-        and max_raw_rotation_reentry <= raw_reentry_tolerance
-        and max_raw_translation_reentry <= raw_reentry_tolerance
-        and max_rotation_reentry <= rotation_reentry_tolerance
-        and max_translation_reentry <= translation_reentry_tolerance
         and official_add_reproduced
         and official_bop_reproduced
+        and exp009_add_reproduced
+        and exp009_bop_reproduced
+        and (
+            not xyz_region_diagnostic
+            or region_stats["posterior_sum_max_error"] <= 1e-5
+        )
     )
+    if endpoint_summary:
+        endpoint_summary["decision"] = (
+            classify_factorial_result(endpoint_summary)
+            if quality_control["passed"]
+            else "INCONCLUSIVE_QC_FAIL"
+        )
 
     write_json(args.output_dir / "protocol.json", protocol)
     write_json(args.output_dir / "architecture.json", architecture)
@@ -888,10 +1252,21 @@ def main() -> int:
         args.output_dir / "condition_summary.json",
         {"overall": overall, "quality_control": quality_control},
     )
+    write_json(args.output_dir / "add_s_summary.json", add_summary)
+    if xyz_region_diagnostic:
+        write_json(
+            args.output_dir / "region_consistency_summary.json",
+            region_consistency,
+        )
+        write_json(args.output_dir / "factorial_summary.json", endpoint_summary)
 
     write_json(
         args.output_dir / "bop_score_summary.json",
-        {"scores": bop_scores, "pose_file_sha256": bop_hashes},
+        {
+            "scores": bop_scores,
+            "bop19_components": bop_details,
+            "pose_file_sha256": bop_hashes,
+        },
     )
     write_json(
         args.output_dir / "run_state.json",

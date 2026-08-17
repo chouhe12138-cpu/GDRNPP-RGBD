@@ -1,19 +1,44 @@
 # GDRNPP 服务器运行环境与实验进度交接
 
-最后更新：2026-08-16
+最后更新：2026-08-18
 
-## 2026-08-16 更新
+## 2026-08-18 更新
+
+- EXP012 已在本地注册为 `AUTHORIZED`，本地 CPU/CUDA full-model preflight 与 strict
+  checkpoint roundtrip PASS；这不是服务器运行证据。
+- `docker/l40/managed_experiment.sh` 已准备 EXP012 的 lab1 gate/formal 路由和
+  `PNP_REPLACEMENT` checkpoint isolation。用户已授权 gate PASS 后跳过
+  smoke/audit48 直接 formal。代码尚未提交或 push，服务器
+  尚未更新 release，也没有 EXP012 access、container、run ID、checkpoint 或指标。
+- 启动前仍必须由用户在服务器重新执行本文只读 GPU/container/process 检查，
+  并使用干净、已推送的 detached source release；不得从本地 preflight 推测 lab1
+  当前可用。
+
+## 2026-08-17 更新
 
 - EXP005/B formal run `RUN-20260811-063606-formal-s42-a01` 已自然完成固定
   Epoch 40：BOP AR `0.6919123414`、ADD(-S) `0.5065743945`。
-- 外部 Windows checkpoint 副本仍在下载；完成后再与服务器原文件核对哈希，
-  下载中的临时文件不解释为权重损坏。
-- EXP010 已授权在 lab0 使用新的确定 Git release 启动。它与 lab1 的 EXP009
-  可以并行；最终比较等待两者固定 Epoch 40。
-- 启动 EXP010 前只替换项目自己的 `lab0_chx` 容器；EXP005 output、旧 release、
-  数据、权重、稳定 environment image 和其他用户资源全部保留。
+- EXP005 外部 checkpoint 已完整下载并通过本地读取，SHA-256 为
+  `39c0128526f68cf9c4f7a1780ff095e71be8cdada186136eb8699d99d68d009e`；
+  当前没有服务器端原文件 SHA，不记录两端哈希一致。
+- EXP009 formal run `RUN-20260811-063626-formal-s42-a01` 已形成固定 Epoch 40
+  checkpoint 和 BOP 评估。外部 checkpoint SHA-256 为
+  `d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d`，
+  本地读取为 Epoch 40 / iteration `255919`。
+- EXP009 完整 console SHA-256 为
+  `258be3940b53012abb5099ee4582a75923df306e2bba994917d82502e26547e0`，记录
+  Epoch 40 / iteration `255919/255920`、checkpoint 保存与最终评估复用。
+- 固定 E40 BOP AR `0.5983921569`、ADD(-S) target-micro `0.3806228374`、
+  由逐物体值派生的 macro-object `0.3768665461`、非负物体 `2/8`，三项 gate
+  均失败，结论 `CPM_SCREEN_FAIL`。本地 EXP011 固定 E40 机制诊断已完成，结论
+  `MISMATCH_IMPORTANT`。早期 Epoch 38 中断和 CUDA 错误继续保留为恢复历史。
+- EXP010 已授权；lab0 access 使用 source commit
+  `29580f65abfeb7625bab252011c19399325b0fa2` 和稳定 environment image 检查
+  PASS。尚无 create、gate、smoke、audit 或 formal run 回传证据。
+- 本节不是实时容器快照。当前容器、GPU 和进程状态均须重新执行本文只读命令，
+  不能从上述历史回传推测。
 
-## 2026-08-11 当前状态
+## 2026-08-11 历史快照
 
 - C2 已自然完成 Epoch 40，固定 Epoch 40 BOP AR 为 `0.6930057670`；筛选结论
   为 `C2_SCREEN_FAIL`。Epoch 40 checkpoint、完整日志和 BOP JSON 已在本地与
@@ -132,8 +157,8 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 账户 | 分配的物理GPU | 容器内可见设备 | 当前实验角色 |
 |---|---:|---:|---|
-| `lab0` | GPU 0 | 通常为CUDA device 0 | B：Patch-PnP-only |
-| `lab1` | GPU 1 | 通常为CUDA device 0 | EXP009：CPM-Head |
+| `lab0` | GPU 0 | 通常为CUDA device 0 | EXP010 已授权；运行状态未实时核验 |
+| `lab1` | GPU 1 | 通常为CUDA device 0 | EXP009 固定 Epoch 40 已完成；实时状态未核验 |
 
 服务器GPU为NVIDIA L40，每张约46,068 MiB。
 
@@ -151,8 +176,9 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 用途 | 账户/GPU | 容器 | 镜像 | 状态 |
 |---|---|---|---|---|
-| EXP005/B | lab0/GPU0 | `lab0_chx` | 稳定 environment image | `652d7fd...` formal Epoch 40 完成；待替换为 EXP010 容器 |
-| EXP009/CPM | lab1/GPU1 | `lab1_chx` | 稳定 environment image | `652d7fd...` gate/smoke/audit PASS；formal 运行中 |
+| EXP005/B | lab0/GPU0 | 未实时核验 | 稳定 environment image | `652d7fd...` formal Epoch 40 已完成 |
+| EXP009/CPM | lab1/GPU1 | 未实时核验 | 稳定 environment image | fixed Epoch 40 complete；CPM_SCREEN_FAIL |
+| EXP010/CPM-LR | lab0/GPU0 | 未实时核验 | 稳定 environment image | `29580f65...` access PASS；无正式 run 证据 |
 
 B/C2镜像最后观察到的ID：
 
@@ -286,8 +312,8 @@ C1容器、日志、输出和权重是不可变实验依据，不用于覆盖式
 ```
 
 - 该次过早formal不计入实验结果。
-- 用户已确认有效正式 B 训练正在 `lab0_chx` 中运行；正式 `run_id` 尚待从
-  `latest_formal_run.path` 核验。正式结果固定使用 Epoch 40。
+- B formal 已完成，正式 run 为 `RUN-20260811-063606-formal-s42-a01`，正式结果
+  固定使用 Epoch 40。
 
 ### EXP009：CPM-Head
 
@@ -295,8 +321,10 @@ C1容器、日志、输出和权重是不可变实验依据，不用于覆盖式
   科学失败。
 - 有效 smoke `RUN-20260811-061226-smoke-s42-a01` 与 audit
   `RUN-20260811-062736-audit-s42-a01` 已完成，smoke checkpoint 已生成。
-- 用户已确认 formal 正在 `lab1_chx` 中运行；正式 `run_id` 尚待从
-  `latest_formal_run.path` 核验。不得使用 LM-O 中间 checkpoint 选模。
+- formal run `RUN-20260811-063626-formal-s42-a01` 已形成固定 Epoch 40
+  checkpoint 与最终评估；BOP AR `0.5983921569`、ADD(-S) `0.3806228374`、
+  非负物体 `2/8`，结论 `CPM_SCREEN_FAIL`。不得使用 LM-O 中间 checkpoint
+  选模；本地 EXP011 固定 E40 机制诊断已完成并判定 `MISMATCH_IMPORTANT`。
 
 ### C2：Patch-PnP + 质量/覆盖联合训练
 
@@ -332,8 +360,8 @@ docker/l40/managed_experiment.sh lab0 EXP005 status
 docker/l40/managed_experiment.sh lab1 EXP009 status
 ```
 
-当前 formal 已启动，只允许只读查看状态和日志；不要重新执行 `launch`，不要在
-release 目录 pull 或修改，不要替换容器或镜像。精确日志指针如下：
+EXP005/EXP009 formal 均已有固定 Epoch 40 结果；只允许只读查看状态和日志，
+不要重新执行 `launch`，不要在 release 目录 pull 或修改。精确日志指针如下：
 
 ```text
 /data/labs/lab0/docker_data/chx/logs/managed/EXP-20260731-005-pnp-only-control/latest_formal_run.path

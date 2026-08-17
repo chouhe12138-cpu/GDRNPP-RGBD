@@ -1,7 +1,7 @@
 # Stage 3C 实验信息看板
 
 最后更新：2026-08-16
-结果截止：C1/C2/B Epoch 40；EXP009 待收尾，EXP010 已授权
+结果截止：C1/C2/B/EXP009 Epoch 40；EXP010 已授权
 
 本文件是用于快速查看的简洁状态页。正式协议和证据链接见
 [实验记录与协议](#实验记录与协议)。
@@ -9,10 +9,9 @@
 ## 当前状态
 
 ```text
-当前实验：EXP005/B 已完成；EXP009/CPM 待固定Epoch 40；EXP010 已授权
-当前判断：C1_SCREEN_FAIL；C2_SCREEN_FAIL；B matched control 已完成
+当前实验：EXP005/B与EXP009/CPM固定Epoch 40已完成；EXP010已授权且仅有access PASS
+当前判断：C1_SCREEN_FAIL；C2_SCREEN_FAIL；CPM_SCREEN_FAIL；B matched control 已完成
 C2结果：BOP最佳Epoch 35为69.3520%，固定Epoch 40为69.3006%，均未过门槛
-后续安排：lab0 启动EXP010；最终比较等待EXP009/EXP010固定Epoch 40
 种子边界：历史C1/C2保留原seed；新managed B/CPM固定seed=42
 ```
 
@@ -54,6 +53,7 @@ C2结果：BOP最佳Epoch 35为69.3520%，固定Epoch 40为69.3006%，均未过�
 | B：姿态头适应实验，固定Epoch 40 | 69.1912 | +0.1497 | 50.66 | -0.20 | 4/8 | matched control完成 |
 | C2：联合适应，BOP最佳Epoch 35 | 69.3520 | +0.3105 | 未取得macro | — | 未取得 | 未过BOP门槛 |
 | C2：联合适应，固定Epoch 40 | 69.3006 | +0.2591 | 历史证据缺失 | — | 未取得 | `C2_SCREEN_FAIL` |
+| EXP009/CPM，固定Epoch 40 | 59.8392 | -9.2023 | 38.06 | -12.80 | 2/8 | `CPM_SCREEN_FAIL` |
 
 冻结的通过门槛为：
 
@@ -75,14 +75,17 @@ mandatory matched-training-protocol 对照。
 
 ```text
 EXP005/B:   lab0_chx / physical GPU 0 / formal complete
-EXP009/CPM: lab1_chx / physical GPU 1 / formal running
+EXP009/CPM: lab1 / physical GPU 1 / fixed E40 complete; CPM_SCREEN_FAIL
 source:     652d7fd9d38f8ea5cea0c5a98cc9477b66623180
 seed:       42
 selection:  fixed Epoch 40 only
 ```
 
 两者 gate、smoke 和 audit 已通过。EXP005 固定 E40 已形成 matched-control
-结果；EXP009/EXP010 的方法比较仍等待各自固定 Epoch 40。
+结果；EXP009 固定 E40 BOP AR 为 `0.5983921569`，ADD(-S) target-micro 为
+`0.3806228374`，由记录的逐物体值派生的 macro-object 为 `0.3768665461`，逐物体
+非负 `2/8`。三项预注册 gate 均失败，结论为 `CPM_SCREEN_FAIL`。固定 E40 的
+EXP011 机制诊断已完成，结论 `MISMATCH_IMPORTANT`。
 
 <details>
 <summary>C1 Epoch 20逐物体ADD(-S)@0.1d</summary>

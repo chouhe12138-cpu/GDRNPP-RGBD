@@ -49,7 +49,17 @@
         "12": 0.215
       }
     },
-    "external_checkpoint_transfer": "IN_PROGRESS_VERIFY_AFTER_COMPLETION",
+    "external_checkpoint_transfer": {
+      "status": "COMPLETE_LOCAL_READABLE_SERVER_HASH_NOT_AVAILABLE",
+      "locator": "E:\\6D姿态估计\\EXP-005\\model_epoch_040.pth",
+      "size_bytes": 519078612,
+      "sha256": "39c0128526f68cf9c4f7a1780ff095e71be8cdada186136eb8699d99d68d009e",
+      "epoch": 40,
+      "iteration": 255919,
+      "model_tensors": 392,
+      "optimizer_present": true,
+      "scheduler_present": true
+    },
     "historical_seed_note": "Existing legacy/local/failed runs retain their recorded seeds; new managed runs use seed 42."
   }
 }

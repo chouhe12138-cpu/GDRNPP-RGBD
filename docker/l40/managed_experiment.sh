@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010 access|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
+    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012 access|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
     exit 2
 }
 
@@ -42,6 +42,11 @@ case "${experiment}" in
         experiment_id="EXP-20260816-010-cpm-official-lr-control"
         config_root="configs/gdrn/lmo_pbr/research/exp010_cpm_official_lr_control"
         isolation_role="CPM"
+        ;;
+    EXP012)
+        experiment_id="EXP-20260817-012-hierarchical-correspondence-head"
+        config_root="configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head"
+        isolation_role="PNP_REPLACEMENT"
         ;;
     *) usage ;;
 esac
@@ -263,6 +268,9 @@ gate() {
     if [[ "${experiment}" == "EXP005" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.pnp_control.preflight --config ${config_root}/train.py --weights ${official_container} --expected-seed 42"
+    elif [[ "${experiment}" == "EXP012" ]]; then
+        "${docker_bin}" exec "${container}" bash -lc \
+            "cd /workspace/gdrnpp && python -m research.next_pose_head.preflight --config ${config_root}/train.py --weights ${official_container} --device cuda --skip-round-trip"
     else
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.cpm_head.preflight --config ${config_root}/train.py --weights ${official_container} --device cuda --skip-round-trip"
@@ -393,8 +401,10 @@ supervise_formal() {
 }
 
 start_supervisor() {
-    require_complete smoke
-    require_complete audit
+    if [[ "${experiment}" != "EXP012" ]]; then
+        require_complete smoke
+        require_complete audit
+    fi
     mkdir -p "${log_root}"
     supervisor_pid_file="${log_root}/formal_supervisor.pid"
     if [[ -f "${supervisor_pid_file}" ]]; then

@@ -47,3 +47,31 @@ def test_managed_launcher_registers_exp010_and_enforces_metadata_authorization()
     )
     assert metadata["status"] == "AUTHORIZED"
     assert metadata["decision"].startswith("AUTHORIZED_AFTER_EXP005")
+
+
+def test_managed_launcher_registers_exp012_with_its_own_preflight():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "EXP005|EXP009|EXP010|EXP012" in source
+    assert 'EXP012)' in source
+    assert (
+        'experiment_id="EXP-20260817-012-hierarchical-correspondence-head"'
+        in source
+    )
+    assert 'isolation_role="PNP_REPLACEMENT"' in source
+    assert "python -m research.next_pose_head.preflight" in source
+    metadata = json.loads(
+        (
+            PROJECT_ROOT
+            / "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/"
+            "EXPERIMENT.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert metadata["status"] == "AUTHORIZED"
+    assert metadata["protocol"]["run_order"] == ["gate", "formal"]
+    assert metadata["evidence"]["server_access_create_gate_formal"] == "NOT_RUN"
+
+
+def test_exp012_formal_skips_smoke_and_audit_without_changing_other_experiments():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert 'if [[ "${experiment}" != "EXP012" ]]; then' in source
+    assert "require_complete smoke\n        require_complete audit" in source

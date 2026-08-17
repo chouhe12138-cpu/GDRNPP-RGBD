@@ -1,6 +1,6 @@
 # EXP-20260809-009 — CPM-Head
 
-状态：`FORMAL RUNNING — MANAGED GATE, SMOKE AND AUDIT PASS`
+状态：`FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL`
 
 ## 研究问题
 
@@ -90,9 +90,69 @@ smoke 完成 1 epoch / 2047 iterations，生成并记录
 `checkpoints/model_epoch_001.pth`。audit 使用 batch-48 对应配置；两者只证明
 训练与产物链可执行，不证明 CPM 的核心假设成立。
 
-用户随后确认 EXP009 formal 已在同一冻结 release、镜像和容器中启动。当前交接
-尚无 formal `run_id`、后台 PID 或当前 epoch，因此实验 metadata 只记录
-`RUNNING`，精确身份必须在后续从只读服务器状态补齐。
+EXP009 formal 在同一冻结 release、镜像和容器中启动，正式 run 为：
+
+```text
+RUN-20260811-063626-formal-s42-a01
+```
+
+## 中断记录与固定 Epoch 40 最终证据
+
+早期训练日志记录到 Epoch 38 / iteration `243123/255920`，恢复日志最终记录
+`CUDA error: unspecified launch failure`。这些中断和恢复失败证据继续保留，不能
+从历史 `console.log` 中删除。
+
+2026-08-17 对外部 EXP009 目录重新核验后，确认同一 formal run 已形成固定
+Epoch 40 checkpoint 和完整 BOP 评估。checkpoint 信息为：
+
+```text
+path:      E:\\6D姿态估计\\EXP-009\\model_epoch_040.pth
+size:      387752090 bytes
+sha256:    d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d
+epoch:     40
+iteration: 255919
+```
+
+本地 `torch.load` 读取成功，包含 optimizer、scheduler 和 384 个模型张量。
+当前没有服务器端原 checkpoint SHA-256，因此只记录外部副本完整可读，不记录
+两端哈希一致。
+
+固定 Epoch 40 BOP 结果为：
+
+| 指标 | 结果 |
+|---|---:|
+| BOP AR | 0.5983921569 |
+| BOP AR ad | 0.1750865052 |
+| BOP AR mspd | 0.8433217993 |
+| BOP AR mssd | 0.5456055363 |
+| BOP AR reS | 0.4412918108 |
+| BOP AR teS | 0.6920415225 |
+| BOP AR vsd | 0.4062491349 |
+
+`scores_bop19_40epoch.json` SHA-256 为
+`2e9c8fa5e13118451d9dd8cdfc68e5f7cad351aa5b82185eb92cf700cb938448`；
+`40epoch.log` SHA-256 为
+`6bd26586475138a92180ca9057f02c261fbcf643ecd9ca71a03f7815ec330e8f`。
+该日志是 E40 BOP evaluator 日志且未记录错误。重新下载的完整 `console.log`
+SHA-256 为
+`258be3940b53012abb5099ee4582a75923df306e2bba994917d82502e26547e0`；它记录训练
+到 Epoch 40 / iteration `255919/255920`（100%）、保存
+`model_epoch_040.pth`，以及 `FINAL_EVAL_REUSED periodic_epoch=40`。早期中断
+和 CUDA 错误仍保留在同一日志中，后续恢复完成证据也已补齐。
+
+固定 E40 BOP AR 相对官方基线 `0.6904152249` 降低 `9.2023 pp`，相对 mandatory
+B control `0.6919123414` 降低 `9.3520 pp`。
+
+完整 console 同时记录固定 E40 ADD(-S)@0.1d `0.3806228374`。代码核对确认
+`EVAL_SUMMARY` 读取 BOP ADD score 的 `recall` 字段，因此该值是 target-micro，
+早期记录曾误标为 macro-object。逐物体结果为：obj 1 `0.182857`、5 `0.603015`、6
+`0.274854`、8 `0.670000`、9 `0.150000`、10 `0.277778`、11 `0.521429`、
+12 `0.335000`；其等权 macro-object 为 `0.3768665461`。相对冻结 official
+baseline 非负物体为 `2/8`。该聚合语义修正不改变 BOP、ADD(-S) 和逐物体三项
+gate 均失败的结论。
+
+Epoch 35 BOP AR `0.5994232987`、ADD(-S) target-micro `0.3861591696` 继续作为
+中间结果保留。
 
 ## Epoch 30 高覆盖预览诊断（非正式结论）
 
@@ -127,20 +187,22 @@ QC FAILED；样本数量完整、没有意外非有限值且诊断未改变 chec
 转化为更好 pose，反而随 alpha 增大持续变差。它不直接证明学习率、moment
 尺度、Region/XYZ 不一致或低阶矩表达不足中的哪一个是根因。
 
-EXP009 使用 `8e-5`，而 CPM 头是新随机初始化的 822,281 参数模块；因此“学习率
-过低导致优化不足”是合理但未证明的工程假设。EXP010 作为严格匹配控制，只把
-学习率改为 `8e-4`，用于隔离这个解释。若 EXP010 仍不能改善固定 Epoch 40 的
-性能和机制响应，应停止用学习率解释 EXP009，再检查 joint-moment 表达与
-Region-conditioned aggregation 本身。
-
-早期某次 Epoch 35 传输尚未完成时不能读取；后续完整文件为 `387752090` bytes，
-SHA-256 `44129bc8ebd32bb99627fcd4170138a2afd3b32bdf17c39d0236724a81d4b196`，
-并已用于预览诊断。它仍不替代固定 Epoch 40 正式结果。
+上述干预结果不能区分学习率、moment 数值尺度、Region/XYZ 关系或低阶矩表达
+中的哪一个因素造成了当前响应；记录中不据此指定根因。
 
 ## 结果与结论
 
-`PENDING FORMAL EPOCH 40`。不得从 smoke/audit loss、LM-O 中间 checkpoint 或
-当前 GPU 占用推导方法有效性。正式 Epoch 40 完成后，必须同时核验 BOP、
-ADD(-S)、per-object 与预注册信息流诊断；CPM 失败时的结论边界仍仅限于“当前
-Region-conditioned low-order joint moments 不足”，不能推出 2D–3D
-correspondence 不重要。
+`CPM_SCREEN_FAIL`。当前 CPM 实现固定 Epoch 40 的三项预注册 gate 均未通过，
+但该结论只约束当前 Region-conditioned low-order joint-moment 实现及其训练
+协议；不能
+推出 2D–3D correspondence 本身不重要，也不能仅凭现有结果指定学习率、moment
+尺度或低阶矩表达能力中的哪一个是根因。
+
+固定 E40 的 EXP011 机制诊断已完成，预注册 decision 为
+`MISMATCH_IMPORTANT`：在 Pred Region 下，GT-XYZ 对 BOP/macro ADD 的 effect 为
+`-0.28948/-0.27965`；在 GT Region 下减弱为 `-0.13811/-0.10250`，interaction
+为 `+0.15136/+0.17715`，rescue ratio 为 `0.5229/0.6335`，8/8 objects 的 ADD
+interaction 为正。该结果支持 XYZ–Region 不一致是既有 GT-XYZ oracle 恶化的
+重要污染因素，但 GT Region 在 Pred XYZ 下本身降低绝对性能，且 hard GT Region
+与 soft Pred Region 的熵差异仍是混杂。因此不能把它写成可直接部署的性能改进，
+也不能声称它是 CPM 欠佳的唯一根因。完整证据见 EXP011 RECORD。
