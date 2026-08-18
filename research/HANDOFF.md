@@ -35,7 +35,7 @@ research/STAGE_03C_EXPERIMENT_OVERVIEW.md
 只有追溯镜像构建、旧容器迁移或 C1 历史环境时，才读取
 `research/SERVER_MIGRATION_HANDOFF.md`。
 
-## 当前研究状态
+## 快照时的研究状态
 
 ```text
 Stage 1:   COMPLETE — FAIL
@@ -61,7 +61,7 @@ C1 和 C2 均已完成并未通过冻结筛选门槛。C2 固定 Epoch 40 BOP AR
 mandatory matched-training-protocol 对照；EXP009/CPM 测试 Region-conditioned
 低阶 2D–3D 联合矩是否足以改善 direct pose regression 的几何消费。
 
-## 当前正式实验
+## 快照时的正式实验
 
 两项正式实验均固定 seed `42`、40 epoch，并只以 Epoch 40 作正式比较：
 
@@ -137,7 +137,7 @@ roundtrip PASS，没有任何服务器 run 或性能结论。原始协议见 EXP
 output，也不得停止其他用户进程。用户在服务器终端执行命令并回传输出；Agent
 不主动 SSH。
 
-## 本地验证基线
+## 快照时的本地验证基线
 
 - 当前正式源码提交：`652d7fd9d38f8ea5cea0c5a98cc9477b66623180`。
 - 本地研究测试基线：`147 passed`。
