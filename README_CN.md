@@ -6,18 +6,14 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 
 ## 从这里开始
 
-1. 查看 [当前研究状态](research/STATUS_CN.md)。
-2. 查看 [历史实验验收总表](research/HISTORICAL_ACCEPTANCE_CN.md)。
+1. 查看 [当前研究状态](research/STATUS_CN.md)，了解已提交并有证据支持的阶段结论。
+2. 查看 [实验索引](research/EXPERIMENT_INDEX.md)，再进入对应实验的 `RECORD.md` 和 `EXPERIMENT.json`。
 3. 需要运行、同步或恢复实验时查看 [实验与服务器运行手册](research/RUNBOOK_CN.md)。
-4. 需要服务器实时事实时查看
+4. 需要服务器动态事实时查看
    [服务器运行状态](research/SERVER_RUNTIME_STATUS_CN.md)，并重新执行其中的只读检查。
-5. 需要理解研究依据时依次查看研究计划、阶段协议和具体实验记录。
-6. 当前 CPM 姿态头工程状态见
-   [EXP009 实验记录](research/experiments/EXP-20260809-009-cpm-head/RECORD.md)。
-7. EXP005/EXP009 的服务器 smoke、audit、formal 统一使用
-   `docker/l40/managed_experiment.sh`；新 run 固定 seed `42`。
-8. 新 release 使用 `docker/l40/prepare_release.sh` 复用稳定 environment image；
-   普通 Python/config 提交不重建镜像。
+5. 需要理解研究依据时查看 [研究计划](research/RESEARCH_PLAN.md)、
+   [决策记录](research/DECISIONS.md) 和 `research/stages/` 中的阶段协议。
+6. 历史重新验收情况见 [历史实验验收总表](research/HISTORICAL_ACCEPTANCE_CN.md)。
 
 ## 目录地图
 
@@ -27,8 +23,9 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 | `configs/` | 模型、训练与评估配置 |
 | `research/stages/` | 阶段问题、冻结协议和 gate |
 | `research/experiments/` | 具体实验记录和紧凑 metadata |
+| `research/EXPERIMENT_INDEX.md` | 全部实验的统一索引 |
 | `research/experiment_system/` | 新实验身份、资产、指标与产物基础设施 |
-| `research/managed_runtime/` | EXP005/EXP009 的受管训练、封存与精简日志执行器 |
+| `research/managed_runtime/` | 受管训练、封存与精简日志执行器 |
 | `docker/l40/` | L40 可复现环境与服务器控制脚本 |
 | `output/` | Git 忽略的本地原始产物，历史目录默认只读 |
 | `.local/` | Git 忽略的机器路径 profile，不得保存凭据 |
@@ -36,6 +33,7 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 ## 状态和证据的关系
 
 - `research/STATUS_CN.md`：当前状态和下一步的中文摘要。
+- `research/EXPERIMENT_INDEX.md`：全部实验的统一索引。
 - `research/HISTORICAL_ACCEPTANCE_CN.md`：EXP000～008 重新验证状态。
 - `research/RESEARCH_PLAN.md`：长期研究路线。
 - `research/DECISIONS.md`：协议变更及原因。
@@ -45,6 +43,9 @@ Patch-PnP 信息利用。当前主线是 RGB-only 的几何、聚合和姿态头
 
 若记录冲突，以原始产物及哈希为先，其次是 run manifest/标准化指标、实验
 RECORD、stage 协议，最后才是状态摘要。
+
+README 不保存“当前实验编号”、Git HEAD/worktree 或服务器实时状态；这些动态事实
+分别由实验索引、Git 本身和服务器状态文档承担。
 
 ## 基本安全规则
 

@@ -1,11 +1,16 @@
 # GDRNPP 研究交接
 
-最后更新：2026-08-18
+快照日期：2026-08-18
 
-本文件只提供新对话需要的当前摘要。稳定工作规则见根目录 `AGENTS.md`，当前
-研究事实见 `research/STATUS_CN.md`，服务器动态事实见
-`research/SERVER_RUNTIME_STATUS_CN.md`。不要用本摘要替代原始实验产物、run
-manifest、实验 `RECORD.md` 或 stage 协议。
+本文件保留 2026-08-18 时点的研究交接快照，用于追溯当时的上下文，不再承担
+“当前状态”的唯一来源。后续实验推进后，不要求同步改写本文件中的每一项实验
+编号、指标或服务器事实。
+
+当前研究事实见 `research/STATUS_CN.md`，完整实验列表见
+`research/EXPERIMENT_INDEX.md`，服务器动态事实见
+`research/SERVER_RUNTIME_STATUS_CN.md`，稳定工作规则见根目录 `AGENTS.md`。
+若本快照与上述入口或具体实验记录冲突，以原始产物及哈希、run manifest、
+标准化指标、实验 `RECORD.md`、stage 协议和当前状态摘要的证据层级处理。
 
 ## 接管顺序
 

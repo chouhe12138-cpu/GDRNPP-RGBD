@@ -3,14 +3,9 @@
 最后核对：2026-08-18。本页只汇总已经由记录、日志、checkpoint 或哈希支持的
 当前事实；服务器实时状态必须重新执行只读检查。
 
-## 代码状态
-
-```text
-branch:      main
-HEAD:        29580f65abfeb7625bab252011c19399325b0fa2
-origin/main: 29580f65abfeb7625bab252011c19399325b0fa2
-worktree:    dirty（EXP011 记录更新与 EXP012 待提交实现；全部保留）
-```
+Git branch、HEAD、远端跟踪和 worktree 属于运行时事实，不在本页固化。需要核对时
+直接执行 `git status --short --branch`、`git rev-parse HEAD` 和
+`git rev-parse --abbrev-ref --symbolic-full-name @{u}`。
 
 EXP011 CPM XYZ–Region 一致性固定权重诊断已完成。失败的早期 QC run 均保留；
 最终 full a02 在 RTX 4060 上完成 1,445 targets × 10 conditions 和 BOP19，QC
