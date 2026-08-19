@@ -1,5 +1,5 @@
 {
-  "experiment_count": 13,
+  "experiment_count": 14,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -122,14 +122,24 @@
       "title": "CPM XYZ–Region 一致性固定权重诊断"
     },
     {
-      "decision": "AUTHORIZED_LOCAL_PREFLIGHT_PASS_NO_SERVER_RUN",
+      "decision": "CLOSED_AFTER_E15_ROTATION_SPECIFIC_GENERALIZATION_COLLAPSE",
       "experiment_id": "EXP-20260817-012-hierarchical-correspondence-head",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/EXPERIMENT.json",
       "role": "hierarchical-correspondence-head",
       "stage": "Stage 4E / correspondence-preserving pose head",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "层级密集 Correspondence Pose Head"
+    },
+    {
+      "decision": "ARCHITECTURE_SCREENING_OPEN_NO_FORMAL_40E",
+      "experiment_id": "EXP-20260819-013-correspondence-guided-architecture",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260819-013-correspondence-guided-architecture/EXPERIMENT.json",
+      "role": "architecture-screening",
+      "stage": "Stage 5 / correspondence-guided architecture redesign",
+      "status": "PLANNED",
+      "title": "Correspondence-Guided 轻量 6D Pose 架构筛选"
     }
   ],
   "schema_version": 1

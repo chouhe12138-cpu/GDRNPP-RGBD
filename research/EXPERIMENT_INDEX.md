@@ -16,4 +16,5 @@
 | EXP-20260809-009-cpm-head | Stage 4 / CPM | CPM | COMPLETE | Correspondence-Aware Moment Pose Head（CPM-Head） |
 | EXP-20260816-010-cpm-official-lr-control | Stage 4 / CPM optimization control | CPM-LR-control | AUTHORIZED | CPM-Head 官方量级学习率受控实验 |
 | EXP-20260817-011-cpm-xyz-region-consistency-diagnostic | Stage 4 / CPM mechanism diagnostic | diagnostic | COMPLETE | CPM XYZ–Region 一致性固定权重诊断 |
-| EXP-20260817-012-hierarchical-correspondence-head | Stage 4E / correspondence-preserving pose head | hierarchical-correspondence-head | AUTHORIZED | 层级密集 Correspondence Pose Head |
+| EXP-20260817-012-hierarchical-correspondence-head | Stage 4E / correspondence-preserving pose head | hierarchical-correspondence-head | COMPLETE | 层级密集 Correspondence Pose Head |
+| EXP-20260819-013-correspondence-guided-architecture | Stage 5 / correspondence-guided architecture redesign | architecture-screening | PLANNED | Correspondence-Guided 轻量 6D Pose 架构筛选 |

@@ -4,9 +4,10 @@
   "title": "层级密集 Correspondence Pose Head",
   "stage": "Stage 4E / correspondence-preserving pose head",
   "role": "hierarchical-correspondence-head",
-  "status": "AUTHORIZED",
+  "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "AUTHORIZED_LOCAL_PREFLIGHT_PASS_NO_SERVER_RUN",
+  "decision": "CLOSED_AFTER_E15_ROTATION_SPECIFIC_GENERALIZATION_COLLAPSE",
+  "source_commit": "2ca752b3f091292172044209f7c8651280d377bd",
   "protocol": {
     "research_question": "在任何全局压缩前保留逐像素 XYZ-ROI2D 配对并学习局部关系、随后进行层级空间聚合，能否改善固定 geometry 输出的姿态信息消费？",
     "parent_evidence": [
@@ -18,9 +19,9 @@
     "test_dataset": "lmo_bop_test",
     "bbox_type": "gt",
     "seed": 42,
-    "total_epochs": 40,
-    "fixed_checkpoint": "epoch_040",
-    "checkpoint_selection": "fixed_epoch_040_only",
+    "planned_total_epochs": 40,
+    "actual_evaluated_epochs": [5, 10, 15],
+    "termination": "stopped_after_epoch_15_diagnostics_due_to_late_generalization_collapse",
     "test_set_model_selection": false,
     "initialization": "official_checkpoint_fresh_start",
     "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
@@ -51,50 +52,87 @@
       "fvcore_supported_flops_per_64x64_sample": 178333952,
       "loss": "official_GDRNPP_pose_losses"
     },
-    "comparison": {
-      "primary_controls": [
-        "EXP-20260729-000-official-gdrnpp-baseline",
-        "EXP-20260731-005-pnp-only-control"
-      ],
-      "checkpoint_selection": "fixed_epoch_040_only"
-    },
     "metrics": [
       "bop19_ar_macro",
-      "add_s_0.1d_macro_object",
+      "add_s_0.1d",
+      "ar_reS",
+      "ar_teS",
       "per_object"
-    ],
-    "gate": {
-      "minimum_bop19_ar_macro_delta": 0.005,
-      "minimum_add_s_0.1d_macro_object_delta": 0.01,
-      "minimum_nonnegative_objects": 5
+    ]
+  },
+  "result": {
+    "epoch_5": {
+      "bop19_ar_macro": 0.642973,
+      "add_s_0.1d": 0.489273,
+      "ar_reS": 0.345790,
+      "ar_teS": 0.783391
     },
-    "run_order": [
-      "gate",
-      "formal"
+    "epoch_10": {
+      "bop19_ar_macro": 0.645972,
+      "add_s_0.1d": 0.473356,
+      "ar_reS": 0.428835,
+      "ar_teS": 0.773472
+    },
+    "epoch_15": {
+      "bop19_ar_macro": 0.544083,
+      "add_s_0.1d": 0.377163,
+      "ar_reS": 0.124798,
+      "ar_teS": 0.798847
+    },
+    "region_ablation": {
+      "epoch_5_normal_bop": 0.642784,
+      "epoch_5_region0_bop": 0.353449,
+      "epoch_10_normal_bop": 0.646028,
+      "epoch_10_region0_bop": 0.316653,
+      "epoch_15_normal_bop": 0.544002,
+      "epoch_15_region0_bop": 0.251550,
+      "qc": "PASS for E15; E5/E10 final three-path summaries PASS"
+    },
+    "checkpoint_interpolation_e10_e15": {
+      "qc": "PASS",
+      "alpha_0_bop": 0.646009,
+      "alpha_1_bop": 0.544127,
+      "bop_monotonic_decreasing": true,
+      "bop_linear_fit_r2": 0.978998,
+      "ar_reS_monotonic_decreasing": true,
+      "ar_reS_linear_fit_r2": 0.988699,
+      "ar_teS_linear_fit_r2": 0.359859
+    },
+    "activation_drift": {
+      "qc": "FAIL",
+      "use_as": "clue_only_not_primary_evidence"
+    }
+  },
+  "evidence_boundary": {
+    "directly_supported": [
+      "EXP012 has useful early performance at E5/E10 but severe degradation by E15 while training loss continues to decrease.",
+      "The E10-to-E15 degradation is predominantly rotation-specific in the recorded BOP components: AR_reS collapses while AR_teS does not.",
+      "EXP012 pose output has strong dependence on Region input under Region x0 interventions.",
+      "Moving predicted XYZ toward GT XYZ does not stably improve the learned EXP012 pose output; synchronizing Region does not rescue the endpoint.",
+      "E10-to-E15 checkpoint interpolation endpoints pass QC and BOP/AR_reS worsen smoothly along the parameter line."
+    ],
+    "not_proven": [
+      "Shared R/t latent representation is the cause of the late collapse.",
+      "Region dependence is the unique cause of the late collapse.",
+      "Dense correspondence is insufficient for pose estimation.",
+      "Explicit PnP must be the final deployment architecture."
+    ],
+    "missing_key_evidence": [
+      "Whether a lightweight correspondence frontend preserves sufficient geometry.",
+      "Whether explicit geometry and correspondence-guided direct regression differ materially in accuracy-latency trade-off under the same frontend.",
+      "Whether rotation-specific and translation-specific representations improve late-stage stability."
     ]
   },
   "evidence": {
     "record": "RECORD.md",
     "formal_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/train.py",
-    "smoke_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/smoke.py",
-    "audit_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/audit48.py",
     "eval_config": "configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/eval.py",
-    "preflight": "research/next_pose_head/preflight.py",
-    "formal_output": "server:/data/labs/lab1/docker_data/chx/outputs/experiments/EXP-20260817-012-hierarchical-correspondence-head",
-    "local_preflight": {
-      "status": "PASS",
-      "devices": [
-        "cpu",
-        "cuda:0 RTX 4060 Laptop GPU"
-      ],
-      "official_shared_tensors": 375,
-      "legacy_pnp_tensors_filtered": 17,
-      "new_pose_head_tensors": 49,
-      "trainable_parameters": 868746,
-      "checkpoint_round_trip": true,
-      "optimizer_step": true,
-      "cuda_full_forward_backward": true
-    },
-    "server_access_create_gate_formal": "NOT_RUN"
+    "formal_source_commit": "2ca752b3f091292172044209f7c8651280d377bd",
+    "handoff_evidence": [
+      "EXP012_E5_E10_E15_EVAL_COMPARISON_FULL.md",
+      "EXP012_DIAGNOSTIC_FACTS_SUMMARY.md",
+      "EXP012_E15_CORE_DIAGNOSTIC_SUMMARY.md",
+      "EXP012_E10_E15_DRIFT_INTERPOLATION_SUMMARY.md"
+    ]
   }
 }
