@@ -34,6 +34,26 @@ git checkout --detach <full-commit>
 docker/l40/prepare_release.sh lab0 <existing-environment-image>
 ```
 
+When GitHub/Gitee is unreachable from the server, copy a complete Git bundle to
+the account-owned `transfer/` directory and clone the release from that bundle.
+The release must still be checked out at the registered 40-character commit in
+detached mode before `prepare_release.sh` is called. Neither release preparation
+nor the managed launcher uses `sudo`.
+
+The managed container names are intentionally fixed as `lab0_chx` and
+`lab1_chx`. If `create` reports that the name already exists, preserve the idle
+legacy container before retrying:
+
+```bash
+docker/l40/managed_experiment.sh lab0 EXP013A preserve
+docker/l40/managed_experiment.sh lab0 EXP013A create
+```
+
+`preserve` never stops or deletes the old container. It refuses to rename while
+a managed formal supervisor or a non-idle container process is active, otherwise
+it renames the container to `lab0_chx_legacy_<UTC timestamp>` (or the equivalent
+lab1 name). Do not bypass a refusal with `sudo`, `docker rm`, or `docker stop`.
+
 `prepare_release.sh` does not build an image. It verifies that Docker,
 requirements/vendor and native inputs remain compatible, then copies only the
 image-built native artifacts into ignored paths in the release checkout. The

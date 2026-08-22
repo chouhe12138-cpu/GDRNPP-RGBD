@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C access|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
+    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
     exit 2
 }
 
@@ -122,6 +122,49 @@ container_running() {
     [[ "$("${docker_bin}" inspect "${container}" --format '{{.State.Running}}')" == "true" ]]
 }
 
+preserve_legacy_container() {
+    local pid_file pid supervisor_args state active_processes timestamp legacy_container container_exists_by_name
+    [[ "$(id -un)" == "${machine}" ]] || {
+        echo "FAIL: ${machine} profile must be run from the ${machine} account" >&2
+        exit 1
+    }
+    if ! container_exists; then
+        echo "LEGACY_CONTAINER=NONE name=${container}"
+        return
+    fi
+    for pid_file in "${root}"/logs/managed/*/formal_supervisor.pid; do
+        [[ -f "${pid_file}" ]] || continue
+        pid="$(cat "${pid_file}")"
+        supervisor_args="$(ps -p "${pid}" -o args= 2>/dev/null || true)"
+        if [[ "${supervisor_args}" == *"managed_experiment.sh"* && \
+              "${supervisor_args}" == *" ${machine} "* && \
+              "${supervisor_args}" == *"_supervise-formal"* ]]; then
+            echo "FAIL: active formal supervisor must finish before preserving ${container}: pid=${pid} args=${supervisor_args}" >&2
+            exit 1
+        fi
+    done
+    state="$("${docker_bin}" inspect "${container}" --format '{{.State.Status}}')"
+    if [[ "${state}" == "running" ]]; then
+        active_processes="$("${docker_bin}" top "${container}" -eo pid,args | tail -n +2 | grep -vE '[[:space:]]sleep infinity$' || true)"
+        if [[ -n "${active_processes}" ]]; then
+            echo "FAIL: active processes must finish before preserving ${container}:" >&2
+            echo "${active_processes}" >&2
+            exit 1
+        fi
+    fi
+    timestamp="$(date -u +%Y%m%d_%H%M%S)"
+    legacy_container="${container}_legacy_${timestamp}"
+    container_exists_by_name="$("${docker_bin}" container inspect "${legacy_container}" --format '{{.Name}}' 2>/dev/null || true)"
+    [[ -z "${container_exists_by_name}" ]] || {
+        echo "FAIL: generated legacy container name already exists: ${legacy_container}" >&2
+        exit 1
+    }
+    "${docker_bin}" inspect "${container}" \
+        --format 'PRESERVING_CONTAINER name={{.Name}} state={{.State.Status}} image={{.Image}} source={{index .Config.Labels "gdrnpp.source.commit"}}'
+    "${docker_bin}" rename "${container}" "${legacy_container}"
+    echo "LEGACY_CONTAINER=PRESERVED old=${container} new=${legacy_container} state=${state}"
+}
+
 start_container() {
     container_exists || {
         echo "FAIL: container ${container} does not exist; run create after preserving any legacy container" >&2
@@ -236,7 +279,7 @@ write_profile() {
 create_container() {
     access_check
     container_exists && {
-        echo "FAIL: container name ${container} already exists; inspect and preserve/rename the legacy container first" >&2
+        echo "FAIL: container name ${container} already exists; run ${self} ${machine} ${experiment} preserve first" >&2
         exit 1
     }
     write_profile
@@ -496,6 +539,7 @@ finalize_run() {
 
 case "${command}" in
     access) access_check ;;
+    preserve) preserve_legacy_container ;;
     create) require_run_authorization; create_container ;;
     gate) require_run_authorization; gate ;;
     smoke) require_run_authorization; launch_once smoke ;;

@@ -16,6 +16,31 @@ docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> finalize
 
 两端必须绑定同一 source commit、官方 checkpoint SHA、environment image ID 和 seed 42。E40 是正式比较点；E5–E35 只观察轨迹，不提前停止。
 
+### 服务器无法连接 GitHub/Gitee 时的 bundle release
+
+本地对已经验证并推送的确定 commit 创建完整 Git bundle，上传到对应账户可写的
+`/data/labs/<lab>/docker_data/chx/transfer/`。服务器从 bundle clone 到新的
+`releases/GDRNPP-RGBD-<short-commit>`，再执行 detached checkout、clean 检查和
+`prepare_release.sh`。bundle 只替代网络传输，不改变 source commit、release
+只读、环境镜像和实验 gate 约束。整个流程使用 `lab0`/`lab1` 普通账户，不使用
+`sudo`，也不向系统目录写文件。
+
+### 固定容器名冲突的保留流程
+
+受管容器固定使用 `lab0_chx`/`lab1_chx`。新 release 执行 `create` 时若提示容器名
+已存在，先执行：
+
+```bash
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP别名> preserve
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP别名> create
+```
+
+`preserve` 会检查所有受管 formal supervisor 和旧容器进程。存在训练任务时直接
+拒绝；旧容器空闲时只把它重命名为 `<lab>_chx_legacy_<UTC时间>`，不停止、不删除，
+随后才允许新容器占用固定名称。不得用 `sudo`、`docker rm` 或 `docker stop` 绕过
+保护。该问题不写入 `AGENTS.md`：后者只保存长期 Agent 路由与安全规则，服务器
+操作故障和恢复步骤统一记录在本运行手册。
+
 C 初始为 `PLANNED`，launcher 会拒绝 mutating/run 命令。仅当 A、B 均通过相对 EXP012 E40 的门槛，且 B 按预注册规则优于 A，才提交把 C 改为 `AUTHORIZED` 的 metadata commit，并在 lab0 对新 commit 建立 release 后执行完整序列。
 
 A/B E40 完成后用 `python -m research.exp013.diagnostics` 运行 1,445 个 LM-O GT-bbox targets、五个 XYZ alpha 和 fixed-pred/synced/region0 三条路径。诊断不更新模型状态，也不替代正式精度 gate。

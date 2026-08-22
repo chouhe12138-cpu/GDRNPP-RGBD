@@ -94,3 +94,16 @@ def test_managed_launcher_registers_exp013_fixed_server_mapping_and_preflight():
     )
     assert c_metadata["status"] == "PLANNED"
     assert c_metadata["decision"] == "BLOCKED_UNTIL_A_AND_B_FORMAL_GATES_PASS"
+
+
+def test_managed_launcher_preserves_idle_legacy_container_without_deleting_it():
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert "access|preserve|create|gate" in source
+    assert "preserve_legacy_container" in source
+    assert 'logs/managed/*/formal_supervisor.pid' in source
+    assert "active formal supervisor must finish" in source
+    assert "active processes must finish" in source
+    assert '"${docker_bin}" rename "${container}" "${legacy_container}"' in source
+    assert '"${docker_bin}" stop' not in source
+    assert '"${docker_bin}" rm' not in source
+    assert "sudo docker" not in source
