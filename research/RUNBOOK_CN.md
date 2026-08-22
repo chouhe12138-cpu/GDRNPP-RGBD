@@ -1,5 +1,25 @@
 # 实验、Git 与服务器运行手册
 
+## EXP013 A/B 并行与 C 条件授权
+
+GitHub 上确定的 40 位 commit 建立 detached、只读 release 后，lab0 对 `EXP013A`、lab1 对 `EXP013B` 分别执行：
+
+```bash
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> access
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> create
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> gate
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> smoke
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> audit48
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> launch
+docker/l40/managed_experiment.sh <lab0|lab1> <EXP013A|EXP013B> finalize
+```
+
+两端必须绑定同一 source commit、官方 checkpoint SHA、environment image ID 和 seed 42。E40 是正式比较点；E5–E35 只观察轨迹，不提前停止。
+
+C 初始为 `PLANNED`，launcher 会拒绝 mutating/run 命令。仅当 A、B 均通过相对 EXP012 E40 的门槛，且 B 按预注册规则优于 A，才提交把 C 改为 `AUTHORIZED` 的 metadata commit，并在 lab0 对新 commit 建立 release 后执行完整序列。
+
+A/B E40 完成后用 `python -m research.exp013.diagnostics` 运行 1,445 个 LM-O GT-bbox targets、五个 XYZ alpha 和 fixed-pred/synced/region0 三条路径。诊断不更新模型状态，也不替代正式精度 gate。
+
 本文记录稳定操作流程。即时 GPU、容器和实验状态以
 `research/SERVER_RUNTIME_STATUS_CN.md` 的重新检查结果为准。
 

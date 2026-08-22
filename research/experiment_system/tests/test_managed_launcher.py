@@ -66,12 +66,31 @@ def test_managed_launcher_registers_exp012_with_its_own_preflight():
             "EXPERIMENT.json"
         ).read_text(encoding="utf-8")
     )
-    assert metadata["status"] == "AUTHORIZED"
-    assert metadata["protocol"]["run_order"] == ["gate", "formal"]
-    assert metadata["evidence"]["server_access_create_gate_formal"] == "NOT_RUN"
+    assert metadata["status"] == "COMPLETE"
+    assert metadata["decision"] == "COMPLETE_EPOCH_040_STABLE_PLATEAU_BELOW_OFFICIAL_BASELINE"
+    assert metadata["protocol"]["actual_evaluated_epochs"][-1] == 40
 
 
 def test_exp012_formal_skips_smoke_and_audit_without_changing_other_experiments():
     source = SCRIPT.read_text(encoding="utf-8")
     assert 'if [[ "${experiment}" != "EXP012" ]]; then' in source
     assert "require_complete smoke\n        require_complete audit" in source
+
+
+def test_managed_launcher_registers_exp013_fixed_server_mapping_and_preflight():
+    source = SCRIPT.read_text(encoding="utf-8")
+    for alias in ("EXP013A", "EXP013B", "EXP013C"):
+        assert f"{alias})" in source
+    assert "EXP013A:lab0|EXP013B:lab1|EXP013C:lab0" in source
+    assert "python -m research.exp013.preflight --variant ${exp013_variant}" in source
+    assert source.count('isolation_role="PNP_REPLACEMENT"') >= 4
+
+    c_metadata = json.loads(
+        (
+            PROJECT_ROOT
+            / "research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/"
+            "EXPERIMENT.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert c_metadata["status"] == "PLANNED"
+    assert c_metadata["decision"] == "BLOCKED_UNTIL_A_AND_B_FORMAL_GATES_PASS"

@@ -1,5 +1,14 @@
 # GDRNPP managed L40 container
 
+## EXP013 managed aliases
+
+`managed_experiment.sh` supports the fixed mapping `EXP013A→lab0`,
+`EXP013B→lab1`, and (only after metadata authorization) `EXP013C→lab0`.
+All three use `PNP_REPLACEMENT` checkpoint isolation and the shared
+`research.exp013.preflight`. A/B/C use the standard
+`gate→smoke→audit48→launch→finalize` sequence; no EXP012 smoke/audit exception
+is inherited. A `PLANNED` C is rejected before any mutating or run command.
+
 This image reproduces the verified GDRNPP stack on an NVIDIA L40:
 
 - Ubuntu 22.04, CUDA 12.1, cuDNN 8;
