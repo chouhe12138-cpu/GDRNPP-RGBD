@@ -1,5 +1,10 @@
 # Future research configs
 
+`exp013/` contains three preregistered pose-head variants. A/B formal configs
+are authorized only after their local gates are recorded; C remains executable
+for local engineering validation while its experiment metadata stays `PLANNED`
+until both A and B pass their fixed E40 gates.
+
 This opt-in hierarchy is for experiments created after the current B/C2 runs.
 Existing Stage 3C configs remain in their original locations and are not
 re-parented.

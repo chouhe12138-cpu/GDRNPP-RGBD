@@ -33,6 +33,9 @@ from core.gdrn_modeling.models import GDRN_double_mask
 from core.gdrn_modeling.models.heads.cpm_pnp_net import (
     CorrespondenceAwareMomentPnPNet,
 )
+from core.gdrn_modeling.models.heads.exp013_geometry_pnp_net import (
+    XYZResidualBypassPnPNet,
+)
 from core.gdrn_modeling.models.model_utils import get_rot_mat
 from core.gdrn_modeling.models.pose_from_pred import pose_from_pred
 from core.gdrn_modeling.models.pose_from_pred_centroid_z import pose_from_pred_centroid_z
@@ -99,21 +102,34 @@ CPM_XYZ_REGION_ALPHA_CONDITIONS = tuple(
     for region_source in ("pred", "gt")
     for alpha in CPM_XYZ_REGION_ALPHA_VALUES
 )
+EXP013_THREE_PATH_CONDITIONS = tuple(
+    f"xyz_alpha_{int(round(alpha * 100)):03d}_{region_source}_region"
+    for region_source in ("pred", "gt", "zero")
+    for alpha in CPM_XYZ_REGION_ALPHA_VALUES
+)
 CPM_CONDITION_SETS = (
     "legacy",
     "cpm_xyz_region_2x2",
     "cpm_xyz_region_alpha_sweep",
+    "exp013_three_path",
+)
+
+EXP013_LAYERS = (
+    "pnp_input",
+    "raw_rotation",
+    "raw_translation",
+    "final_pose",
 )
 
 
 def layers_for_model(model) -> tuple[str, ...]:
     """Return architecture-compatible diagnostic checkpoints."""
 
-    return (
-        CPM_LAYERS
-        if isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet)
-        else LAYERS
-    )
+    if isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet):
+        return CPM_LAYERS
+    if isinstance(model.pnp_net, XYZResidualBypassPnPNet):
+        return EXP013_LAYERS
+    return LAYERS
 
 
 def conditions_for_model(model, condition_set: str = "legacy") -> tuple[str, ...]:
@@ -121,6 +137,10 @@ def conditions_for_model(model, condition_set: str = "legacy") -> tuple[str, ...
 
     if condition_set not in CPM_CONDITION_SETS:
         raise ValueError(f"Unknown diagnostic condition set: {condition_set}")
+    if condition_set == "exp013_three_path":
+        if not isinstance(model.pnp_net, XYZResidualBypassPnPNet):
+            raise ValueError("exp013_three_path requires an EXP013 pose head")
+        return EXP013_THREE_PATH_CONDITIONS
     if condition_set != "legacy":
         if not isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet):
             raise ValueError(f"{condition_set} requires a CPM pose head")
@@ -147,7 +167,7 @@ def cpm_xyz_region_condition(condition: str) -> tuple[float, str]:
         return endpoints[condition]
     for alpha in CPM_XYZ_REGION_ALPHA_VALUES:
         token = int(round(alpha * 100))
-        for region_source in ("pred", "gt"):
+        for region_source in ("pred", "gt", "zero"):
             if condition == f"xyz_alpha_{token:03d}_{region_source}_region":
                 return alpha, region_source
     raise ValueError(f"Unknown CPM XYZ/Region condition: {condition}")
@@ -172,6 +192,8 @@ def apply_cpm_xyz_region_intervention(
     region_out = np.asarray(pred_region).copy()
     if region_source == "gt":
         region_out[mask] = np.asarray(gt_region)[mask]
+    elif region_source == "zero":
+        region_out[...] = 0.0
     return xyz_out, np.asarray(roi_2d).copy(), region_out
 
 
@@ -373,6 +395,32 @@ def run_head_with_hooks(
                     final_rotation.detach().cpu().flatten(1),
                     final_translation.detach().cpu(),
                 ),
+                dim=1,
+            ),
+        }
+        return (
+            activations,
+            final_rotation[0].detach().float().cpu().numpy(),
+            final_translation[0].detach().float().cpu().numpy(),
+        )
+
+    if isinstance(pnp, XYZResidualBypassPnPNet):
+        with autocast(enabled=bool(cfg.TEST.AMP_TEST)):
+            raw_rotation, raw_translation = pnp(
+                coor.clone(),
+                region=region_tensor,
+                extents=extent,
+                mask_attention=mask_tensor,
+            )
+            final_rotation, final_translation = pose_from_raw(
+                model, cfg, raw_rotation, raw_translation, batch, index
+            )
+        activations = {
+            "pnp_input": actual_input.detach().cpu(),
+            "raw_rotation": raw_rotation.detach().cpu(),
+            "raw_translation": raw_translation.detach().cpu(),
+            "final_pose": torch.cat(
+                (final_rotation.detach().cpu().flatten(1), final_translation.detach().cpu()),
                 dim=1,
             ),
         }

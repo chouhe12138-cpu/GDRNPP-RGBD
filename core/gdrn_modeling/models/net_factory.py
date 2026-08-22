@@ -32,6 +32,11 @@ from .heads.conv_mask_xyz_region_head import ConvMaskXyzRegionHead
 from .heads.conv_pnp_net import ConvPnPNet
 from .heads.cpm_pnp_net import CorrespondenceAwareMomentPnPNet
 from .heads.hierarchical_corr_pnp_net import HierarchicalCorrespondencePnPNet
+from .heads.exp013_geometry_pnp_net import (
+    GeometryAttentionResidualPnPNet,
+    RTDecoupledGeometryPnPNet,
+    XYZResidualBypassPnPNet,
+)
 from .heads.conv_pnp_net_no_region import ConvPnPNetNoRegion
 from .heads.conv_pnp_net_cls import ConvPnPNetCls
 from .heads.point_pnp_net import SimplePointPnPNet
@@ -91,6 +96,9 @@ HEADS = {
     "ConvPnPNet": ConvPnPNet,
     "CorrespondenceAwareMomentPnPNet": CorrespondenceAwareMomentPnPNet,
     "HierarchicalCorrespondencePnPNet": HierarchicalCorrespondencePnPNet,
+    "XYZResidualBypassPnPNet": XYZResidualBypassPnPNet,
+    "GeometryAttentionResidualPnPNet": GeometryAttentionResidualPnPNet,
+    "RTDecoupledGeometryPnPNet": RTDecoupledGeometryPnPNet,
     "ConvPnPNetNoRegion": ConvPnPNetNoRegion,
     "ConvPnPNetCls": ConvPnPNetCls,
     "SimplePointPnPNet": SimplePointPnPNet,

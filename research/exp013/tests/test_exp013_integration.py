@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+from mmcv import Config
+
+from research.pose_head_diagnostic.run_information_flow import (
+    EXP013_THREE_PATH_CONDITIONS,
+    apply_cpm_xyz_region_intervention,
+    cpm_xyz_region_condition,
+)
+from research.exp013.summarize import attention_effective, versus_exp012
+
+
+ROOT = Path(__file__).resolve().parents[3]
+CONFIGS = {
+    "A": ROOT / "configs/gdrn/lmo_pbr/research/exp013/a_xyz_residual/train.py",
+    "B": ROOT / "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/train.py",
+    "C": ROOT / "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
+}
+
+
+def test_formal_config_contracts_and_head_types():
+    expected = {
+        "A": "XYZResidualBypassPnPNet",
+        "B": "GeometryAttentionResidualPnPNet",
+        "C": "RTDecoupledGeometryPnPNet",
+    }
+    for variant, path in CONFIGS.items():
+        cfg = Config.fromfile(str(path))
+        pose = cfg.MODEL.POSE_NET
+        assert cfg.SEED == 42
+        assert cfg.SOLVER.TOTAL_EPOCHS == 40
+        assert cfg.SOLVER.IMS_PER_BATCH == 48
+        assert cfg.SOLVER.CHECKPOINT_PERIOD == 5
+        assert cfg.TEST.EVAL_PERIOD == 5
+        assert pose.BACKBONE.FREEZE and pose.GEO_HEAD.FREEZE
+        assert not pose.PNP_NET.FREEZE
+        assert pose.PNP_NET.INIT_CFG.type == expected[variant]
+        assert pose.PNP_NET.COORD_2D_TYPE == "abs"
+        assert pose.PNP_NET.REGION_ATTENTION
+        assert pose.PNP_NET.MASK_ATTENTION == "mul"
+
+
+def test_smoke_configs_are_isolated_one_epoch_real_data_runs():
+    for path in CONFIGS.values():
+        cfg = Config.fromfile(str(path.with_name("smoke.py")))
+        assert tuple(cfg.DATASETS.TRAIN) == ("lmo_pbr_stage3_local_train",)
+        assert tuple(cfg.DATASETS.TEST) == ()
+        assert cfg.SOLVER.TOTAL_EPOCHS == 1
+        assert cfg.SOLVER.IMS_PER_BATCH == 4
+        assert cfg.DATALOADER.NUM_WORKERS == 2
+        assert cfg.TEST.EVAL_PERIOD == 0
+
+
+def test_exp013_three_path_has_five_alphas_and_three_region_sources():
+    factors = {cpm_xyz_region_condition(name) for name in EXP013_THREE_PATH_CONDITIONS}
+    assert factors == {
+        (alpha, source)
+        for alpha in (0.0, 0.25, 0.5, 0.75, 1.0)
+        for source in ("pred", "gt", "zero")
+    }
+
+
+def test_region_zero_intervention_zeros_region_without_changing_roi():
+    xyz = np.zeros((2, 2, 3), dtype=np.float32)
+    gt_xyz = np.ones_like(xyz)
+    roi = np.arange(8, dtype=np.float32).reshape(2, 2, 2)
+    pred_region = np.ones((2, 2, 64), dtype=np.float32) / 64
+    gt_region = np.zeros_like(pred_region)
+    support = np.ones((2, 2), dtype=bool)
+    xyz_out, roi_out, region_out = apply_cpm_xyz_region_intervention(
+        xyz,
+        gt_xyz,
+        roi,
+        pred_region,
+        gt_region,
+        support,
+        "xyz_alpha_050_zero_region",
+    )
+    np.testing.assert_allclose(xyz_out, 0.5)
+    np.testing.assert_array_equal(roi_out, roi)
+    np.testing.assert_array_equal(region_out, np.zeros_like(region_out))
+
+
+def test_preregistered_metric_gates_are_applied_literally():
+    a = {
+        "bop": 0.6839,
+        "add_s": 0.5042,
+        "per_object_delta": {str(index): 0.0 for index in range(8)},
+    }
+    b = {**a, "bop": 0.6849, "add_s": 0.5040}
+    assert versus_exp012(a)["passed"]
+    assert attention_effective(a, b)["effective"]
+    tied = {**a, "bop": a["bop"] + 0.0005, "add_s": a["add_s"] + 0.0001}
+    assert attention_effective(a, tied)["effective"]

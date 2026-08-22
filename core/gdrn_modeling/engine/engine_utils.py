@@ -8,7 +8,6 @@ import numpy as np
 import mmcv
 import itertools
 from einops import rearrange
-from lib.egl_renderer.egl_renderer_v3 import EGLRenderer
 from core.utils.camera_geometry import get_K_crop_resize
 from core.utils.data_utils import xyz_to_region_batch
 from lib.vis_utils.image import grid_show
@@ -359,6 +358,11 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
         )
     if renderer_type != "egl":
         raise ValueError(f"Unknown online XYZ renderer: {renderer_type}")
+
+    # EGL is optional when the explicitly selected C++ BOP renderer is used.
+    # Importing it lazily lets local smoke tests use an existing bop_renderer
+    # build without requiring the unrelated PyOpenGL extension.
+    from lib.egl_renderer.egl_renderer_v3 import EGLRenderer
 
     texture_paths = None
     if data_ref.texture_paths is not None:

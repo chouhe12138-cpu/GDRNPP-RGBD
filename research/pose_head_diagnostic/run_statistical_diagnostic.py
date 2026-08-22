@@ -34,6 +34,9 @@ from core.gdrn_modeling.models import GDRN_double_mask
 from core.gdrn_modeling.models.heads.cpm_pnp_net import (
     CorrespondenceAwareMomentPnPNet,
 )
+from core.gdrn_modeling.models.heads.exp013_geometry_pnp_net import (
+    XYZResidualBypassPnPNet,
+)
 from core.utils.data_utils import xyz_to_region
 from core.utils.my_checkpoint import MyCheckpointer
 from lib.pysixd import inout
@@ -92,7 +95,7 @@ POSE_ROTATION_REENTRY_TOLERANCE_CUDA = 3e-4
 POSE_TRANSLATION_REENTRY_TOLERANCE_CUDA = 5e-5
 EXPERIMENT_ID = "EXP-20260804-007-pose-head-information-flow"
 XYZ_REGION_EXPERIMENT_ID = "EXP-20260817-011-cpm-xyz-region-consistency-diagnostic"
-MODEL_ROLES = ("official", "c1", "pnp_adapted", "joint", "cpm")
+MODEL_ROLES = ("official", "c1", "pnp_adapted", "joint", "cpm", "exp013")
 MODES = ("smoke", "audit80", "full")
 POSE_METRICS = (
     "rotation_delta_deg",
@@ -484,7 +487,9 @@ def main() -> int:
     if args.model_role == "official" and checkpoint_hash != EXPECTED_OFFICIAL_HASH:
         raise RuntimeError(f"Unexpected official checkpoint SHA-256: {checkpoint_hash}")
     xyz_region_diagnostic = args.condition_set != "legacy"
-    if xyz_region_diagnostic:
+    cpm_xyz_region_diagnostic = args.condition_set.startswith("cpm_")
+    exp013_three_path = args.condition_set == "exp013_three_path"
+    if cpm_xyz_region_diagnostic:
         if args.model_role != "cpm":
             raise ValueError("XYZ/Region condition sets require --model-role cpm")
         if checkpoint_hash != EXPECTED_EXP009_E40_HASH:
@@ -492,6 +497,8 @@ def main() -> int:
                 "XYZ/Region diagnostic requires the verified EXP009 Epoch-40 "
                 f"checkpoint SHA-256, got {checkpoint_hash}"
             )
+    if exp013_three_path and args.model_role != "exp013":
+        raise ValueError("exp013_three_path requires --model-role exp013")
     if maybe_resume(args, checkpoint_hash):
         return 0
     if args.output_dir.exists() and any(args.output_dir.iterdir()):
@@ -548,13 +555,18 @@ def main() -> int:
     layers = layers_for_model(model)
     conditions = conditions_for_model(model, args.condition_set)
     is_cpm = isinstance(model.pnp_net, CorrespondenceAwareMomentPnPNet)
+    is_exp013 = isinstance(model.pnp_net, XYZResidualBypassPnPNet)
     if (args.model_role == "cpm") != is_cpm:
         raise RuntimeError(
             "--model-role cpm must agree with the pose-head type built by the config"
         )
+    if (args.model_role == "exp013") != is_exp013:
+        raise RuntimeError(
+            "--model-role exp013 must agree with the pose-head type built by the config"
+        )
     mask_attention_type = str(cfg.MODEL.POSE_NET.PNP_NET.MASK_ATTENTION)
-    if is_cpm and mask_attention_type != "mul":
-        raise RuntimeError("CPM diagnostic requires MASK_ATTENTION='mul'")
+    if (is_cpm or is_exp013) and mask_attention_type != "mul":
+        raise RuntimeError("CPM/EXP013 diagnostic requires MASK_ATTENTION='mul'")
     if not is_cpm and mask_attention_type != "none":
         raise RuntimeError("The frozen ConvPnP protocol requires MASK_ATTENTION='none'")
     baseline_condition = (
@@ -1064,13 +1076,13 @@ def main() -> int:
         <= OFFICIAL_BOP_TOLERANCE
     )
     exp009_add_reproduced = (
-        not xyz_region_diagnostic
+        not cpm_xyz_region_diagnostic
         or args.mode != "full"
         or abs(baseline_add_recall - EXPECTED_EXP009_E40_ADD_TARGET_MICRO)
         <= 1e-12
     )
     exp009_bop_reproduced = (
-        not xyz_region_diagnostic
+        not cpm_xyz_region_diagnostic
         or args.mode != "full"
         or abs(bop_scores[baseline_condition] - EXPECTED_EXP009_E40_BOP_AR)
         <= OFFICIAL_BOP_TOLERANCE
@@ -1112,7 +1124,13 @@ def main() -> int:
 
     protocol = {
         "experiment_id": (
-            XYZ_REGION_EXPERIMENT_ID if xyz_region_diagnostic else EXPERIMENT_ID
+            (
+                str(cfg.EXPERIMENT_ID)
+                if exp013_three_path
+                else XYZ_REGION_EXPERIMENT_ID
+            )
+            if xyz_region_diagnostic
+            else EXPERIMENT_ID
         ),
         "mode": args.mode,
         "model_role": args.model_role,
@@ -1176,7 +1194,7 @@ def main() -> int:
             "xyz": 3,
             "roi_2d": 2,
             "effective_region": 64,
-            "visible_mask": 1 if is_cpm else 0,
+            "visible_mask": 1 if (is_cpm or is_exp013) else 0,
         },
         "layers": shapes,
         "rotation_representation": str(cfg.MODEL.POSE_NET.PNP_NET.ROT_TYPE),

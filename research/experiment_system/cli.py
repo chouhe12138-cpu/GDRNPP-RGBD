@@ -30,7 +30,7 @@ from .metrics import (
     metric_registry_payload,
     verify_indexed_evaluation,
 )
-from .registry import compare_generated_registry, registry_payload
+from .registry import compare_generated_registry, registry_payload, render_registry_markdown
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -51,6 +51,7 @@ def parser() -> argparse.ArgumentParser:
     )
     registry.add_argument("--experiments-root", type=Path, default=DEFAULT_EXPERIMENTS)
     registry.add_argument("--check", action="store_true")
+    registry.add_argument("--write", action="store_true")
     registry.add_argument(
         "--json-index",
         type=Path,
@@ -190,13 +191,23 @@ def parser() -> argparse.ArgumentParser:
 
 
 def command_registry(args: argparse.Namespace) -> int:
+    if args.check and args.write:
+        raise ValueError("registry --check and --write are mutually exclusive")
+    payload = registry_payload(args.experiments_root)
+    if args.write:
+        args.json_index.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        args.markdown_index.write_text(
+            render_registry_markdown(payload["experiments"]), encoding="utf-8"
+        )
     if args.check:
         compare_generated_registry(
             args.experiments_root,
             args.json_index,
             args.markdown_index,
         )
-    payload = registry_payload(args.experiments_root)
     payload["status"] = "PASS"
     print_json(payload)
     return 0

@@ -244,6 +244,9 @@ def get_pnp_net(cfg):
     elif pnp_head_type in [
         "CorrespondenceAwareMomentPnPNet",
         "HierarchicalCorrespondencePnPNet",
+        "XYZResidualBypassPnPNet",
+        "GeometryAttentionResidualPnPNet",
+        "RTDecoupledGeometryPnPNet",
     ]:
         if loss_cfg.XYZ_LOSS_TYPE not in ["MSE", "L1", "L2", "SmoothL1"]:
             raise ValueError(f"{pnp_head_type} requires three-channel regression XYZ")
@@ -257,13 +260,13 @@ def get_pnp_net(cfg):
         else:
             if pnp_net_cfg.MASK_ATTENTION != "mul":
                 raise ValueError(
-                    "Hierarchical correspondence head requires multiplicative "
+                    "Hierarchical/EXP013 correspondence heads require multiplicative "
                     "predicted visible-mask support"
                 )
             uses_region = bool(pnp_net_init_cfg.get("use_region_aux", True))
             if bool(pnp_net_cfg.REGION_ATTENTION) != uses_region:
                 raise ValueError(
-                    "Hierarchical correspondence Region input must match "
+                    "Hierarchical/EXP013 correspondence Region input must match "
                     "INIT_CFG.use_region_aux"
                 )
         pnp_net_init_cfg.update(
