@@ -4,9 +4,9 @@
   "title": "局部几何注意力残差支路",
   "stage": "Stage 4F / local geometry attention",
   "role": "geometry-attention-residual",
-  "status": "PLANNED",
+  "status": "AUTHORIZED",
   "legacy_import": false,
-  "decision": "PENDING_LOCAL_GATE",
+  "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
   "protocol": {
     "research_question": "在 A 的独立几何路径中加入遮挡感知的九邻域几何注意力是否带来额外收益？",
     "parent_experiment": "EXP-20260822-013-a-xyz-residual-bypass",

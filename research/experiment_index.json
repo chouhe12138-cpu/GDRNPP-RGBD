@@ -132,23 +132,23 @@
       "title": "层级密集 Correspondence Pose Head"
     },
     {
-      "decision": "PENDING_LOCAL_GATE",
+      "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
       "experiment_id": "EXP-20260822-013-a-xyz-residual-bypass",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260822-013-a-xyz-residual-bypass/EXPERIMENT.json",
       "role": "xyz-residual-bypass",
       "stage": "Stage 4F / geometry-path ablation",
-      "status": "PLANNED",
+      "status": "AUTHORIZED",
       "title": "XYZ-ROI2D 独立几何残差支路"
     },
     {
-      "decision": "PENDING_LOCAL_GATE",
+      "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
       "experiment_id": "EXP-20260822-013-b-geometry-attention-residual",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260822-013-b-geometry-attention-residual/EXPERIMENT.json",
       "role": "geometry-attention-residual",
       "stage": "Stage 4F / local geometry attention",
-      "status": "PLANNED",
+      "status": "AUTHORIZED",
       "title": "局部几何注意力残差支路"
     },
     {

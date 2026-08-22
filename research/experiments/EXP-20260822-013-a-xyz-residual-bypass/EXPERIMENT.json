@@ -4,9 +4,9 @@
   "title": "XYZ-ROI2D 独立几何残差支路",
   "stage": "Stage 4F / geometry-path ablation",
   "role": "xyz-residual-bypass",
-  "status": "PLANNED",
+  "status": "AUTHORIZED",
   "legacy_import": false,
-  "decision": "PENDING_LOCAL_GATE",
+  "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
   "protocol": {
     "research_question": "不经过 Region 的 XYZ-ROI2D 独立路径能否改善冻结 geometry 输出的姿态信息利用？",
     "parent_experiment": "EXP-20260817-012-hierarchical-correspondence-head",

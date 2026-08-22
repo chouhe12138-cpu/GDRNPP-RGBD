@@ -98,6 +98,27 @@
         {"mode": "local_preflight", "status": "COMPLETE", "storage": "local", "locator": "research/next_pose_head/preflight.py", "official_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c", "evidence": "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md"},
         {"mode": "managed_formal", "status": "AUTHORIZED_NOT_RUN", "storage": "lab1", "locator": "output/experiments/EXP-20260817-012-hierarchical-correspondence-head/<run>", "evidence": "research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md"}
       ]
+    },
+    {
+      "experiment_id": "EXP-20260822-013-a-xyz-residual-bypass",
+      "artifacts": [
+        {"mode": "local_gate", "status": "COMPLETE", "storage": "git", "locator": "research/experiments/EXP-20260822-013-a-xyz-residual-bypass/LOCAL_GATE.json", "evidence": "research/experiments/EXP-20260822-013-a-xyz-residual-bypass/RECORD.md"},
+        {"mode": "managed_formal", "status": "AUTHORIZED_NOT_RUN", "storage": "lab0", "locator": "output/experiments/EXP-20260822-013-a-xyz-residual-bypass/<run>", "evidence": "research/experiments/EXP-20260822-013-a-xyz-residual-bypass/RECORD.md"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260822-013-b-geometry-attention-residual",
+      "artifacts": [
+        {"mode": "local_gate", "status": "COMPLETE", "storage": "git", "locator": "research/experiments/EXP-20260822-013-b-geometry-attention-residual/LOCAL_GATE.json", "evidence": "research/experiments/EXP-20260822-013-b-geometry-attention-residual/RECORD.md"},
+        {"mode": "managed_formal", "status": "AUTHORIZED_NOT_RUN", "storage": "lab1", "locator": "output/experiments/EXP-20260822-013-b-geometry-attention-residual/<run>", "evidence": "research/experiments/EXP-20260822-013-b-geometry-attention-residual/RECORD.md"}
+      ]
+    },
+    {
+      "experiment_id": "EXP-20260822-013-c-rt-decoupled-fusion",
+      "artifacts": [
+        {"mode": "local_engineering_gate", "status": "COMPLETE_SERVER_BLOCKED", "storage": "git", "locator": "research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/LOCAL_GATE.json", "evidence": "research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/RECORD.md"},
+        {"mode": "managed_formal", "status": "PLANNED_NOT_AUTHORIZED", "storage": "lab0", "locator": "output/experiments/EXP-20260822-013-c-rt-decoupled-fusion/<run>", "evidence": "research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/RECORD.md"}
+      ]
     }
   ]
 }
