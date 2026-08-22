@@ -1,5 +1,5 @@
 {
-  "experiment_count": 14,
+  "experiment_count": 13,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -130,16 +130,6 @@
       "stage": "Stage 4E / correspondence-preserving pose head",
       "status": "COMPLETE",
       "title": "层级密集 Correspondence Pose Head"
-    },
-    {
-      "decision": "ARCHITECTURE_SCREENING_OPEN_NO_FORMAL_40E",
-      "experiment_id": "EXP-20260819-013-correspondence-guided-architecture",
-      "legacy_import": false,
-      "metadata_path": "research/experiments/EXP-20260819-013-correspondence-guided-architecture/EXPERIMENT.json",
-      "role": "architecture-screening",
-      "stage": "Stage 5 / correspondence-guided architecture redesign",
-      "status": "PLANNED",
-      "title": "Correspondence-Guided 轻量 6D Pose 架构筛选"
     }
   ],
   "schema_version": 1

@@ -6,7 +6,7 @@ Git branch、HEAD、远端跟踪和 worktree 属于运行时事实，不在本�
 
 EXP011 CPM XYZ–Region 一致性固定权重诊断已完成。失败的早期 QC run 均保留；最终 full a02 在 RTX 4060 上完成 1,445 targets × 10 conditions 和 BOP19，QC PASS，预注册结论为 `MISMATCH_IMPORTANT`。
 
-EXP012 已完成 E5/E10/E15 正式评估和后续无重训练诊断。E15 出现严重且主要集中于 rotation 的后期泛化退化，因此 EXP012 结构路线关闭，不继续按原计划跑到 E40。EXP013 当前仅登记为 architecture screening 阶段，尚无固定实现、source commit、checkpoint 或性能结果。
+EXP012 已完成 E5/E10/E15 正式评估和后续无重训练诊断。E15 出现严重且主要集中于 rotation 的后期泛化退化，因此 EXP012 结构路线关闭，不继续按原计划跑到 E40。
 
 ## 阶段状态
 
@@ -22,7 +22,6 @@ Stage 4:   EXP009 FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
 Stage 4C:  EXP010 AUTHORIZED — ACCESS PASS，NO FORMAL RUN RECORDED
 Stage 4D:  EXP011 COMPLETE — MISMATCH_IMPORTANT
 Stage 4E:  EXP012 COMPLETE — CLOSED AFTER E15 ROTATION-SPECIFIC GENERALIZATION COLLAPSE
-Stage 5:   EXP013 PLANNED — ARCHITECTURE SCREENING ONLY，NO FIXED IMPLEMENTATION / NO FORMAL 40E
 ```
 
 ## 当前实验事实
@@ -113,13 +112,6 @@ EXP012 的结论边界：
 
 因此 EXP012 关闭的含义是停止继续修补该 hierarchical learned pose head，不是否定 correspondence-guided pose estimation。
 
-### EXP013/Correspondence-Guided 轻量 6D Pose 架构筛选
-
-- 当前只登记为 `PLANNED / ARCHITECTURE_SCREENING_OPEN / NO_FORMAL_40E`。
-- 当前没有固定 EXP013 implementation、source commit、训练 checkpoint 或性能结果。
-- EXP013 的具体第一版结构尚未冻结；在实现与 screening protocol 固定前，不把任何候选结构写成实验结论。
-- 40-epoch 全量 PBR 当前未授权。
-
 ## 其他已完成事实
 
 - C1 固定 Epoch 40：BOP AR `0.6897416378`、ADD(-S) macro-object `0.5057`，
@@ -141,7 +133,6 @@ EXP012 的结论边界：
 - EXP010：`research/experiments/EXP-20260816-010-cpm-official-lr-control/RECORD.md`
 - EXP011：`research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md`
 - EXP012：`research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md`
-- EXP013：`research/experiments/EXP-20260819-013-correspondence-guided-architecture/RECORD.md`
 - 姿态头诊断快照：`research/POSE_HEAD_DIAGNOSTIC_HANDOFF_CN.md`
 - 服务器快照：`research/SERVER_RUNTIME_STATUS_CN.md`
 - 运行手册：`research/RUNBOOK_CN.md`
