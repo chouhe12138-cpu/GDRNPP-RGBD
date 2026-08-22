@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260822-013-b-geometry-attention-residual",
+  "status": "PENDING",
+  "source_commit": null,
+  "official_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+  "checks": {}
+}

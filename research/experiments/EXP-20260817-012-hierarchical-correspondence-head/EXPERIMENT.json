@@ -6,7 +6,7 @@
   "role": "hierarchical-correspondence-head",
   "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "CLOSED_AFTER_E15_ROTATION_SPECIFIC_GENERALIZATION_COLLAPSE",
+  "decision": "COMPLETE_EPOCH_040_STABLE_PLATEAU_BELOW_OFFICIAL_BASELINE",
   "source_commit": "2ca752b3f091292172044209f7c8651280d377bd",
   "protocol": {
     "research_question": "在任何全局压缩前保留逐像素 XYZ-ROI2D 配对并学习局部关系、随后进行层级空间聚合，能否改善固定 geometry 输出的姿态信息消费？",
@@ -20,8 +20,8 @@
     "bbox_type": "gt",
     "seed": 42,
     "planned_total_epochs": 40,
-    "actual_evaluated_epochs": [5, 10, 15],
-    "termination": "stopped_after_epoch_15_diagnostics_due_to_late_generalization_collapse",
+    "actual_evaluated_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
+    "termination": "completed_planned_epoch_040",
     "test_set_model_selection": false,
     "initialization": "official_checkpoint_fresh_start",
     "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
@@ -79,6 +79,28 @@
       "ar_reS": 0.124798,
       "ar_teS": 0.798847
     },
+    "epoch_20": {
+      "bop19_ar_macro": 0.644362,
+      "add_s_0.1d": 0.428374
+    },
+    "epoch_25": {
+      "bop19_ar_macro": 0.671084,
+      "add_s_0.1d": 0.474048
+    },
+    "epoch_30": {
+      "bop19_ar_macro": 0.678768,
+      "add_s_0.1d": 0.493426
+    },
+    "epoch_35": {
+      "bop19_ar_macro": 0.679061,
+      "add_s_0.1d": 0.492042
+    },
+    "epoch_40": {
+      "bop19_ar_macro": 0.678800,
+      "add_s_0.1d": 0.494118,
+      "ar_reS": 0.491349,
+      "ar_teS": 0.791926
+    },
     "region_ablation": {
       "epoch_5_normal_bop": 0.642784,
       "epoch_5_region0_bop": 0.353449,
@@ -105,11 +127,11 @@
   },
   "evidence_boundary": {
     "directly_supported": [
-      "EXP012 has useful early performance at E5/E10 but severe degradation by E15 while training loss continues to decrease.",
+      "EXP012 has useful E5/E10 performance, a severe temporary degradation at E15, and recovers to a stable E30-E40 plateau.",
       "The E10-to-E15 degradation is predominantly rotation-specific in the recorded BOP components: AR_reS collapses while AR_teS does not.",
       "EXP012 pose output has strong dependence on Region input under Region x0 interventions.",
       "Moving predicted XYZ toward GT XYZ does not stably improve the learned EXP012 pose output; synchronizing Region does not rescue the endpoint.",
-      "E10-to-E15 checkpoint interpolation endpoints pass QC and BOP/AR_reS worsen smoothly along the parameter line."
+      "E10-to-E15 checkpoint interpolation endpoints pass QC and BOP/AR_reS worsen smoothly along that parameter line; this did not predict the later E20-E40 recovery."
     ],
     "not_proven": [
       "Shared R/t latent representation is the cause of the late collapse.",

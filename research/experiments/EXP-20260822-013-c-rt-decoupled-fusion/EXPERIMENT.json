@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260822-013-c-rt-decoupled-fusion",
+  "title": "Rotation/Translation 专用特征融合",
+  "stage": "Stage 4F / conditional R-t decoupling",
+  "role": "rt-decoupled-fusion",
+  "status": "PLANNED",
+  "legacy_import": false,
+  "decision": "BLOCKED_UNTIL_A_AND_B_FORMAL_GATES_PASS",
+  "protocol": {
+    "research_question": "在 B 的共同 correspondence frontend 后使用 R/t 专用聚合和独立 latent，能否提高 rotation 且不损伤 translation？",
+    "parent_experiment": "EXP-20260822-013-b-geometry-attention-residual",
+    "authorization_preconditions": [
+      "EXP013A passes its fixed E40 gate",
+      "EXP013B passes its fixed E40 gate",
+      "EXP013B is effective relative to EXP013A under the preregistered rule"
+    ],
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "evaluation_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
+    "fixed_checkpoint": "epoch_040",
+    "initialization": "official_checkpoint_fresh_start",
+    "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+    "trainable_modules": ["pnp_net"],
+    "frozen_modules": ["backbone", "geometry_head"],
+    "server_after_authorization": "lab0",
+    "model": {
+      "pose_head": "RTDecoupledGeometryPnPNet",
+      "inherits": "EXP013B correspondence encoder and local attention",
+      "rotation_input": "main spatial grid plus geometry 8x8 descriptor",
+      "translation_input": "main global statistics, geometry mean/std, ROI support center/scale, object extent",
+      "shared_late_pose_latent": false,
+      "cross_branch_communication": false
+    },
+    "acceptance_gate": {
+      "primary_comparison": "EXP013B epoch_040",
+      "rotation": "AR_reS must increase",
+      "translation_max_drop": 0.01,
+      "overall": "BOP and ADD(-S) must not fail the registered screening gate"
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "design": "DESIGN.md",
+    "local_gate": "LOCAL_GATE.json",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/eval.py"
+  }
+}

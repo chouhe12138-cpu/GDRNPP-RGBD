@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260822-013-b-geometry-attention-residual",
+  "title": "局部几何注意力残差支路",
+  "stage": "Stage 4F / local geometry attention",
+  "role": "geometry-attention-residual",
+  "status": "PLANNED",
+  "legacy_import": false,
+  "decision": "PENDING_LOCAL_GATE",
+  "protocol": {
+    "research_question": "在 A 的独立几何路径中加入遮挡感知的九邻域几何注意力是否带来额外收益？",
+    "parent_experiment": "EXP-20260822-013-a-xyz-residual-bypass",
+    "single_changed_variable": "masked 3x3 local attention from du,dv,dx,dy,dz,and XYZ distance",
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "evaluation_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
+    "fixed_checkpoint": "epoch_040",
+    "initialization": "official_checkpoint_fresh_start",
+    "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+    "trainable_modules": ["pnp_net"],
+    "frozen_modules": ["backbone", "geometry_head"],
+    "server": "lab1",
+    "model": {
+      "pose_head": "GeometryAttentionResidualPnPNet",
+      "inherits": "EXP013A",
+      "attention_grid": "16x16",
+      "attention_neighbourhood": "3x3",
+      "invalid_neighbours_masked_before_softmax": true,
+      "attention_scale_init": 0.1
+    },
+    "baseline": {
+      "experiment": "EXP-20260817-012-hierarchical-correspondence-head",
+      "epoch": 40,
+      "bop19_ar_macro": 0.678800,
+      "add_s_0.1d": 0.494118,
+      "ar_reS": 0.491349,
+      "ar_teS": 0.791926
+    },
+    "acceptance_gate": {
+      "versus_exp012_bop_delta_min": 0.005,
+      "versus_exp012_add_s_delta_min": 0.010,
+      "versus_exp012_objects_nonnegative_min": "5/8",
+      "versus_a": "BOP > A+0.001 effective; BOP < A-0.001 ineffective; otherwise ADD(-S) must exceed A"
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "design": "DESIGN.md",
+    "local_gate": "LOCAL_GATE.json",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/train.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/eval.py"
+  }
+}
