@@ -1,6 +1,6 @@
 # 实验、Git 与服务器运行手册
 
-## EXP013 A/B 并行与 C 条件授权
+## EXP013 A/B 与 C revision 2
 
 GitHub 上确定的 40 位 commit 建立 detached、只读 release 后，lab0 对 `EXP013A`、lab1 对 `EXP013B` 分别执行：
 
@@ -41,7 +41,7 @@ docker/l40/managed_experiment.sh <lab0|lab1> <EXP别名> create
 保护。该问题不写入 `AGENTS.md`：后者只保存长期 Agent 路由与安全规则，服务器
 操作故障和恢复步骤统一记录在本运行手册。
 
-C 初始为 `PLANNED`，launcher 会拒绝 mutating/run 命令。仅当 A、B 均通过相对 EXP012 E40 的门槛，且 B 按预注册规则优于 A，才提交把 C 改为 `AUTHORIZED` 的 metadata commit，并在 lab0 对新 commit 建立 release 后执行完整序列。
+原始 B-based C 的条件是 A、B 均通过相对 EXP012 E40 的门槛；由于 B 严格 BOP gate 失败，该版本没有运行。2026-08-26 在任何 C formal run 之前，C 明确修订为继承已通过 gate 的 A，并完成新的本地 CPU/CUDA preflight 与完整 1 epoch smoke。用户审阅后授权 revision 2，因此 metadata 为 `AUTHORIZED`；lab0 必须从授权后的新 commit 建立 release，并对 `EXP013C` 重新执行完整 `access→create→gate→smoke→audit48→launch→finalize` 序列，不能复用 A 的 run 或跳过门槛。
 
 A/B E40 完成后用 `python -m research.exp013.diagnostics` 运行 1,445 个 LM-O GT-bbox targets、五个 XYZ alpha 和 fixed-pred/synced/region0 三条路径。诊断不更新模型状态，也不替代正式精度 gate。
 

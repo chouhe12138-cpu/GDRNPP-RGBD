@@ -132,33 +132,33 @@
       "title": "层级密集 Correspondence Pose Head"
     },
     {
-      "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
+      "decision": "PASS_E40_FORMAL_GATE",
       "experiment_id": "EXP-20260822-013-a-xyz-residual-bypass",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260822-013-a-xyz-residual-bypass/EXPERIMENT.json",
       "role": "xyz-residual-bypass",
       "stage": "Stage 4F / geometry-path ablation",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "XYZ-ROI2D 独立几何残差支路"
     },
     {
-      "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
+      "decision": "FAIL_E40_BOP_GATE_ATTENTION_EFFECTIVE_VS_A",
       "experiment_id": "EXP-20260822-013-b-geometry-attention-residual",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260822-013-b-geometry-attention-residual/EXPERIMENT.json",
       "role": "geometry-attention-residual",
       "stage": "Stage 4F / local geometry attention",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "局部几何注意力残差支路"
     },
     {
-      "decision": "BLOCKED_UNTIL_A_AND_B_FORMAL_GATES_PASS",
+      "decision": "AUTHORIZED_A_BASED_PROTOCOL_REVISION_LOCAL_GATE_PASS",
       "experiment_id": "EXP-20260822-013-c-rt-decoupled-fusion",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/EXPERIMENT.json",
       "role": "rt-decoupled-fusion",
       "stage": "Stage 4F / conditional R-t decoupling",
-      "status": "PLANNED",
+      "status": "AUTHORIZED",
       "title": "Rotation/Translation 专用特征融合"
     }
   ],

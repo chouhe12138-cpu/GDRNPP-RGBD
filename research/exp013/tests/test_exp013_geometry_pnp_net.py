@@ -150,6 +150,10 @@ def test_b_attention_scale_zero_matches_a_with_same_common_weights():
 
 def test_c_has_independent_late_paths_and_both_receive_gradients():
     model = RTDecoupledGeometryPnPNet(**_small_kwargs())
+    assert isinstance(model, XYZResidualBypassPnPNet)
+    assert not isinstance(model, GeometryAttentionResidualPnPNet)
+    assert not hasattr(model, "geometry_attention")
+    assert not hasattr(model, "attention_scale")
     assert not hasattr(model, "pose_fc1")
     assert not hasattr(model, "pose_fc2")
     inputs = _inputs(batch=1)
@@ -157,10 +161,16 @@ def test_c_has_independent_late_paths_and_both_receive_gradients():
     rotation.sum().backward(retain_graph=True)
     assert model.rotation_fc1.weight.grad is not None
     assert model.translation_fc1.weight.grad is None
+    assert model.geometry_scale_r.grad is not None
+    assert model.geometry_scale_t.grad is None
+    assert torch.isfinite(model.geometry_scale_r.grad).all()
     model.zero_grad(set_to_none=True)
     translation.sum().backward()
     assert model.translation_fc1.weight.grad is not None
     assert model.rotation_fc1.weight.grad is None
+    assert model.geometry_scale_t.grad is not None
+    assert model.geometry_scale_r.grad is None
+    assert torch.isfinite(model.geometry_scale_t.grad).all()
 
 
 @pytest.mark.parametrize("head_type", HEADS_UNDER_TEST)

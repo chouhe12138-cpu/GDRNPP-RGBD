@@ -92,6 +92,11 @@ def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
         raise RuntimeError("EXP013 requires checkpoint/evaluation every five epochs")
     if cfg.SEED != 42:
         raise RuntimeError("EXP013 requires seed 42")
+    if expected_type is RTDecoupledGeometryPnPNet:
+        if pose.GEO_HEAD.get("TRAIN_SUPERVISION", True):
+            raise RuntimeError("A-based EXP013C must disable frozen geometry supervision")
+        if "attention_scale_init" in pnp.INIT_CFG:
+            raise RuntimeError("A-based EXP013C must not inherit B attention settings")
 
 
 def load_official_shared_state(
@@ -204,6 +209,11 @@ def full_forward_backward_step(
             "Full-model backward gradient failure: "
             f"missing={missing}, nonfinite={nonfinite}"
         )
+    if isinstance(model.pnp_net, RTDecoupledGeometryPnPNet):
+        for scale_name in ("geometry_scale_r", "geometry_scale_t"):
+            gradient = getattr(model.pnp_net, scale_name).grad
+            if gradient is None or not torch.isfinite(gradient).all():
+                raise RuntimeError(f"Missing or non-finite C gradient: {scale_name}")
     optimizer.step()
     frozen_after = {
         key: value.detach().cpu()

@@ -85,14 +85,27 @@ class CppTrainingRenderer:
         self._renderer = None
 
 
+def geometry_supervision_enabled(cfg):
+    """Return whether training needs rendered GT geometry targets."""
+    g_head_cfg = cfg.MODEL.POSE_NET.GEO_HEAD
+    enabled = bool(g_head_cfg.get("TRAIN_SUPERVISION", True))
+    if (not enabled) and (not bool(g_head_cfg.FREEZE)):
+        raise ValueError(
+            "GEO_HEAD.TRAIN_SUPERVISION=False requires GEO_HEAD.FREEZE=True; "
+            "enable geometry supervision before unfreezing the geometry head."
+        )
+    return enabled
+
+
 def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):
     if phase != "train":
         return batch_data_test(cfg, data, device=device)
 
-    if cfg.MODEL.POSE_NET.XYZ_ONLINE:
+    if cfg.MODEL.POSE_NET.XYZ_ONLINE and geometry_supervision_enabled(cfg):
         assert renderer is not None, "renderer must be provided for online rendering"
         return batch_data_train_online(cfg, data, renderer=renderer, device=device)
 
+    # Keep the online mapper contract while skipping rendered GT geometry.
     # batch training data
     batch = {}
     batch["roi_img"] = torch.stack([d["roi_img"] for d in data], dim=0).to(device, non_blocking=True)

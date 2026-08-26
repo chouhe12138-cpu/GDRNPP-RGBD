@@ -4,8 +4,8 @@ The three public classes implement one controlled progression:
 
 * EXP013A adds a Region-free geometry residual to the EXP012 main stream.
 * EXP013B adds masked 3x3 local geometry attention inside that residual.
-* EXP013C keeps B's correspondence encoder but gives rotation and translation
-  independent late aggregation and latent representations.
+* EXP013C reuses A's correspondence/geometry encoders and gives rotation and
+  translation independent aggregation, geometry fusion scales, and latents.
 """
 
 from __future__ import annotations
@@ -264,10 +264,17 @@ class GeometryAttentionResidualPnPNet(XYZResidualBypassPnPNet):
         return high + self.attention_scale.to(high.dtype) * update
 
 
-class RTDecoupledGeometryPnPNet(GeometryAttentionResidualPnPNet):
-    """EXP013C: B frontend with independent late rotation/translation paths."""
+class RTDecoupledGeometryPnPNet(XYZResidualBypassPnPNet):
+    """EXP013C: A frontend with independent rotation/translation aggregation."""
 
-    def __init__(self, *, extent_dim: int = 3, **kwargs) -> None:
+    def __init__(
+        self,
+        *,
+        extent_dim: int = 3,
+        geometry_scale_r_init: float = 0.1,
+        geometry_scale_t_init: float = 0.1,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         if extent_dim != 3:
             raise ValueError("EXP013C currently requires three object extents")
@@ -293,6 +300,12 @@ class RTDecoupledGeometryPnPNet(GeometryAttentionResidualPnPNet):
         del self.pose_translation
         del self.geometry_projection
         del self.geometry_scale
+        self.geometry_scale_r = nn.Parameter(
+            torch.tensor([float(geometry_scale_r_init)], dtype=torch.float32)
+        )
+        self.geometry_scale_t = nn.Parameter(
+            torch.tensor([float(geometry_scale_t_init)], dtype=torch.float32)
+        )
         self.rotation_fc1 = nn.Linear(rotation_in, 256)
         self.rotation_fc2 = nn.Linear(256, 256)
         self.rotation_output = nn.Linear(256, self.rot_dim)
@@ -333,24 +346,26 @@ class RTDecoupledGeometryPnPNet(GeometryAttentionResidualPnPNet):
         fine, mid, high = self._encode_main_features(metric, masked_region)
         geometry_grid = self._encode_geometry_grid(metric, support)
 
+        rotation_geometry = self.geometry_scale_r.to(geometry_grid.dtype) * geometry_grid
         rotation_descriptor = torch.cat(
             [
                 F.adaptive_avg_pool2d(
                     high, (self.coarse_grid_size, self.coarse_grid_size)
                 ).flatten(start_dim=1),
-                geometry_grid.flatten(start_dim=1),
+                rotation_geometry.flatten(start_dim=1),
             ],
             dim=1,
         )
         geometry_mean = geometry_grid.mean(dim=(2, 3))
         geometry_std = geometry_grid.var(dim=(2, 3), unbiased=False).clamp_min(0).sqrt()
+        geometry_stats = torch.cat([geometry_mean, geometry_std], dim=1)
+        geometry_stats = self.geometry_scale_t.to(geometry_grid.dtype) * geometry_stats
         translation_descriptor = torch.cat(
             [
                 fine.mean(dim=(2, 3)),
                 mid.mean(dim=(2, 3)),
                 high.mean(dim=(2, 3)),
-                geometry_mean,
-                geometry_std,
+                geometry_stats,
                 self._roi_support_stats(metric, support),
                 extents.to(device=metric.device, dtype=metric.dtype),
             ],

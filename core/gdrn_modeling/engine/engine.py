@@ -432,7 +432,7 @@ class GDRN_Lite(LightningLite):
                     gt_mask_trunc=batch["roi_mask_trunc"],
                     gt_mask_visib=batch["roi_mask_visib"],
                     gt_mask_full=batch.get("roi_mask_full", None),
-                    gt_mask_obj=batch["roi_mask_obj"],
+                    gt_mask_obj=batch.get("roi_mask_obj", None),
                     gt_region=batch.get("roi_region", None),
                     gt_ego_rot=batch.get("ego_rot", None),
                     gt_trans=batch.get("trans", None),

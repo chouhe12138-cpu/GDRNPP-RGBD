@@ -116,6 +116,12 @@ class GDRN_DoubleMask(nn.Module):
         net_cfg = cfg.MODEL.POSE_NET
         g_head_cfg = net_cfg.GEO_HEAD
         pnp_net_cfg = net_cfg.PNP_NET
+        geo_supervision = bool(g_head_cfg.get("TRAIN_SUPERVISION", True))
+        if do_loss and (not geo_supervision) and (not bool(g_head_cfg.FREEZE)):
+            raise ValueError(
+                "GEO_HEAD.TRAIN_SUPERVISION=False requires GEO_HEAD.FREEZE=True; "
+                "enable geometry supervision before unfreezing the geometry head."
+            )
 
         device = x.device
         bs = x.shape[0]
@@ -245,12 +251,9 @@ class GDRN_DoubleMask(nn.Module):
                 )
         else:
             out_dict = {}
-            assert (
-                (gt_xyz is not None)
-                and (gt_trans is not None)
-                and (gt_trans_ratio is not None)
-                and (gt_region is not None)
-            )
+            assert (gt_trans is not None) and (gt_trans_ratio is not None)
+            if geo_supervision:
+                assert (gt_xyz is not None) and (gt_region is not None)
             mean_re, mean_te = compute_mean_re_te(pred_trans, pred_rot_m, gt_trans, gt_ego_rot)
             vis_dict = {
                 "vis/error_R": mean_re,

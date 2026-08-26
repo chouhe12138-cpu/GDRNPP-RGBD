@@ -4,9 +4,9 @@
   "title": "局部几何注意力残差支路",
   "stage": "Stage 4F / local geometry attention",
   "role": "geometry-attention-residual",
-  "status": "AUTHORIZED",
+  "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "AUTHORIZED_LOCAL_GATE_PASS_FORMAL_NOT_STARTED",
+  "decision": "FAIL_E40_BOP_GATE_ATTENTION_EFFECTIVE_VS_A",
   "protocol": {
     "research_question": "在 A 的独立几何路径中加入遮挡感知的九邻域几何注意力是否带来额外收益？",
     "parent_experiment": "EXP-20260822-013-a-xyz-residual-bypass",
@@ -51,6 +51,18 @@
     "design": "DESIGN.md",
     "local_gate": "LOCAL_GATE.json",
     "formal_config": "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/train.py",
-    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/eval.py"
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/eval.py",
+    "checkpoint_epoch_040_sha256": "7f4e80c9494b6faf16d1729ccf5aa0e939040d9ad0d901dd3f1ea79bca341d04",
+    "formal_epoch_040": {
+      "bop_ar": 0.683691,
+      "add_s_0.1d": 0.514187,
+      "ar_reS": 0.498039,
+      "ar_teS": 0.801153,
+      "objects_nonnegative_vs_exp012": "5/8",
+      "bop_delta_vs_a": -0.000265,
+      "add_s_delta_vs_a": 0.003460,
+      "attention_effective_by_registered_rule": true,
+      "all_exp012_gates_pass": false
+    }
   }
 }

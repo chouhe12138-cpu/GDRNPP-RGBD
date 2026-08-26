@@ -4,17 +4,24 @@
   "title": "Rotation/Translation 专用特征融合",
   "stage": "Stage 4F / conditional R-t decoupling",
   "role": "rt-decoupled-fusion",
-  "status": "PLANNED",
+  "status": "AUTHORIZED",
   "legacy_import": false,
-  "decision": "BLOCKED_UNTIL_A_AND_B_FORMAL_GATES_PASS",
+  "decision": "AUTHORIZED_A_BASED_PROTOCOL_REVISION_LOCAL_GATE_PASS",
   "protocol": {
-    "research_question": "在 B 的共同 correspondence frontend 后使用 R/t 专用聚合和独立 latent，能否提高 rotation 且不损伤 translation？",
-    "parent_experiment": "EXP-20260822-013-b-geometry-attention-residual",
+    "protocol_revision": 2,
+    "revision_date": "2026-08-26",
+    "revision_reason": "B failed its strict EXP012 BOP gate; the unrun C candidate was explicitly redefined as an A-based R/t decoupling experiment before formal authorization",
+    "research_question": "在已通过 gate 的 A correspondence frontend 后使用 R/t 专用聚合和独立 latent，能否提高 rotation 且不损伤 translation？",
+    "parent_experiment": "EXP-20260822-013-a-xyz-residual-bypass",
     "authorization_preconditions": [
       "EXP013A passes its fixed E40 gate",
-      "EXP013B passes its fixed E40 gate",
-      "EXP013B is effective relative to EXP013A under the preregistered rule"
+      "revised A-based implementation passes a fresh local gate",
+      "user explicitly authorizes formal server execution after reviewing the protocol revision"
     ],
+    "authorization": {
+      "date": "2026-08-26",
+      "basis": "user explicitly requested Git submission, bundle creation, and EXP013C training on lab0 after reviewing the local gate result"
+    },
     "train_dataset": "lmo_pbr_train",
     "test_dataset": "lmo_bop_test",
     "bbox_type": "gt",
@@ -29,14 +36,18 @@
     "server_after_authorization": "lab0",
     "model": {
       "pose_head": "RTDecoupledGeometryPnPNet",
-      "inherits": "EXP013B correspondence encoder and local attention",
+      "inherits": "EXP013A correspondence encoder without local geometry attention",
       "rotation_input": "main spatial grid plus geometry 8x8 descriptor",
       "translation_input": "main global statistics, geometry mean/std, ROI support center/scale, object extent",
       "shared_late_pose_latent": false,
-      "cross_branch_communication": false
+      "cross_branch_communication": false,
+      "geometry_scale_r_init": 0.1,
+      "geometry_scale_t_init": 0.1,
+      "frozen_geometry_train_supervision": false,
+      "xyz_online_mapper_retained": true
     },
     "acceptance_gate": {
-      "primary_comparison": "EXP013B epoch_040",
+      "primary_comparison": "EXP013A epoch_040",
       "rotation": "AR_reS must increase",
       "translation_max_drop": 0.01,
       "overall": "BOP and ADD(-S) must not fail the registered screening gate"

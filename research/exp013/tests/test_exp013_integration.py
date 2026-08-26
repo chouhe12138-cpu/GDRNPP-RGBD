@@ -3,7 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 from mmcv import Config
+
+from core.gdrn_modeling.engine.engine_utils import geometry_supervision_enabled
 
 from research.pose_head_diagnostic.run_information_flow import (
     EXP013_THREE_PATH_CONDITIONS,
@@ -41,6 +44,19 @@ def test_formal_config_contracts_and_head_types():
         assert pose.PNP_NET.COORD_2D_TYPE == "abs"
         assert pose.PNP_NET.REGION_ATTENTION
         assert pose.PNP_NET.MASK_ATTENTION == "mul"
+        assert pose.XYZ_ONLINE is True
+        assert geometry_supervision_enabled(cfg) is (variant != "C")
+        if variant == "C":
+            assert "attention_scale_init" not in pose.PNP_NET.INIT_CFG
+            assert pose.PNP_NET.INIT_CFG.geometry_scale_r_init == 0.1
+            assert pose.PNP_NET.INIT_CFG.geometry_scale_t_init == 0.1
+
+
+def test_geometry_supervision_disabled_rejects_unfrozen_head():
+    cfg = Config.fromfile(str(CONFIGS["C"]))
+    cfg.MODEL.POSE_NET.GEO_HEAD.FREEZE = False
+    with pytest.raises(ValueError, match="requires GEO_HEAD.FREEZE=True"):
+        geometry_supervision_enabled(cfg)
 
 
 def test_smoke_configs_are_isolated_one_epoch_real_data_runs():

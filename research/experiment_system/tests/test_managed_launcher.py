@@ -92,8 +92,12 @@ def test_managed_launcher_registers_exp013_fixed_server_mapping_and_preflight():
             "EXPERIMENT.json"
         ).read_text(encoding="utf-8")
     )
-    assert c_metadata["status"] == "PLANNED"
-    assert c_metadata["decision"] == "BLOCKED_UNTIL_A_AND_B_FORMAL_GATES_PASS"
+    assert c_metadata["status"] == "AUTHORIZED"
+    assert c_metadata["decision"] == "AUTHORIZED_A_BASED_PROTOCOL_REVISION_LOCAL_GATE_PASS"
+    assert c_metadata["protocol"]["protocol_revision"] == 2
+    assert c_metadata["protocol"]["parent_experiment"].endswith(
+        "013-a-xyz-residual-bypass"
+    )
 
 
 def test_managed_launcher_preserves_idle_legacy_container_without_deleting_it():

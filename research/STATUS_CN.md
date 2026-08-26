@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-08-19。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
+最后核对：2026-08-26。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
 
 Git branch、HEAD、远端跟踪和 worktree 属于运行时事实，不在本页固化。需要核对时直接执行 `git status --short --branch`、`git rev-parse HEAD` 和 `git rev-parse --abbrev-ref --symbolic-full-name @{u}`。
 
@@ -22,7 +22,7 @@ Stage 4:   EXP009 FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
 Stage 4C:  EXP010 AUTHORIZED — ACCESS PASS，NO FORMAL RUN RECORDED
 Stage 4D:  EXP011 COMPLETE — MISMATCH_IMPORTANT
 Stage 4E:  EXP012 COMPLETE — E40 STABLE PLATEAU RECORDED
-Stage 4F:  EXP013 A/B LOCAL GATE IN PROGRESS；C PLANNED AND SERVER-BLOCKED
+Stage 4F:  EXP013 A COMPLETE/PASS；B COMPLETE/STRICT BOP GATE FAIL；C A-BASED REVISION AUTHORIZED/FORMAL NOT STARTED
 ```
 
 ## 当前实验事实
@@ -119,6 +119,14 @@ EXP012 的结论边界：
 EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.491349`、AR_teS `0.791926`。
 
 ## 其他已完成事实
+
+### EXP013 E40 最终事实
+
+- A E40：BOP AR `0.683956`、ADD(-S) `0.510727`、AR_reS `0.498039`、AR_teS `0.797693`；相对 EXP012 的增量为 `+0.005156 / +0.016609`，逐物体非负 `5/8`，三项 gate 全部通过。
+- B E40：BOP AR `0.683691`、ADD(-S) `0.514187`、AR_reS `0.498039`、AR_teS `0.801153`；ADD 和逐物体 `5/8` 通过，但 BOP 增量 `+0.004891` 比冻结门槛少 `0.000109`，因此严格 gate 失败。
+- B 与 A 的 BOP 差 `-0.000265` 位于 `±0.001` 区间，ADD 高 `+0.003460`，故 attention 按 B−A 规则有效；原 B-based C 因 B 未通过全部 EXP012 gate 而停止。
+- 2026-08-26 在任何 C formal run 之前，用户明确提供 A-based R/t decoupling 修订方案。revision 2 已完成本地 CPU/CUDA preflight 与 1 epoch、2048 iteration 无 renderer 真实数据 smoke；工程 gate PASS。用户随后明确要求提交、生成 bundle 并准备在 lab0 训练，因此 C 已授权，但 formal 尚未启动，必须使用新的确定 commit 建立只读 release。
+- A/B E40 的本地小样本结构诊断均保持权重哈希不变。结果显示几何残差、Region 和空间布局都被实际使用；R/t 共享梯度存在弱冲突或明显尺度失衡。该机制证据不替代 formal gate。
 
 - C1 固定 Epoch 40：BOP AR `0.6897416378`、ADD(-S) macro-object `0.5057`，
   结论 `C1_SCREEN_FAIL`。

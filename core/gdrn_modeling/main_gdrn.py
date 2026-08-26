@@ -41,7 +41,7 @@ from lib.utils.time_utils import get_time_str
 import ref
 
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
-from core.gdrn_modeling.engine.engine_utils import get_renderer
+from core.gdrn_modeling.engine.engine_utils import geometry_supervision_enabled, get_renderer
 from core.gdrn_modeling.engine.engine import GDRN_Lite
 from core.gdrn_modeling.models import (
     GDRN,
@@ -143,7 +143,12 @@ class Lite(GDRN_Lite):
         self.set_my_env(args, cfg)
 
         # get renderer ----------------------
-        if args.eval_only or cfg.TEST.SAVE_RESULTS_ONLY or (not cfg.MODEL.POSE_NET.XYZ_ONLINE):
+        if (
+            args.eval_only
+            or cfg.TEST.SAVE_RESULTS_ONLY
+            or (not cfg.MODEL.POSE_NET.XYZ_ONLINE)
+            or (not geometry_supervision_enabled(cfg))
+        ):
             renderer = None
         else:
             train_dset_meta = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
