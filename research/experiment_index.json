@@ -1,5 +1,5 @@
 {
-  "experiment_count": 16,
+  "experiment_count": 17,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -160,6 +160,16 @@
       "stage": "Stage 4F / conditional R-t decoupling",
       "status": "AUTHORIZED",
       "title": "Rotation/Translation 专用特征融合"
+    },
+    {
+      "decision": "AUTHORIZED_USER_APPROVED_LOCAL_GATE_PASS",
+      "experiment_id": "EXP-20260827-014-d-fulltrain-imagenet",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260827-014-d-fulltrain-imagenet/EXPERIMENT.json",
+      "role": "d-fulltrain-imagenet",
+      "stage": "Stage 4F / full end-to-end training",
+      "status": "AUTHORIZED",
+      "title": "ImageNet 预训练 ConvNeXt 全量端到端训练"
     }
   ],
   "schema_version": 1

@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260827-014-d-fulltrain-imagenet",
+  "title": "ImageNet 预训练 ConvNeXt 全量端到端训练",
+  "stage": "Stage 4F / full end-to-end training",
+  "role": "d-fulltrain-imagenet",
+  "status": "AUTHORIZED",
+  "legacy_import": false,
+  "decision": "AUTHORIZED_USER_APPROVED_LOCAL_GATE_PASS",
+  "protocol": {
+    "protocol_revision": 1,
+    "revision_date": "2026-08-27",
+    "revision_reason": "Establish the official-recipe reference point for the new pose head (previous EXP013 variants all used frozen backbone/geometry head)",
+    "research_question": "官方端到端协议（ImageNet ConvNeXt-Base + 随机初始化几何/姿态头 + 全量解冻）下，EXP013C 的 RTDecoupledGeometryPnPNet 能否超越冻结特征版本（EXP013A E40 0.683956）乃至官方 ckpt GT 框直评（0.690399）？",
+    "parent_experiment": "EXP-20260822-013-c-rt-decoupled-fusion",
+    "authorization_preconditions": [
+      "user explicitly requested a new branch for full end-to-end training on lab1",
+      "local preflight + smoke + audit48 gate PASS",
+      "offline bundle delivery (server cannot reach GitHub/Gitee)"
+    ],
+    "authorization": {
+      "date": "2026-08-27",
+      "basis": "user requested full end-to-end training on lab1 after reviewing the plan; bundle delivery replaces network transport"
+    },
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "evaluation_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
+    "fixed_checkpoint": "epoch_040",
+    "initialization": "imagenet_pretrained_random_head_fresh_start",
+    "initialization_checkpoint_sha256": null,
+    "backbone_pretrained_source": "timm/convnext_base_1k_224_ema",
+    "trainable_modules": ["backbone", "geometry_head", "pnp_net"],
+    "frozen_modules": [],
+    "geometry_supervision": true,
+    "xyz_renderer": "egl",
+    "server_after_authorization": "lab1",
+    "model": {
+      "pose_head": "RTDecoupledGeometryPnPNet",
+      "inherits": "EXP013A correspondence encoder without local geometry attention",
+      "rotation_input": "main spatial grid plus geometry 8x8 descriptor",
+      "translation_input": "main global statistics, geometry mean/std, ROI support center/scale, object extent",
+      "shared_late_pose_latent": false,
+      "cross_branch_communication": false,
+      "geometry_scale_r_init": 0.1,
+      "geometry_scale_t_init": 0.1
+    },
+    "acceptance_gate": {
+      "primary_comparison": ["official checkpoint GT-box direct eval EPOC[0.690399] → new head competitiveness under the official end-to-end recipe", "EXP013A epoch_040 [0.683956] → full-training increment over frozen features"],
+      "reference_points": ["EXP005/B official-head fine-tune 0.691912", "C2 joint adaptation 0.693006", "EXP012 baseline 0.678800"],
+      "screen_rule": "BOP AR < 0.686 => check environment first (timm weights really loaded, egl renderer active, unfreezing actually effective), do not conclude structural failure",
+      "note": "seed 42 first run; a second seed is required before the final conclusion"
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "design": "DESIGN.md",
+    "local_gate": "LOCAL_GATE.json",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp013/d_fulltrain/train.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/d_fulltrain/eval.py",
+    "preflight": "research/exp014/preflight.py"
+  }
+}

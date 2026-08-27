@@ -45,6 +45,31 @@ docker/l40/managed_experiment.sh <lab0|lab1> <EXP别名> create
 
 A/B E40 完成后用 `python -m research.exp013.diagnostics` 运行 1,445 个 LM-O GT-bbox targets、五个 XYZ alpha 和 fixed-pred/synced/region0 三条路径。诊断不更新模型状态，也不替代正式精度 gate。
 
+## EXP014-D（ImageNet 全量端到端训练）
+
+分支 `exp014-d-fulltrain`，服务器离线时同样走 bundle 流程（上传
+`/data/labs/lab1/docker_data/chx/transfer/` → clone 到
+`releases/GDRNPP-RGBD-<short>` → detached checkout 40 位 commit → clean 检查 →
+`docker/l40/prepare_release.sh lab1 <image sha256:f3055cb6…>`）。lab1 对
+`EXP014D` 执行完整序列：
+
+```bash
+docker/l40/managed_experiment.sh lab1 EXP014D access
+docker/l40/managed_experiment.sh lab1 EXP014D create
+docker/l40/managed_experiment.sh lab1 EXP014D gate
+docker/l40/managed_experiment.sh lab1 EXP014D smoke
+docker/l40/managed_experiment.sh lab1 EXP014D audit48
+docker/l40/managed_experiment.sh lab1 EXP014D launch
+docker/l40/managed_experiment.sh lab1 EXP014D finalize
+```
+
+与 EXP013 的关键差异：无官方 ckpt（`MODEL.WEIGHTS=""`），主干/几何头/姿态头全部
+解冻，几何监督开启（训练渲染器 egl），WARMUP_ITERS=1000。服务器首道 gate 是 egl
+渲染器验证——失败则报告，按预注册规则降级 cpp 并在 RECORD 记录。timm 的
+`convnext_base_1k_224_ema.pth`（~330MB）随 bundle 交付到
+`E:\6D姿态估计\EXP-014\`，容器内放入 `$TORCH_HOME/hub/checkpoints/`（或 HF 缓存），
+避免离线训练启动时下载失败。
+
 本文记录稳定操作流程。即时 GPU、容器和实验状态以
 `research/SERVER_RUNTIME_STATUS_CN.md` 的重新检查结果为准。
 
