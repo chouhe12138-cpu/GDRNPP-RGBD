@@ -69,7 +69,7 @@ case "${experiment}" in
     EXP013D)
         experiment_id="EXP-20260827-014-d-fulltrain-imagenet"
         config_root="configs/gdrn/lmo_pbr/research/exp013/d_fulltrain"
-        isolation_role="PNP_REPLACEMENT"
+        isolation_role="FULL_TRAIN"
         ;;
     *) usage ;;
 esac

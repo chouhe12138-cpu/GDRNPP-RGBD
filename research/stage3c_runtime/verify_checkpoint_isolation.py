@@ -54,7 +54,9 @@ def compare_states(role: str, official, trained) -> dict[str, object]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("role", choices=("B", "C2", "CPM", "PNP_REPLACEMENT"))
+    parser.add_argument(
+        "role", choices=("B", "C2", "CPM", "PNP_REPLACEMENT", "FULL_TRAIN")
+    )
     parser.add_argument("--official", type=Path, required=True)
     parser.add_argument("--trained", type=Path, required=True)
     return parser.parse_args()
@@ -65,6 +67,26 @@ def main() -> int:
     official = load_state(args.official)
     trained = load_state(args.trained)
     result = compare_states(args.role, official, trained)
+    if args.role == "FULL_TRAIN":
+        # Full end-to-end training (e.g. EXP013D) has no frozen boundary:
+        # backbone/geometry head legitimately change and the official
+        # checkpoint is not an initialization anchor. Only require that
+        # training produced real checkpoint changes.
+        if (
+            not result["changed_frozen"]
+            and not result["changed_allowed"]
+            and not result["added"]
+        ):
+            raise RuntimeError(f"Full-train checkpoint changed nothing: {result}")
+        result.update(
+            {
+                "status": "PASS",
+                "official_sha256": sha256(args.official),
+                "trained_sha256": sha256(args.trained),
+            }
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0
     unexpected_removed = result["removed"]
     replacement_roles = {"CPM", "PNP_REPLACEMENT"}
     if args.role in replacement_roles:

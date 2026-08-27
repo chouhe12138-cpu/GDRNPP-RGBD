@@ -22,6 +22,17 @@ smoke 摘要：loss_region 21.2→20.97（平滑均值）、loss_PM_R 0.097→0.
 SHA-256 `04d86dc4c10d35eb688a22eedff61c75e8e1827a69d735177c1dd9f7be4f2a89`，
 `geometry_scale_r=0.100107`、`geometry_scale_t=0.098307`（均从 0.1 获得有限更新）。
 
+## 服务器 smoke 记录（2026-08-27）
+
+- RUN-20260827-151207-smoke-s42-a01（source commit `310476b`）：**训练本身 PASS**——
+  timm ImageNet 权重从缓存加载、95.16M 参数全量解冻确认（MODEL_SUMMARY）、2048 iters 无错误、
+  checkpoint 保存成功，loss 曲线与本地 gate 一致。
+- managed 的 **checkpoint-isolation 关卡 FAIL**：`verify_checkpoint_isolation.py` 按
+  PNP_REPLACEMENT 冻结语义与官方 ckpt 对比，全解冻设计必然被判"冻结张量变化"（语义不适用，非训练错误）。
+- **修复**：新增 `FULL_TRAIN` 隔离角色（仅要求训练产生真实张量变化，不再对照官方 ckpt 判冻结）；
+  `research/managed_runtime/run.py`、`research/stage3c_runtime/verify_checkpoint_isolation.py`、
+  `docker/l40/managed_experiment.sh`（EXP013D isolation_role）同步更新，bundle 重新生成。
+
 ## 正式运行计划
 
 服务器执行顺序（用户侧）：bundle 上传 `/data/labs/lab1/docker_data/chx/transfer/`
