@@ -66,11 +66,17 @@ case "${experiment}" in
         isolation_role="PNP_REPLACEMENT"
         exp013_variant="C"
         ;;
+    EXP013D)
+        experiment_id="EXP-20260827-014-d-fulltrain-imagenet"
+        config_root="configs/gdrn/lmo_pbr/research/exp013/d_fulltrain"
+        isolation_role="PNP_REPLACEMENT"
+        ;;
     *) usage ;;
 esac
 
 case "${experiment}:${machine}" in
     EXP013A:lab0|EXP013B:lab1|EXP013C:lab0) ;;
+    EXP013D:lab1) ;;
     EXP013A:*|EXP013B:*|EXP013C:*)
         echo "FAIL: fixed server mapping is EXP013A=lab0, EXP013B=lab1, EXP013C=lab0" >&2
         exit 1
@@ -340,6 +346,9 @@ gate() {
     elif [[ "${experiment}" == "EXP012" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.next_pose_head.preflight --config ${config_root}/train.py --weights ${official_container} --device cuda --skip-round-trip"
+    elif [[ "${experiment}" == "EXP013D" ]]; then
+        "${docker_bin}" exec "${container}" bash -lc \
+            "cd /workspace/gdrnpp && python -m research.exp014.preflight --config ${config_root}/train.py --device cuda --skip-round-trip"
     elif [[ "${experiment}" == EXP013* ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.exp013.preflight --variant ${exp013_variant} --config ${config_root}/train.py --weights ${official_container} --device cuda --skip-round-trip"
