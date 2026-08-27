@@ -45,22 +45,22 @@ docker/l40/managed_experiment.sh <lab0|lab1> <EXP别名> create
 
 A/B E40 完成后用 `python -m research.exp013.diagnostics` 运行 1,445 个 LM-O GT-bbox targets、五个 XYZ alpha 和 fixed-pred/synced/region0 三条路径。诊断不更新模型状态，也不替代正式精度 gate。
 
-## EXP014-D（ImageNet 全量端到端训练）
+## EXP013D（ImageNet 全量端到端训练）
 
 分支 `exp014-d-fulltrain`，服务器离线时同样走 bundle 流程（上传
 `/data/labs/lab1/docker_data/chx/transfer/` → clone 到
 `releases/GDRNPP-RGBD-<short>` → detached checkout 40 位 commit → clean 检查 →
 `docker/l40/prepare_release.sh lab1 <image sha256:f3055cb6…>`）。lab1 对
-`EXP014D` 执行完整序列：
+`EXP013D` 执行完整序列：
 
 ```bash
-docker/l40/managed_experiment.sh lab1 EXP014D access
-docker/l40/managed_experiment.sh lab1 EXP014D create
-docker/l40/managed_experiment.sh lab1 EXP014D gate
-docker/l40/managed_experiment.sh lab1 EXP014D smoke
-docker/l40/managed_experiment.sh lab1 EXP014D audit48
-docker/l40/managed_experiment.sh lab1 EXP014D launch
-docker/l40/managed_experiment.sh lab1 EXP014D finalize
+docker/l40/managed_experiment.sh lab1 EXP013D access
+docker/l40/managed_experiment.sh lab1 EXP013D create
+docker/l40/managed_experiment.sh lab1 EXP013D gate
+docker/l40/managed_experiment.sh lab1 EXP013D smoke
+docker/l40/managed_experiment.sh lab1 EXP013D audit48
+docker/l40/managed_experiment.sh lab1 EXP013D launch
+docker/l40/managed_experiment.sh lab1 EXP013D finalize
 ```
 
 与 EXP013 的关键差异：无官方 ckpt（`MODEL.WEIGHTS=""`），主干/几何头/姿态头全部
