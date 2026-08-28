@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
+    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C|EXP013D access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
     exit 2
 }
 
