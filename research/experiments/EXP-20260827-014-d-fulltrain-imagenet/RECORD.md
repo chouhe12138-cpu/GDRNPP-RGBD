@@ -4,7 +4,7 @@
 |---|---|
 | 实验 ID | `EXP-20260827-014-d-fulltrain-imagenet` |
 | 分支 | `exp014-d-fulltrain` |
-| 状态 | `AUTHORIZED / LOCAL_GATE_PASS / FORMAL_NOT_STARTED` |
+| 状态 | `AUTHORIZED / RENDERER_FIX_COMMITTED / FORMAL_A01_INVALIDATED / RETRAIN_PLANNED` |
 | 服务器 | lab1 |
 | 环境镜像 | `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`（沿用 EXP013） |
 | 交付方式 | 完整 Git bundle（服务器无法连 GitHub/Gitee） |
@@ -46,6 +46,28 @@ SHA-256 `04d86dc4c10d35eb688a22eedff61c75e8e1827a69d735177c1dd9f7be4f2a89`，
 - D < 0.686 → 先查环境（timm 权重/渲染器/解冻是否真生效），不直接判结构失败；
 - 决策点固定 `epoch_040`，评估点 ckpt（E5..E40）全部保留；
 - seed 42 首轮，正式结论前补第二 seed。
+
+## 2026-08-28 渲染器覆盖事故与重训决定
+
+- formal a01（RUN-20260827-160112-formal-s42-a01）实际使用 CppTrainingRenderer：
+  console.log 崩溃转储中的 renderer 对象与 `engine_utils.get_renderer` 的唯一消费
+  路径 `cfg.MODEL.POSE_NET.XYZ_RENDERER`（engine_utils.py:361）均证实。D train.py
+  的顶层 `XYZ_RENDERER="egl"` 是无效键；cpp 实际继承自官方 LM-O 基座配置
+  `convnext_a6_..._lmo.py` 的 `POSE_NET.XYZ_RENDERER="cpp"`（含 WSL 兼容注释）。
+- 旧 preflight 校验的正是同一顶层死键，因此本地 gate 假通过；smoke/audit48 的
+  顶层 cpp 覆盖同样无效（碰巧与继承值一致）。egl 在本仓库服务器上从未真实执行，
+  此前"egl 已验证"的记录作废。
+- a01 于 2026-08-28 06:58 UTC 在 E5 评估与 checkpoint 保存后因共享 L40 被其他
+  进程占满显存而 CUDA OOM 崩溃。E5 BOP AR 0.5517 仅作为中断证据保留，不进入
+  任何 gate 或决策。E5 checkpoint、console.log 与 score 已归档至
+  `E:\6D姿态估计\EXP-014\`。
+- 修复（本 commit）：`XYZ_RENDERER` 覆盖移入 `MODEL.POSE_NET`（train.py）；
+  smoke/audit48 的 cpp 覆盖同步移入 POSE_NET（否则修复后本地 smoke 将继承 egl
+  并在无 GL 的 WSL 崩溃）；preflight 改为校验嵌套键并断言 `egl`。合并值已在
+  本地 conda pytorch22 验证（train=egl, smoke/audit48=cpp），EXP013 回归测试通过。
+- 决定：废弃 a01 并清理其 release 与训练产物（用户执行），以修复后的 commit
+  重新 formal：egl、从头训练。预注册决策规则不变（主对照 0.690399、次对照
+  0.683956、SCREEN 0.686 先查环境、固定 epoch_040、seed 42）。
 
 ## 最终结果
 

@@ -64,8 +64,14 @@ def validate_config(cfg: Config) -> None:
         raise RuntimeError("EXP014-D requires seed 42")
     if cfg.SOLVER.WARMUP_ITERS < 1000:
         raise RuntimeError("EXP014-D requires WARMUP_ITERS >= 1000")
-    if cfg.get("XYZ_RENDERER", "") not in ("egl", "cpp"):
-        raise RuntimeError(f"Unexpected XYZ_RENDERER: {cfg.get('XYZ_RENDERER', '')}")
+    # The engine only reads MODEL.POSE_NET.XYZ_RENDERER (engine_utils.get_renderer);
+    # a top-level XYZ_RENDERER key is inert, so validate the nested value and
+    # enforce the preregistered egl renderer for the full-training formal run.
+    if pose.get("XYZ_RENDERER", "") != "egl":
+        raise RuntimeError(
+            "EXP014-D preregisters MODEL.POSE_NET.XYZ_RENDERER='egl'; "
+            f"got {pose.get('XYZ_RENDERER', '')!r}"
+        )
 
 
 def bucket_parameters(model: torch.nn.Module) -> dict[str, list[torch.nn.Parameter]]:

@@ -1,7 +1,8 @@
 _base_ = ["./train.py"]
 
 # WSL has no GL: use the local BOP C++ renderer for the local gate.
-XYZ_RENDERER = "cpp"
+# Must be nested under POSE_NET, otherwise it cannot override train.py's egl.
+MODEL = dict(POSE_NET=dict(XYZ_RENDERER="cpp"))
 
 DATASETS = dict(TRAIN=("lmo_pbr_stage3_local_train",), TEST=())
 DATALOADER = dict(NUM_WORKERS=2)
