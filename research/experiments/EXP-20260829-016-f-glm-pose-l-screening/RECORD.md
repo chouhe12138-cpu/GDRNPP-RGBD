@@ -36,4 +36,21 @@
 - 门禁结果(详见 LOCAL_GATE.json):pytest 28 项全过;preflight F
   CPU(严格往返)与 CUDA 均 PASS;真实数据 smoke
   `LOCAL-20260829-f-online-depth-smoke` 1 epoch 2048 iters batch 4
-  workers 2,loss 有限,渲染器 0 次构造。
+  workers 2,loss 有限(final 0.678,均值 1.903 递减),渲染器 0 次构造,
+  `model_epoch_001.pth` 已保存。
+
+## 2026-08-29 独立子代理审计(v2 之后)
+
+- 结论 **PASS,0 P1**;12 项清单(M1 继承、M2 结构、M3 注入点、输出契约、
+  参数预算、渲染器保证、协议常数、预注册 gate、深度管线 a–f、键安全、
+  测试运行、家族独立性)全部 PASS;头参数实测 929,175。
+- P2-1(已修):`batch_data_train_online`(监督开启的在线路径)补齐
+  `roi_depth_stats` 堆叠——未来若组合 XYZ_ONLINE+监督开+HEAD_DEPTH,
+  训练统计不再被静默零填充(当前 F 协议下该路径不可达,属防御性修复)。
+- P2-2(不修,记录在案):A 基类遗留死方法 `_encode_main`/`_encode_geometry`
+  引用已删除模块;它们在 A/B/C 归档代码中即已不可达,改共享基类文件
+  超出 F 范围且无行为收益。
+- P2-3(已修):F EXPERIMENT.json 基线里 A 的 ar_teS 误写 0.788247,
+  更正为档案权威值 0.797693(A RECORD.md:17);四条预注册 gate 数字
+  未动(0.8028/0.5107/0.4930/0.6838 为用户批准的契约)。
+- 审计后复跑:F 单测 7 项 + 全套 28 项、preflight F CPU,全部 PASS。

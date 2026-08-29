@@ -32,14 +32,14 @@
       "optimizer": "Ranger lr 8e-4 (EXP013 family recipe), warmup 200"
     },
     "baseline": {
-      "exp013a": {"bop19_ar": 0.683956, "ar_reS": 0.498039, "ar_teS": 0.788247},
+      "exp013a": {"bop19_ar": 0.683956, "ar_reS": 0.498039, "ar_teS": 0.797693},
       "exp013b": {"bop19_ar": 0.684058},
       "exp013c_e40": {"bop19_ar": 0.684646, "ar_reS": 0.525029, "ar_teS": 0.794216, "add_s_0.1d": 0.496914},
       "exp005_official_head_continued_frozen": {"bop19_ar": 0.691912, "ar_reS": 0.544406, "ar_teS": 0.800923}
     },
     "acceptance_gate": {
       "type": "screening_pass_gate_symptom_targeted",
-      "ar_teS_ge_0.8028": "平移显著超过 A(0.7882),达到 EXP005 平移水平",
+      "ar_teS_ge_0.8028": "平移显著超过 A(0.7977),达到 EXP005 平移水平(0.8009)之上",
       "add_s_0.1d_ge_0.5107": "ADD 超过 C 的 0.4969 与家族上限",
       "ar_reS_ge_0.4930": "旋转不低于 A(0.4980)减去单评估噪声",
       "bop19_ar_ge_0.6838": "BOP19 AR 不低于家族上限带(0.6846)减去噪声",

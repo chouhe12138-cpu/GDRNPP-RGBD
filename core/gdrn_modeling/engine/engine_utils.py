@@ -171,6 +171,10 @@ def batch_data_train_online(cfg, data, renderer, device="cuda"):
     batch["roi_img"] = torch.stack([d["roi_img"] for d in data], dim=0).to(device, non_blocking=True)
     if cfg.INPUT.WITH_DEPTH:
         batch["roi_depth"] = torch.stack([d["roi_depth"] for d in data], dim=0).to(device, non_blocking=True)
+    if cfg.INPUT.get("HEAD_DEPTH", False):
+        batch["roi_depth_stats"] = torch.stack(
+            [d["roi_depth_stats"] for d in data], dim=0
+        ).to(device, non_blocking=True)
     batch["roi_cls"] = torch.as_tensor([d["roi_cls"] for d in data], dtype=torch.long).to(device, non_blocking=True)
     bs = batch["roi_cls"].shape[0]
     if "roi_coord_2d" in data[0]:
