@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260829-015-e-official-head-random",
+  "title": "官方头随机初始化冻结对照",
+  "stage": "Stage 4H / official-head random-init control",
+  "role": "official-head-random",
+  "status": "AUTHORIZED",
+  "legacy_import": false,
+  "decision": "AUTHORIZED_PLANNED_LAB0",
+  "protocol": {
+    "research_question": "官方 ConvPnP 头在冻结特征协议下从随机初始化训练,能否达到 EXP005(官方头从预训练继续微调)的旋转水平(reS 0.5444)?即官方头的旋转优势是预训练继承还是结构可读出?",
+    "parent_experiment": "EXP-20260731-005-pnp-only-control",
+    "single_changed_variable": "official ConvPnPNet head trained from random initialization instead of continued from official weights (EXP005), under the EXP013A frozen protocol",
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "evaluation_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
+    "fixed_checkpoint": "epoch_040",
+    "initialization": "official_checkpoint_fresh_start_with_pnp_stripped",
+    "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+    "weights_note": "MODEL.WEIGHTS points to the pnp-stripped derivative (research/exp013/e_prep.py, pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth); the official pnp keys share their names with the rebuilt head and would overwrite the random initialization",
+    "trainable_modules": ["pnp_net"],
+    "frozen_modules": ["backbone", "geometry_head"],
+    "server": "lab0",
+    "model": {
+      "pose_head": "ConvPnPNet",
+      "head_flags": "official-native: GN+gelu, flatten fc1 8192->1024, denormalize_by_extent, REGION_ATTENTION=True, WITH_2D_COORD=abs, MASK_ATTENTION=none",
+      "training_renderer": "none (frozen geometry supervision disabled; no CPP/EGL renderer is constructed)",
+      "optimizer": "Ranger lr 8e-4 (EXP013 family recipe, matching official full-training lr), warmup 200"
+    },
+    "baseline": {
+      "exp005_official_head_continued_frozen": {
+        "bop19_ar": 0.691912,
+        "ar_reS": 0.544406,
+        "ar_teS": 0.800923,
+        "note": "reS inherited from official pretraining"
+      },
+      "exp013a": {"bop19_ar": 0.683956, "ar_reS": 0.498039},
+      "exp013c": {"bop19_ar": 0.684646, "ar_reS": 0.525029}
+    },
+    "acceptance_gate": {
+      "type": "diagnostic_readout_no_pass_gate",
+      "ar_reS_ge_0.54": "官方头读出结构优势成立;GLM-Pose M2(注意力池化替代 fc1)假设获得强支撑",
+      "ar_reS_0.52_to_0.54": "部分支撑;M2 与 M3 并重",
+      "ar_reS_lt_0.52": "官方头优势主要为预训练继承;M2 立论降级,重心移向 M3 与训练制度",
+      "secondary_readouts": ["bop_ar", "add_s_0.1d", "ar_teS"],
+      "noise_caveat": "EXP013 家族单评估摆幅 ±0.01~0.015,读数结论需结合逐 epoch 轨迹;正式引用前补第二 seed"
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "design": "DESIGN.md",
+    "local_gate": "LOCAL_GATE.json",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/train.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/eval.py"
+  }
+}

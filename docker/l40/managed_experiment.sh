@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C|EXP013D access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
+    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C|EXP013D|EXP013E access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
     exit 2
 }
 
@@ -71,14 +71,21 @@ case "${experiment}" in
         config_root="configs/gdrn/lmo_pbr/research/exp013/d_fulltrain"
         isolation_role="FULL_TRAIN"
         ;;
+    EXP013E)
+        experiment_id="EXP-20260829-015-e-official-head-random"
+        config_root="configs/gdrn/lmo_pbr/research/exp013/e_official_head_random"
+        isolation_role="PNP_REPLACEMENT"
+        exp013_variant="E"
+        ;;
     *) usage ;;
 esac
 
 case "${experiment}:${machine}" in
     EXP013A:lab0|EXP013B:lab1|EXP013C:lab0) ;;
     EXP013D:lab1) ;;
-    EXP013A:*|EXP013B:*|EXP013C:*)
-        echo "FAIL: fixed server mapping is EXP013A=lab0, EXP013B=lab1, EXP013C=lab0" >&2
+    EXP013E:lab0) ;;
+    EXP013A:*|EXP013B:*|EXP013C:*|EXP013E:*)
+        echo "FAIL: fixed server mapping is EXP013A=lab0, EXP013B=lab1, EXP013C=lab0, EXP013E=lab0" >&2
         exit 1
         ;;
 esac
@@ -349,6 +356,11 @@ gate() {
     elif [[ "${experiment}" == "EXP013D" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.exp014.preflight --config ${config_root}/train.py --device cuda --skip-round-trip"
+    elif [[ "${experiment}" == "EXP013E" ]]; then
+        # Derive the pnp-stripped checkpoint first (deterministic, verified),
+        # then run the E preflight against it instead of the original file.
+        "${docker_bin}" exec "${container}" bash -lc \
+            "cd /workspace/gdrnpp && python -m research.exp013.e_prep --official ${official_container} --out pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth && python -m research.exp013.preflight --variant E --config ${config_root}/train.py --weights pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth --official ${official_container} --device cuda --skip-round-trip"
     elif [[ "${experiment}" == EXP013* ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.exp013.preflight --variant ${exp013_variant} --config ${config_root}/train.py --weights ${official_container} --device cuda --skip-round-trip"

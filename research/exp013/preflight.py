@@ -14,6 +14,7 @@ import torch
 from mmcv import Config
 
 from core.gdrn_modeling.models.GDRN_double_mask import build_model_optimizer
+from core.gdrn_modeling.models.heads.conv_pnp_net import ConvPnPNet
 from core.gdrn_modeling.models.heads.exp013_geometry_pnp_net import (
     GeometryAttentionResidualPnPNet,
     RTDecoupledGeometryPnPNet,
@@ -37,6 +38,10 @@ VARIANTS = {
     "C": (
         "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
         RTDecoupledGeometryPnPNet,
+    ),
+    "E": (
+        "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/train.py",
+        ConvPnPNet,
     ),
 }
 
@@ -80,10 +85,26 @@ def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
         raise RuntimeError(f"Unexpected pose head: {pnp.INIT_CFG.type}")
     if not pnp.WITH_2D_COORD or pnp.COORD_2D_TYPE != "abs":
         raise RuntimeError("EXP013 requires absolute ROI2D")
-    if not pnp.REGION_ATTENTION or not pnp.INIT_CFG.use_region_aux:
-        raise RuntimeError("EXP013 keeps the EXP012 Region main path")
-    if pnp.MASK_ATTENTION != "mul":
-        raise RuntimeError("EXP013 requires visible-mask multiplication")
+    if expected_type is ConvPnPNet:
+        # EXP013E rebuilds the official head with its native flags; it must
+        # not inherit any EXP013-family head settings.
+        if pnp.INIT_CFG.get("act") != "gelu" or pnp.INIT_CFG.get("norm") != "GN":
+            raise RuntimeError("EXP013E must mirror the official head norm/act")
+        if pnp.INIT_CFG.get("flat_op") != "flatten" or not pnp.INIT_CFG.get(
+            "denormalize_by_extent"
+        ):
+            raise RuntimeError("EXP013E must keep the official flatten-fc1 design")
+        if "use_region_aux" in pnp.INIT_CFG or "geometry_scale_init" in pnp.INIT_CFG:
+            raise RuntimeError("EXP013E must not inherit EXP013 head settings")
+        if pnp.MASK_ATTENTION != "none":
+            raise RuntimeError("EXP013E keeps the official no-mask-gating design")
+        if not pnp.REGION_ATTENTION:
+            raise RuntimeError("EXP013E keeps the official region attention")
+    else:
+        if not pnp.REGION_ATTENTION or not pnp.INIT_CFG.use_region_aux:
+            raise RuntimeError("EXP013 keeps the EXP012 Region main path")
+        if pnp.MASK_ATTENTION != "mul":
+            raise RuntimeError("EXP013 requires visible-mask multiplication")
     if cfg.SOLVER.TOTAL_EPOCHS != 40 or cfg.SOLVER.IMS_PER_BATCH != 48:
         raise RuntimeError(
             "EXP013 formal protocol requires 40 epochs and batch size 48"
@@ -97,6 +118,12 @@ def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
             raise RuntimeError("A-based EXP013C must disable frozen geometry supervision")
         if "attention_scale_init" in pnp.INIT_CFG:
             raise RuntimeError("A-based EXP013C must not inherit B attention settings")
+    if expected_type is ConvPnPNet:
+        if pose.GEO_HEAD.get("TRAIN_SUPERVISION", True):
+            raise RuntimeError(
+                "EXP013E must disable frozen geometry supervision so no CPP/EGL "
+                "training renderer is ever constructed"
+            )
 
 
 def load_official_shared_state(
@@ -133,6 +160,31 @@ def load_official_shared_state(
         "official_shared_tensors": len(shared),
         "legacy_pnp_tensors_filtered": official_pnp_count,
         "new_pnp_tensors": len(expected_missing),
+    }
+
+
+def verify_stripped_checkpoint(
+    stripped_path: Path, official_path: Path
+) -> dict[str, int]:
+    """EXP013E precondition: the derived file carries no pnp tensors and is
+    otherwise value-identical to the SHA-256-verified official checkpoint."""
+    stripped = checkpoint_model_state(stripped_path)
+    official = checkpoint_model_state(official_path)
+    official_pnp = [key for key in official if key.startswith("pnp_net.")]
+    leaked = [key for key in stripped if key.startswith("pnp_net.")]
+    if leaked:
+        raise RuntimeError(f"Stripped checkpoint still contains pnp tensors: {leaked[:5]}")
+    expected_keys = {key for key in official if key not in set(official_pnp)}
+    if set(stripped) != expected_keys:
+        raise RuntimeError(
+            "Stripped checkpoint key set diverges from the official non-pnp keys"
+        )
+    bad = [key for key in stripped if not torch.equal(stripped[key], official[key])]
+    if bad:
+        raise RuntimeError(f"Stripped tensors diverge from official: {bad[:5]}")
+    return {
+        "official_shared_tensors": len(stripped),
+        "stripped_pnp_tensors": len(official_pnp),
     }
 
 
@@ -300,6 +352,13 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=PROJECT_ROOT / "pretrained_models/lmo_pbr/model_final_wo_optim.pth",
     )
+    parser.add_argument(
+        "--official",
+        type=Path,
+        default=PROJECT_ROOT / "pretrained_models/lmo_pbr/model_final_wo_optim.pth",
+        help="SHA-256-verified official checkpoint; variant E verifies its "
+        "pnp-stripped derivative (passed via --weights) against this file",
+    )
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--skip-round-trip", action="store_true")
     return parser.parse_args()
@@ -310,9 +369,25 @@ def main() -> int:
     relative_config, expected_type = VARIANTS[args.variant]
     config_path = (args.config or PROJECT_ROOT / relative_config).resolve()
     weights_path = args.weights.resolve()
-    actual_hash = sha256(weights_path)
-    if actual_hash != EXPECTED_WEIGHT_SHA256:
-        raise RuntimeError(f"Unexpected official checkpoint hash: {actual_hash}")
+    stripped_verification: dict[str, int] | None = None
+    if args.variant == "E":
+        official_path = args.official.resolve()
+        official_hash = sha256(official_path)
+        if official_hash != EXPECTED_WEIGHT_SHA256:
+            raise RuntimeError(f"Unexpected official checkpoint hash: {official_hash}")
+        if weights_path == official_path:
+            raise RuntimeError(
+                "EXP013E requires the pnp-stripped derivative (e_prep.py), not "
+                "the original checkpoint: its pnp keys would overwrite the "
+                "random initialization"
+            )
+        stripped_verification = verify_stripped_checkpoint(
+            weights_path, official_path
+        )
+    else:
+        official_hash = sha256(weights_path)
+        if official_hash != EXPECTED_WEIGHT_SHA256:
+            raise RuntimeError(f"Unexpected official checkpoint hash: {official_hash}")
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but unavailable")
     cfg = Config.fromfile(str(config_path))
@@ -346,10 +421,11 @@ def main() -> int:
                 "config": str(config_path),
                 "device": args.device,
                 "dtype": "float32",
-                "official_checkpoint_sha256": actual_hash,
+                "official_checkpoint_sha256": official_hash,
                 "only_pnp_net_trainable": True,
                 "full_model_forward_backward_optimizer_step": True,
                 "strict_roundtrip": not args.skip_round_trip,
+                **(stripped_verification or {}),
                 **profile,
                 **migration,
             },

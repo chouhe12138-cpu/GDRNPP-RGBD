@@ -70,6 +70,28 @@ docker/l40/managed_experiment.sh lab1 EXP013D finalize
 `E:\6D姿态估计\EXP-014\`，容器内放入 `$TORCH_HOME/hub/checkpoints/`（或 HF 缓存），
 避免离线训练启动时下载失败。
 
+## EXP013E（官方头随机初始化冻结对照）
+
+分支 `exp013e-official-random`，目标 lab0，bundle 流程与 EXP013D 相同。lab0 对
+`EXP013E` 执行完整序列：
+
+```bash
+docker/l40/managed_experiment.sh lab0 EXP013E access
+docker/l40/managed_experiment.sh lab0 EXP013E create
+docker/l40/managed_experiment.sh lab0 EXP013E gate
+docker/l40/managed_experiment.sh lab0 EXP013E smoke
+docker/l40/managed_experiment.sh lab0 EXP013E audit48
+docker/l40/managed_experiment.sh lab0 EXP013E launch
+docker/l40/managed_experiment.sh lab0 EXP013E finalize
+```
+
+与 EXP013A/B/C 的关键差异：头为官方 `ConvPnPNet` **随机初始化**；`MODEL.WEIGHTS`
+指向官方 ckpt 的 pnp 剥离派生文件 `model_final_wo_optim_wo_pnp.pth`——gate 步骤
+会先执行 `python -m research.exp013.e_prep` 从 SHA 校验的官方文件确定性生成
+（官方 pnp 键与重建头同名，直接加载原始 ckpt 会覆盖随机初始化）。训练渲染器为
+**关闭**状态（冻结几何监督关闭，引擎不构造 CPP/EGL 渲染器）；决策点固定
+epoch_040；预注册读数为诊断型（reS ≥0.54 / 0.52–0.54 / <0.52 三档解释规则）。
+
 本文记录稳定操作流程。即时 GPU、容器和实验状态以
 `research/SERVER_RUNTIME_STATUS_CN.md` 的重新检查结果为准。
 

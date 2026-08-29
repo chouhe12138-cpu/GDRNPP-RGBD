@@ -21,3 +21,4 @@
 | EXP-20260822-013-b-geometry-attention-residual | Stage 4F / local geometry attention | geometry-attention-residual | COMPLETE | 局部几何注意力残差支路 |
 | EXP-20260822-013-c-rt-decoupled-fusion | Stage 4F / conditional R-t decoupling | rt-decoupled-fusion | AUTHORIZED | Rotation/Translation 专用特征融合 |
 | EXP-20260827-014-d-fulltrain-imagenet | Stage 4F / full end-to-end training | d-fulltrain-imagenet | AUTHORIZED | ImageNet 预训练 ConvNeXt 全量端到端训练 |
+| EXP-20260829-015-e-official-head-random | Stage 4H / official-head random-init control | official-head-random | AUTHORIZED | 官方头随机初始化冻结对照 |

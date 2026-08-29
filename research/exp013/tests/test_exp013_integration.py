@@ -60,7 +60,10 @@ def test_geometry_supervision_disabled_rejects_unfrozen_head():
 
 
 def test_smoke_configs_are_isolated_one_epoch_real_data_runs():
-    for path in CONFIGS.values():
+    paths = list(CONFIGS.values()) + [
+        ROOT / "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/train.py"
+    ]
+    for path in paths:
         cfg = Config.fromfile(str(path.with_name("smoke.py")))
         assert tuple(cfg.DATASETS.TRAIN) == ("lmo_pbr_stage3_local_train",)
         assert tuple(cfg.DATASETS.TEST) == ()
