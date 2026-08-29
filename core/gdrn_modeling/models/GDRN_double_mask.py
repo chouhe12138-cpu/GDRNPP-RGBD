@@ -110,6 +110,7 @@ class GDRN_DoubleMask(nn.Module):
         roi_whs=None,
         roi_extents=None,
         resize_ratios=None,
+        depth_stats=None,
         do_loss=False,
     ):
         cfg = self.cfg
@@ -192,8 +193,15 @@ class GDRN_DoubleMask(nn.Module):
             quality_mask = torch.nan_to_num(quality_mask, nan=0.0, posinf=1.0, neginf=0.0)
             region_atten = self.quality_coverage_net(coor_feat, region_atten, quality_mask)
 
+        # EXP013F: only heads that declare use_depth_stats receive the depth
+        # statistics; existing heads keep their exact forward signature.
+        pnp_kwargs = {}
+        if depth_stats is not None and pnp_net_cfg.INIT_CFG.get(
+            "use_depth_stats", False
+        ):
+            pnp_kwargs["depth_stats"] = depth_stats
         pred_rot_, pred_t_ = self.pnp_net(
-            coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
+            coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten, **pnp_kwargs
         )
 
         # convert pred_rot to rot mat -------------------------

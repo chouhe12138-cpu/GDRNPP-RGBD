@@ -1,5 +1,5 @@
 {
-  "experiment_count": 17,
+  "experiment_count": 18,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -170,6 +170,16 @@
       "stage": "Stage 4F / full end-to-end training",
       "status": "AUTHORIZED",
       "title": "ImageNet 预训练 ConvNeXt 全量端到端训练"
+    },
+    {
+      "decision": "AUTHORIZED_USER_APPROVED_LOCAL_GATE_PASS",
+      "experiment_id": "EXP-20260829-016-f-glm-pose-l-screening",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260829-016-f-glm-pose-l-screening/EXPERIMENT.json",
+      "role": "glm-pose-l-screening",
+      "stage": "Stage 4H / GLM-Pose-L head screening",
+      "status": "AUTHORIZED",
+      "title": "GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计)"
     }
   ],
   "schema_version": 1

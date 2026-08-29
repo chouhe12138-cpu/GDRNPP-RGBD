@@ -35,6 +35,7 @@ from lib.utils.mask_utils import cocosegm2mask, get_edge
 from lib.vis_utils.image import grid_show
 from .dataset_factory import register_datasets
 from .data_loader_online import GDRN_Online_DatasetFromList
+from .roi_depth_stats import compute_roi_depth_stats
 from lib.utils.config_utils import try_get_key
 
 logger = logging.getLogger(__name__)
@@ -151,6 +152,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
 
         self.with_depth = cfg.INPUT.WITH_DEPTH
         self.bp_depth = cfg.INPUT.BP_DEPTH
+        # EXP013F: load depth paths for head-level statistics without changing
+        # the backbone input (INPUT.HEAD_DEPTH never concatenates into roi_img).
+        self.head_depth = bool(cfg.INPUT.get("HEAD_DEPTH", False))
+        if self.head_depth and self.bp_depth:
+            raise ValueError("INPUT.HEAD_DEPTH supports raw single-channel depth only")
         self.aug_depth = cfg.INPUT.AUG_DEPTH
         self.drop_depth_ratio = cfg.INPUT.DROP_DEPTH_RATIO
         self.drop_depth_prob = cfg.INPUT.DROP_DEPTH_PROB
@@ -342,7 +348,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         else:
             raise RuntimeError("cam intrinsic is missing")
 
-        if self.with_depth:
+        if self.with_depth or self.head_depth:
             assert "depth_file" in dataset_dict, "depth file is not in dataset_dict"
             depth_path = dataset_dict["depth_file"]
             log_first_n(logging.WARN, "with depth", n=1)
@@ -406,7 +412,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
             dataset_dict["cam"][1] *= scale_y
             K = dataset_dict["cam"].numpy()
 
-        if self.with_depth:
+        if self.with_depth or self.head_depth:
             if do_replace_bg and self.with_bg_depth:
                 mask_bg_depth = (~mask_trunc).astype(np.bool)
                 depth[mask_bg_depth] = bg_depth[mask_bg_depth]
@@ -509,6 +515,19 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
                 roi_depth = roi_depth.reshape(1, input_res, input_res)
             else:
                 roi_depth = roi_depth.transpose(2, 0, 1)
+
+        # EXP013F: per-ROI depth statistics for the pose-head translation
+        # branch (mask-free anchor-band method, identical at train and test).
+        if self.head_depth:
+            if self.with_depth:
+                depth_hw = roi_depth[0]
+            else:
+                depth_hw = crop_resize_by_warp_affine(
+                    depth, bbox_center, scale, input_res, interpolation=cv2.INTER_NEAREST
+                )
+            dataset_dict["roi_depth_stats"] = torch.as_tensor(
+                compute_roi_depth_stats(depth_hw, float(roi_extent[2]))
+            )
 
         # roi_coord_2d ----------------------------------------------------
         roi_coord_2d = crop_resize_by_warp_affine(
@@ -684,7 +703,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
             raise RuntimeError("cam intrinsic is missing")
 
         ## load depth
-        if self.with_depth:
+        if self.with_depth or self.head_depth:
             assert "depth_file" in dataset_dict, "depth file is not in dataset_dict"
             depth_path = dataset_dict["depth_file"]
             log_first_n(logging.WARN, "with depth", n=1)
@@ -722,6 +741,8 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         ]
         if self.with_depth:
             roi_keys.append("roi_depth")
+        if self.head_depth:
+            roi_keys.append("roi_depth_stats")
         for _key in roi_keys:
             roi_infos[_key] = []
         # yapf: enable
@@ -787,6 +808,18 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
                 else:
                     roi_depth = roi_depth.transpose(2, 0, 1)
                 roi_infos["roi_depth"].append(roi_depth.astype("float32"))
+
+            # EXP013F: per-ROI depth statistics (mask-free anchor-band method).
+            if self.head_depth:
+                if self.with_depth:
+                    depth_hw = roi_depth[0]
+                else:
+                    depth_hw = crop_resize_by_warp_affine(
+                        depth, bbox_center, scale, input_res, interpolation=cv2.INTER_NEAREST
+                    )
+                roi_infos["roi_depth_stats"].append(
+                    compute_roi_depth_stats(depth_hw, float(roi_extent[2]))
+                )
 
             # roi_coord_2d
             roi_coord_2d = crop_resize_by_warp_affine(

@@ -70,6 +70,32 @@ docker/l40/managed_experiment.sh lab1 EXP013D finalize
 `E:\6D姿态估计\EXP-014\`，容器内放入 `$TORCH_HOME/hub/checkpoints/`（或 HF 缓存），
 避免离线训练启动时下载失败。
 
+## EXP013F（GLM-Pose-L 头筛选：M2 注意力池化 + M3 深度统计）
+
+分支 `exp013f-glm-pose-l`，lab1 bundle 流程（上传
+`/data/labs/lab1/docker_data/chx/transfer/` → clone 到
+`releases/GDRNPP-RGBD-<short>` → detached checkout 40 位 commit → clean 检查 →
+`docker/l40/prepare_release.sh lab1 <image sha256:f3055cb6…>`）。lab1 对
+`EXP013F` 执行完整序列：
+
+```bash
+docker/l40/managed_experiment.sh lab1 EXP013F access
+docker/l40/managed_experiment.sh lab1 EXP013F create
+docker/l40/managed_experiment.sh lab1 EXP013F gate
+docker/l40/managed_experiment.sh lab1 EXP013F smoke
+docker/l40/managed_experiment.sh lab1 EXP013F audit48
+docker/l40/managed_experiment.sh lab1 EXP013F launch
+docker/l40/managed_experiment.sh lab1 EXP013F finalize
+```
+
+与 EXP013A/B/C 的关键差异：头为 `GLMPoseLNet`（继承 A 的 M1 输入主路；M2 注意力
+池化替代 flatten/FC；M3 平移支路拼接 4 维 ROI 深度统计），`INPUT.HEAD_DEPTH=True`
+（独立开关，只读深度做统计，不拼入 backbone 输入）。gate 判据（`variant: F`）：
+`trainable_parameters: 929175`、`legacy_pnp_tensors_filtered: 17`、
+`official_shared_tensors: 375`、深度敏感性三项 true。渲染器为**关闭**状态
+（几何监督关闭，无 CPP/EGL）；EGL 仅属 EXP013D。启动前照例检查 lab1 空闲显存
+（F 峰值与 A 同量级，约 5–6GB）。
+
 本文记录稳定操作流程。即时 GPU、容器和实验状态以
 `research/SERVER_RUNTIME_STATUS_CN.md` 的重新检查结果为准。
 

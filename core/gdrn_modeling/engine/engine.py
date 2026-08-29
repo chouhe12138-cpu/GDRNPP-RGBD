@@ -447,6 +447,7 @@ class GDRN_Lite(LightningLite):
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
+                    depth_stats=batch.get("roi_depth_stats", None),
                     do_loss=True,
                 )
                 losses = sum(loss_dict.values())

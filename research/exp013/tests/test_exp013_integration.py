@@ -21,6 +21,7 @@ CONFIGS = {
     "A": ROOT / "configs/gdrn/lmo_pbr/research/exp013/a_xyz_residual/train.py",
     "B": ROOT / "configs/gdrn/lmo_pbr/research/exp013/b_geometry_attention/train.py",
     "C": ROOT / "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
+    "F": ROOT / "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/train.py",
 }
 
 
@@ -29,6 +30,7 @@ def test_formal_config_contracts_and_head_types():
         "A": "XYZResidualBypassPnPNet",
         "B": "GeometryAttentionResidualPnPNet",
         "C": "RTDecoupledGeometryPnPNet",
+        "F": "GLMPoseLNet",
     }
     for variant, path in CONFIGS.items():
         cfg = Config.fromfile(str(path))
@@ -45,11 +47,14 @@ def test_formal_config_contracts_and_head_types():
         assert pose.PNP_NET.REGION_ATTENTION
         assert pose.PNP_NET.MASK_ATTENTION == "mul"
         assert pose.XYZ_ONLINE is True
-        assert geometry_supervision_enabled(cfg) is (variant != "C")
+        assert geometry_supervision_enabled(cfg) is (variant not in ("C", "F"))
         if variant == "C":
             assert "attention_scale_init" not in pose.PNP_NET.INIT_CFG
             assert pose.PNP_NET.INIT_CFG.geometry_scale_r_init == 0.1
             assert pose.PNP_NET.INIT_CFG.geometry_scale_t_init == 0.1
+        if variant == "F":
+            assert pose.PNP_NET.INIT_CFG.use_depth_stats is True
+            assert cfg.INPUT.HEAD_DEPTH is True
 
 
 def test_geometry_supervision_disabled_rejects_unfrozen_head():

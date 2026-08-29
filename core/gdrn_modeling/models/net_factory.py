@@ -37,6 +37,7 @@ from .heads.exp013_geometry_pnp_net import (
     RTDecoupledGeometryPnPNet,
     XYZResidualBypassPnPNet,
 )
+from .heads.glm_pose_net import GLMPoseLNet
 from .heads.conv_pnp_net_no_region import ConvPnPNetNoRegion
 from .heads.conv_pnp_net_cls import ConvPnPNetCls
 from .heads.point_pnp_net import SimplePointPnPNet
@@ -99,6 +100,7 @@ HEADS = {
     "XYZResidualBypassPnPNet": XYZResidualBypassPnPNet,
     "GeometryAttentionResidualPnPNet": GeometryAttentionResidualPnPNet,
     "RTDecoupledGeometryPnPNet": RTDecoupledGeometryPnPNet,
+    "GLMPoseLNet": GLMPoseLNet,
     "ConvPnPNetNoRegion": ConvPnPNetNoRegion,
     "ConvPnPNetCls": ConvPnPNetCls,
     "SimplePointPnPNet": SimplePointPnPNet,

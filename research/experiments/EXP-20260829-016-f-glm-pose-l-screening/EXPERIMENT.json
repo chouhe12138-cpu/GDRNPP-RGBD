@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "experiment_id": "EXP-20260829-016-f-glm-pose-l-screening",
+  "title": "GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计)",
+  "stage": "Stage 4H / GLM-Pose-L head screening",
+  "role": "glm-pose-l-screening",
+  "status": "AUTHORIZED",
+  "legacy_import": false,
+  "decision": "AUTHORIZED_PLANNED_LAB1",
+  "protocol": {
+    "research_question": "在冻结特征协议下,GLM-Pose-L(M1 官方输入管线 + M2 注意力池化替代 flatten/FC + M3 深度统计注入平移支路)能否在 teS 与 ADD 上超过 A/B/C 家族上限(0.684±0.001 BOP AR)且不损伤旋转,验证 GLM-Pose 设计文档的 M2+M3 方向?",
+    "parent_experiment": "EXP-20260822-013-a-xyz-residual-bypass",
+    "single_changed_variable": "head structure: GLMPoseLNet (A main stream kept verbatim; late flatten/FC replaced by one Transformer encoder layer + learned attention pooling; translation branch concatenates 4 normalized ROI depth statistics) plus INPUT.HEAD_DEPTH=True",
+    "train_dataset": "lmo_pbr_train",
+    "test_dataset": "lmo_bop_test",
+    "bbox_type": "gt",
+    "seed": 42,
+    "total_epochs": 40,
+    "evaluation_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
+    "fixed_checkpoint": "epoch_040",
+    "initialization": "official_checkpoint_fresh_start_legacy_filter",
+    "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+    "trainable_modules": ["pnp_net"],
+    "frozen_modules": ["backbone", "geometry_head"],
+    "server": "lab1",
+    "model": {
+      "pose_head": "GLMPoseLNet",
+      "head_flags": "M1: A 的 XYZ extent 反归一化 + abs ROI2D + region 注意力 + mask 乘性门控主路逐字保留; M2: 16x16 token 网格 + 2D 位置编码 + 1 层 TransformerEncoderLayer(embed 256, 8 heads, FFN 512) + tanh 打分注意力池化 + 共享 fc 256; M3: 深度统计仅拼入平移输入(260->3), 旋转输入不含深度(256->6); depth_stats=None 时零填充",
+      "depth_statistics": "mask-free anchor-band 法(core/gdrn_modeling/datasets/roi_depth_stats.py): ROI 裁剪深度, 中心窗锚定, |d-center|<=extent_z 带; 4 维 [median/ext_z, center/ext_z, variance/median^2, band_fraction]; 训练/测试同法",
+      "head_parameters": 929175,
+      "training_renderer": "none (frozen geometry supervision disabled; no CPP/EGL renderer is constructed)",
+      "optimizer": "Ranger lr 8e-4 (EXP013 family recipe), warmup 200"
+    },
+    "baseline": {
+      "exp013a": {"bop19_ar": 0.683956, "ar_reS": 0.498039, "ar_teS": 0.788247},
+      "exp013b": {"bop19_ar": 0.684058},
+      "exp013c_e40": {"bop19_ar": 0.684646, "ar_reS": 0.525029, "ar_teS": 0.794216, "add_s_0.1d": 0.496914},
+      "exp005_official_head_continued_frozen": {"bop19_ar": 0.691912, "ar_reS": 0.544406, "ar_teS": 0.800923}
+    },
+    "acceptance_gate": {
+      "type": "screening_pass_gate_symptom_targeted",
+      "ar_teS_ge_0.8028": "平移显著超过 A(0.7882),达到 EXP005 平移水平",
+      "add_s_0.1d_ge_0.5107": "ADD 超过 C 的 0.4969 与家族上限",
+      "ar_reS_ge_0.4930": "旋转不低于 A(0.4980)减去单评估噪声",
+      "bop19_ar_ge_0.6838": "BOP19 AR 不低于家族上限带(0.6846)减去噪声",
+      "note": "四条同时满足才算 F 过线;M2 与 M3 联合筛选,未单独拆分归因",
+      "noise_caveat": "EXP013 家族单评估摆幅 ±0.01~0.015;过线后正式引用前补第二 seed"
+    }
+  },
+  "evidence": {
+    "record": "RECORD.md",
+    "design": "DESIGN.md",
+    "local_gate": "LOCAL_GATE.json",
+    "formal_config": "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/train.py",
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/eval.py"
+  }
+}

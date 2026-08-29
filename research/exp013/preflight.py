@@ -19,6 +19,7 @@ from core.gdrn_modeling.models.heads.exp013_geometry_pnp_net import (
     RTDecoupledGeometryPnPNet,
     XYZResidualBypassPnPNet,
 )
+from core.gdrn_modeling.models.heads.glm_pose_net import GLMPoseLNet
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -37,6 +38,10 @@ VARIANTS = {
     "C": (
         "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
         RTDecoupledGeometryPnPNet,
+    ),
+    "F": (
+        "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/train.py",
+        GLMPoseLNet,
     ),
 }
 
@@ -97,6 +102,18 @@ def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
             raise RuntimeError("A-based EXP013C must disable frozen geometry supervision")
         if "attention_scale_init" in pnp.INIT_CFG:
             raise RuntimeError("A-based EXP013C must not inherit B attention settings")
+    if expected_type is GLMPoseLNet:
+        if pose.GEO_HEAD.get("TRAIN_SUPERVISION", True):
+            raise RuntimeError(
+                "EXP013F must disable frozen geometry supervision so no CPP/EGL "
+                "training renderer is ever constructed"
+            )
+        if not pnp.INIT_CFG.get("use_depth_stats", False):
+            raise RuntimeError("EXP013F preregisters use_depth_stats=True")
+        if not cfg.INPUT.get("HEAD_DEPTH", False):
+            raise RuntimeError(
+                "EXP013F requires INPUT.HEAD_DEPTH=True to feed the depth statistics"
+            )
 
 
 def load_official_shared_state(
@@ -291,6 +308,39 @@ def profile_head(
     }
 
 
+def depth_stats_sensitivity_check(
+    head: GLMPoseLNet, device: torch.device
+) -> dict[str, bool]:
+    """EXP013F: translation must consume depth statistics while rotation must
+    not, and the zero padding must equal an explicit zero vector."""
+    head = head.to(device).eval()
+    coor = torch.rand(1, 5, 64, 64, device=device)
+    region = torch.softmax(torch.randn(1, 64, 64, 64, device=device), dim=1)
+    extents = torch.rand(1, 3, device=device) + 0.1
+    mask = torch.rand(1, 1, 64, 64, device=device)
+    with torch.no_grad():
+        rot_none, t_none = head(coor, region=region, extents=extents, mask_attention=mask)
+        zeros = torch.zeros(1, head.depth_stats_dim, device=device)
+        rot_zero, t_zero = head(
+            coor, region=region, extents=extents, mask_attention=mask, depth_stats=zeros
+        )
+        probe = torch.full((1, head.depth_stats_dim), 0.5, device=device)
+        rot_probe, t_probe = head(
+            coor, region=region, extents=extents, mask_attention=mask, depth_stats=probe
+        )
+    if not torch.equal(t_none, t_zero) or not torch.equal(rot_none, rot_zero):
+        raise RuntimeError("EXP013F zero-padding is not equivalent to depth_stats=None")
+    if torch.equal(t_zero, t_probe):
+        raise RuntimeError("EXP013F translation ignores depth statistics")
+    if not torch.equal(rot_zero, rot_probe):
+        raise RuntimeError("EXP013F rotation must not depend on depth statistics")
+    return {
+        "depth_stats_zero_padding_equivalent": True,
+        "depth_stats_translation_sensitive": True,
+        "depth_stats_rotation_independent": True,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--variant", choices=tuple(VARIANTS), required=True)
@@ -331,6 +381,14 @@ def main() -> int:
     device = torch.device(args.device)
     model.to(device)
     full_forward_backward_step(model, optimizer, device)
+    depth_stats_check = None
+    if isinstance(model.pnp_net, GLMPoseLNet):
+        depth_stats_check = depth_stats_sensitivity_check(model.pnp_net, device)
+        head_params = sum(p.numel() for p in model.pnp_net.parameters())
+        if not 800_000 <= head_params <= 1_100_000:
+            raise RuntimeError(
+                f"EXP013F head parameter budget violated: {head_params}"
+            )
     profile = profile_head(model.pnp_net, device)
     if not args.skip_round_trip:
         if device.type != "cpu":
@@ -350,6 +408,7 @@ def main() -> int:
                 "only_pnp_net_trainable": True,
                 "full_model_forward_backward_optimizer_step": True,
                 "strict_roundtrip": not args.skip_round_trip,
+                **(depth_stats_check or {}),
                 **profile,
                 **migration,
             },

@@ -1,0 +1,39 @@
+{
+ "schema_version": 1,
+ "experiment_id": "EXP-20260829-016-f-glm-pose-l-screening",
+ "status": "PASS",
+ "tested_source_commit": "working tree on exp013f-glm-pose-l (base 4064bc2 + v2 depth-pipeline fixes)",
+ "official_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
+ "environment": {
+  "platform": "Linux-WSL2 (Ubuntu)",
+  "conda_environment": "pytorch22",
+  "local_smoke_renderer": "none (renderer never constructed; supervision disabled)"
+ },
+ "checks": {
+  "config_merge_renderer_state": "PASS_train_smoke_audit48_renderer_none",
+  "unit_and_integration_tests": "PASS_28_TESTS",
+  "cpu_full_forward_backward_optimizer": "PASS",
+  "cuda_full_forward_backward_optimizer": "PASS",
+  "strict_checkpoint_roundtrip": "PASS_VALUE_EXACT_CPU",
+  "depth_stats_sensitivity": "PASS_zero_padding_equivalent_translation_sensitive_rotation_independent",
+  "head_parameter_budget": "PASS_929175_in_800k_1.1M",
+  "real_data_smoke": "PASS_1_EPOCH_2048_ITERATIONS_BATCH4_WORKERS2_NO_RENDERER",
+  "smoke_loss_finite": true,
+  "depth_stats_pipeline": "PASS_online_train_offline_test_both_produce_Bx4_roi_depth_stats"
+ },
+ "profile": {
+  "trainable_parameters": 929175,
+  "fvcore_supported_flops_per_64x64_sample": 321063180,
+  "cuda_head_forward_latency_ms_batch1": 1.9676,
+  "cuda_peak_vram_bytes_batch1": 420388864
+ },
+ "smoke": {
+  "last_total_loss": 0.6778,
+  "running_mean_total_loss": 1.903,
+  "output_dir": "output/experiments/EXP-20260829-016-f-glm-pose-l-screening/LOCAL-20260829-f-online-depth-smoke"
+ },
+ "training_renderer": null,
+ "xyz_online_mapper_retained": true,
+ "mechanism": "v2 depth pipeline (HEAD_DEPTH flag; roi-cropped anchor-band stats computed in BOTH data_loader_online.GDRN_Online_DatasetFromList and data_loader.GDRN_DatasetFromList; [4]-shaped stats; 3D-depth normalization)",
+ "v1_failure_note": "v1 stats only in GDRN_DatasetFromList while XYZ_ONLINE=True routes training through GDRN_Online_DatasetFromList -> KeyError roi_depth_stats; v1 also used full-image depth and [B,1,4]-shaped batches"
+}

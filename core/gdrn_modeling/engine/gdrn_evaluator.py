@@ -744,6 +744,7 @@ def gdrn_inference_on_dataset(cfg, model, data_loader, evaluator, amp_test=False
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
+                    depth_stats=batch.get("roi_depth_stats", None),
                 )
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
@@ -905,6 +906,7 @@ def gdrn_save_result_of_dataset(cfg, model, data_loader, output_dir, dataset_nam
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
+                    depth_stats=batch.get("roi_depth_stats", None),
                 )
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
