@@ -85,12 +85,13 @@ docker/l40/managed_experiment.sh lab0 EXP013E launch
 docker/l40/managed_experiment.sh lab0 EXP013E finalize
 ```
 
-与 EXP013A/B/C 的关键差异：头为官方 `ConvPnPNet` **随机初始化**；`MODEL.WEIGHTS`
-指向官方 ckpt 的 pnp 剥离派生文件 `model_final_wo_optim_wo_pnp.pth`——gate 步骤
-会先执行 `python -m research.exp013.e_prep` 从 SHA 校验的官方文件确定性生成
-（官方 pnp 键与重建头同名，直接加载原始 ckpt 会覆盖随机初始化）。训练渲染器为
-**关闭**状态（冻结几何监督关闭，引擎不构造 CPP/EGL 渲染器）；决策点固定
-epoch_040；预注册读数为诊断型（reS ≥0.54 / 0.52–0.54 / <0.52 三档解释规则）。
+与 EXP013A/B/C 的关键差异：头为官方 `ConvPnPNet` **随机初始化**（经
+`OfficialConvPnPNetRandomInit` wrapper，键名 `pnp_net.head.*` 与官方 ckpt 的
+`pnp_net.*` 永不重名——`MODEL.WEIGHTS` 直接使用原始官方 ckpt，无需任何派生
+权重文件）。训练渲染器为**关闭**状态（冻结几何监督关闭，引擎不构造 CPP/EGL
+渲染器）；决策点固定 epoch_040；预注册读数为诊断型（reS ≥0.54 / 0.52–0.54 /
+<0.52 三档解释规则）。历史备注：v1 的 pnp 剥离派生权重方案已被
+RUN-20260829-063652-smoke-s42-a01 失败否决并废弃。
 
 本文记录稳定操作流程。即时 GPU、容器和实验状态以
 `research/SERVER_RUNTIME_STATUS_CN.md` 的重新检查结果为准。

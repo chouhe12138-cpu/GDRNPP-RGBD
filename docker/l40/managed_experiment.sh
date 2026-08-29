@@ -356,11 +356,6 @@ gate() {
     elif [[ "${experiment}" == "EXP013D" ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.exp014.preflight --config ${config_root}/train.py --device cuda --skip-round-trip"
-    elif [[ "${experiment}" == "EXP013E" ]]; then
-        # Derive the pnp-stripped checkpoint first (deterministic, verified),
-        # then run the E preflight against it instead of the original file.
-        "${docker_bin}" exec "${container}" bash -lc \
-            "cd /workspace/gdrnpp && python -m research.exp013.e_prep --official ${official_container} --out pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth && python -m research.exp013.preflight --variant E --config ${config_root}/train.py --weights pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth --official ${official_container} --device cuda --skip-round-trip"
     elif [[ "${experiment}" == EXP013* ]]; then
         "${docker_bin}" exec "${container}" bash -lc \
             "cd /workspace/gdrnpp && python -m research.exp013.preflight --variant ${exp013_variant} --config ${config_root}/train.py --weights ${official_container} --device cuda --skip-round-trip"

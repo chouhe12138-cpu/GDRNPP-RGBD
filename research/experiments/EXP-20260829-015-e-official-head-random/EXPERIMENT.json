@@ -18,14 +18,14 @@
     "total_epochs": 40,
     "evaluation_epochs": [5, 10, 15, 20, 25, 30, 35, 40],
     "fixed_checkpoint": "epoch_040",
-    "initialization": "official_checkpoint_fresh_start_with_pnp_stripped",
+    "initialization": "official_checkpoint_fresh_start_key_safe_wrapper",
     "initialization_checkpoint_sha256": "bafa869d4e6c00410517ecb1add59f234ed1642e47fabcf3aa6e0e8a1b498a8c",
-    "weights_note": "MODEL.WEIGHTS points to the pnp-stripped derivative (research/exp013/e_prep.py, pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth); the official pnp keys share their names with the rebuilt head and would overwrite the random initialization",
+    "weights_note": "MODEL.WEIGHTS is the original official checkpoint; the rebuilt head nests the official module under a head.* submodule (core/gdrn_modeling/models/heads/official_head_random_init.py) so official pnp_net.* keys can never collide with or overwrite the random initialization (same key-mismatch mechanism as EXP013A/B/C)",
     "trainable_modules": ["pnp_net"],
     "frozen_modules": ["backbone", "geometry_head"],
     "server": "lab0",
     "model": {
-      "pose_head": "ConvPnPNet",
+      "pose_head": "OfficialConvPnPNetRandomInit",
       "head_flags": "official-native: GN+gelu, flatten fc1 8192->1024, denormalize_by_extent, REGION_ATTENTION=True, WITH_2D_COORD=abs, MASK_ATTENTION=none",
       "training_renderer": "none (frozen geometry supervision disabled; no CPP/EGL renderer is constructed)",
       "optimizer": "Ranger lr 8e-4 (EXP013 family recipe, matching official full-training lr), warmup 200"

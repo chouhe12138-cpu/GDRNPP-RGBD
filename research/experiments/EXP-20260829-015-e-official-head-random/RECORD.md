@@ -6,28 +6,34 @@
   随机初始化,渲染器状态:**关闭**(无 CPP/EGL,冻结几何监督关闭,
   `TRAIN_SUPERVISION=False`)。
 
-## 2026-08-29 本地门禁(PASS)
+## 2026-08-29 smoke v1 失败记录(保留证据)
 
-- 权重剥离:`research/exp013/e_prep.py` 从 SHA 校验的官方 ckpt 生成
-  `pretrained_models/lmo_pbr/model_final_wo_optim_wo_pnp.pth`;保留 375 个
-  非 pnp 张量(逐值一致)、剥离 17 个 pnp 张量;
-  SHA-256 `de07b832c2b28260f7c16915790d8db71fea0e921abd10594b3e67e7b844281c`。
-- 配置合并检查:train/smoke/audit48 三态均为 `ConvPnPNet + gelu + MASK=none +
-  剥离权重`,几何监督关闭,渲染器 = 无(引擎不会构造 CPP/EGL)。
-- pytest:`research/exp013/tests` 共 27 项全部通过(含 6 项 E 专属 + smoke 隔离
-  扩展)。
+- `RUN-20260829-063652-smoke-s42-a01`:v1 机制(pnp 剥离派生权重
+  `model_final_wo_optim_wo_pnp.pth` 由 gate 生成)在服务器 smoke 时报
+  `Checkpoint ... not found!`——gate 与 smoke 之间的容器文件状态不可靠。
+- 结论:放弃派生文件方案,E 机制改为 wrapper 键名错位保护(见 DESIGN v2)。
+  该 run 目录保留,不计入任何结果。
+
+## 2026-08-29 本地门禁 v2(PASS)
+
+- 机制:`OfficialConvPnPNetRandomInit` wrapper(官方模块嵌套于 `head.*`),
+  `MODEL.WEIGHTS` = 原始官方 ckpt(容器内必然存在);官方 warm start 时
+  17 个官方 pnp 键被 legacy 过滤器丢弃,随机初始化不可能被覆盖;
+  单测覆盖"官方键无法改写随机初始化"这一核心保证。
+- 配置合并检查:train/smoke/audit48 三态均为
+  `OfficialConvPnPNetRandomInit + gelu + MASK=none + 原始官方 ckpt`,
+  几何监督关闭,渲染器 = 无(引擎不会构造 CPP/EGL)。
+- pytest:`research/exp013/tests` 全部通过(含 E 专属 5 项 + smoke 隔离扩展)。
 - preflight `--variant E`:CPU(含严格 checkpoint 往返)与 CUDA 均通过;
-  375 共享张量迁移、17 个 pnp 剥离键、随机初始化未被覆盖;
+  375 共享张量迁移、17 个官方 pnp 键过滤、64→17 个新头张量;
   trainable params `9,029,513`;head FLOPs `138,094,848`;
-  batch1 延迟 CPU `8.13ms` / CUDA `0.52ms`;峰值显存(batch1)`578,798,080` 字节。
+  batch1 延迟 CPU `2.56ms` / CUDA `0.40ms` 级;峰值显存(batch1)`~0.55GB`。
 - 真实数据 smoke:`lmo_pbr_stage3_local_train`,batch 4,2 workers,2048/2048
   iterations,输出目录
-  `output/experiments/EXP-20260829-015-e-official-head-random/LOCAL-20260829-e-no-render-smoke`;
-  全程日志 0 次 renderer 出现(未创建 CPP/EGL renderer);
-  final total loss `0.3981`(running mean `1.698`),checkpoint
-  `model_epoch_001.pth` 已保存。
+  `output/experiments/EXP-20260829-015-e-official-head-random/LOCAL-20260829-e-wrapper-no-render-smoke`;
+  全程日志 0 次 renderer 构造;checkpoint `model_epoch_001.pth` 已保存。
 
 ## 服务器流程
 
-见 `research/RUNBOOK_CN.md` EXP013E 小节(gate 会先运行 e_prep 生成剥离权重再跑
-preflight)。formal 启动前照例检查 lab0 空闲显存。
+见 `research/RUNBOOK_CN.md` EXP013E 小节(gate 走通用 EXP013 通配,直接使用
+原始官方 ckpt)。formal 启动前照例检查 lab0 空闲显存。
