@@ -102,13 +102,13 @@
       "title": "Correspondence-Aware Moment Pose Head（CPM-Head）"
     },
     {
-      "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_ACCESS_PASS_FORMAL_NOT_STARTED_OR_VERIFIED",
+      "decision": "FAILED_FORMAL_CRASHED_NO_RETRY",
       "experiment_id": "EXP-20260816-010-cpm-official-lr-control",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260816-010-cpm-official-lr-control/EXPERIMENT.json",
       "role": "CPM-LR-control",
       "stage": "Stage 4 / CPM optimization control",
-      "status": "AUTHORIZED",
+      "status": "FAILED",
       "title": "CPM-Head 官方量级学习率受控实验"
     },
     {
@@ -172,7 +172,7 @@
       "title": "ImageNet 预训练 ConvNeXt 全量端到端训练"
     },
     {
-      "decision": "AUTHORIZED_USER_APPROVED_LOCAL_GATE_PASS",
+      "decision": "AUTHORIZED_PLANNED_LAB1",
       "experiment_id": "EXP-20260829-016-f-glm-pose-l-screening",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260829-016-f-glm-pose-l-screening/EXPERIMENT.json",

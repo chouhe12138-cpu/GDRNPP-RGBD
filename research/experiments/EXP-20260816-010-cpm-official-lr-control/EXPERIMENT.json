@@ -4,9 +4,9 @@
   "title": "CPM-Head 官方量级学习率受控实验",
   "stage": "Stage 4 / CPM optimization control",
   "role": "CPM-LR-control",
-  "status": "AUTHORIZED",
+  "status": "FAILED",
   "legacy_import": false,
-  "decision": "AUTHORIZED_AFTER_EXP005_FIXED_EPOCH_040_ACCESS_PASS_FORMAL_NOT_STARTED_OR_VERIFIED",
+  "decision": "FAILED_FORMAL_CRASHED_NO_RETRY",
   "protocol": {
     "research_question": "EXP009 的欠佳结果是否受到新随机初始化 CPM 姿态头使用过低学习率的限制？",
     "single_changed_variable": "SOLVER.OPTIMIZER_CFG.lr: 8e-5 -> 8e-4",
@@ -80,8 +80,20 @@
       "status": "PASS",
       "machine": "lab0",
       "physical_gpu": 0,
-      "formal_run_identity": "NOT_RECORDED",
+      "formal_run_identity": "RUN-20260816-081032-formal-s42-a01 (crashed at ~E27; no fixed E40)",
       "create_gate_smoke_audit_status": "NOT_RECORDED"
+    },
+    "crash": {
+      "formal_run": "RUN-20260816-081032-formal-s42-a01",
+      "log_end": "epoch 27, iter 166999/255920 (65.3%), 2026-08-18",
+      "evaluated_epochs": {
+        "epoch_005_bop_ar": 0.49620530565167237,
+        "epoch_010_bop_ar": 0.5407750865051902,
+        "epoch_015_bop_ar": 0.5670449826989619,
+        "epoch_020_bop_ar": 0.5135478662053056,
+        "epoch_025_bop_ar": 0.5333956170703575
+      },
+      "user_decision_20260830": "crashed; no retry (not worth further compute)"
     }
   }
 }

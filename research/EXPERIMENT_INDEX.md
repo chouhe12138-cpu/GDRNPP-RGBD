@@ -14,11 +14,11 @@
 | EXP-20260804-007-pose-head-information-flow | Stage 3C mechanism diagnostic | official/C1/B/C2 diagnostic | RUNNING | Patch-PnP 姿态头信息流全量统计诊断 |
 | EXP-20260805-008-stage3c2-joint-adaptation | Stage 3C2 | C2 | COMPLETE | Patch-PnP 与质量/覆盖模块联合适应 C2 |
 | EXP-20260809-009-cpm-head | Stage 4 / CPM | CPM | COMPLETE | Correspondence-Aware Moment Pose Head（CPM-Head） |
-| EXP-20260816-010-cpm-official-lr-control | Stage 4 / CPM optimization control | CPM-LR-control | AUTHORIZED | CPM-Head 官方量级学习率受控实验 |
+| EXP-20260816-010-cpm-official-lr-control | Stage 4 / CPM optimization control | CPM-LR-control | FAILED | CPM-Head 官方量级学习率受控实验 |
 | EXP-20260817-011-cpm-xyz-region-consistency-diagnostic | Stage 4 / CPM mechanism diagnostic | diagnostic | COMPLETE | CPM XYZ–Region 一致性固定权重诊断 |
 | EXP-20260817-012-hierarchical-correspondence-head | Stage 4E / correspondence-preserving pose head | hierarchical-correspondence-head | COMPLETE | 层级密集 Correspondence Pose Head |
 | EXP-20260822-013-a-xyz-residual-bypass | Stage 4F / geometry-path ablation | xyz-residual-bypass | COMPLETE | XYZ-ROI2D 独立几何残差支路 |
 | EXP-20260822-013-b-geometry-attention-residual | Stage 4F / local geometry attention | geometry-attention-residual | COMPLETE | 局部几何注意力残差支路 |
 | EXP-20260822-013-c-rt-decoupled-fusion | Stage 4F / conditional R-t decoupling | rt-decoupled-fusion | AUTHORIZED | Rotation/Translation 专用特征融合 |
 | EXP-20260827-014-d-fulltrain-imagenet | Stage 4F / full end-to-end training | d-fulltrain-imagenet | AUTHORIZED | ImageNet 预训练 ConvNeXt 全量端到端训练 |
-| EXP-20260829-016-f-glm-pose-l-screening | Stage 4H / GLM-Pose-L head screening | glm-pose-l-screening | AUTHORIZED | GLM-Pose-L 头筛选（M2 注意力池化 + M3 深度统计） |
+| EXP-20260829-016-f-glm-pose-l-screening | Stage 4H / GLM-Pose-L head screening | glm-pose-l-screening | AUTHORIZED | GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计) |

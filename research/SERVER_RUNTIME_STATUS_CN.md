@@ -1,12 +1,22 @@
 # GDRNPP 服务器运行环境与实验进度交接
 
-最后更新：2026-08-18
+最后更新：2026-08-30
 
 本文同时保存带日期的服务器历史快照和可重复执行的只读检查说明。日期段落只描述
 当时已经回传的事实，不保证等同于当前 Git、GPU、容器或进程状态，也不因后续
 实验推进而反向改写。当前 Git 状态以实际 `git` 命令为准；当前服务器状态必须
 重新执行本文的只读检查。若历史段落中的“尚未提交”“正在运行”等表述与现在冲突，
 应按其段落日期理解，而不是当作实时事实。
+
+## 2026-08-30 更新
+
+- EXP010 formal run `RUN-20260816-081032-formal-s42-a01`（lab0，2026-08-16
+  启动，commit `29580f65...`）经本地 `E:\6D姿态估计\EXP-010\console.log` 确认
+  曾实际运行：日志止于 epoch 27 / iteration `166999/255920`（2026-08-18），
+  之后崩溃，无固定 Epoch 40 结果。已完成 E5/E10/E15/E20/E25 评估（BOP AR
+  `0.4962/0.5408/0.5670/0.5135/0.5334`）。用户决定不重试，EXP010 关闭为
+  `FAILED`；崩溃日志与评估保留为证据。早期段落中“EXP010 无 formal run
+  回传证据”的表述按快照日期理解，已过时。
 
 ## 2026-08-18 更新
 
@@ -163,7 +173,7 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 
 | 账户 | 分配的物理GPU | 容器内可见设备 | 当前实验角色 |
 |---|---:|---:|---|
-| `lab0` | GPU 0 | 通常为CUDA device 0 | EXP010 已授权；运行状态未实时核验 |
+| `lab0` | GPU 0 | 通常为CUDA device 0 | EXP010 已关闭（FAILED，formal 崩溃于 ~E27） |
 | `lab1` | GPU 1 | 通常为CUDA device 0 | EXP009 固定 Epoch 40 已完成；实时状态未核验 |
 
 服务器GPU为NVIDIA L40，每张约46,068 MiB。
@@ -184,7 +194,7 @@ EXP009 必须以本轮实际推送到 Gitee 的 full release commit 为准，后
 |---|---|---|---|---|
 | EXP005/B | lab0/GPU0 | 未实时核验 | 稳定 environment image | `652d7fd...` formal Epoch 40 已完成 |
 | EXP009/CPM | lab1/GPU1 | 未实时核验 | 稳定 environment image | fixed Epoch 40 complete；CPM_SCREEN_FAIL |
-| EXP010/CPM-LR | lab0/GPU0 | 未实时核验 | 稳定 environment image | `29580f65...` access PASS；无正式 run 证据 |
+| EXP010/CPM-LR | lab0/GPU0 | 未实时核验 | 稳定 environment image | formal `RUN-20260816-081032-formal-s42-a01` 曾运行至 ~E27 后崩溃；FAILED，不重试 |
 
 B/C2镜像最后观察到的ID：
 

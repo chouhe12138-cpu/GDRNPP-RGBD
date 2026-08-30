@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-08-26。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
+最后核对：2026-08-30。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
 
 Git branch、HEAD、远端跟踪和 worktree 属于运行时事实，不在本页固化。需要核对时直接执行 `git status --short --branch`、`git rev-parse HEAD` 和 `git rev-parse --abbrev-ref --symbolic-full-name @{u}`。
 
@@ -19,7 +19,7 @@ Stage 3C0: EXP005/B COMPLETE
 Stage 3C1: C1 COMPLETE — C1_SCREEN_FAIL
 Stage 3C2: C2 COMPLETE — C2_SCREEN_FAIL
 Stage 4:   EXP009 FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
-Stage 4C:  EXP010 AUTHORIZED — ACCESS PASS，NO FORMAL RUN RECORDED
+Stage 4C:  EXP010 FAILED — FORMAL CRASHED ~E27，USER NO-RETRY（E5–E25 评估保留为证据）
 Stage 4D:  EXP011 COMPLETE — MISMATCH_IMPORTANT
 Stage 4E:  EXP012 COMPLETE — E40 STABLE PLATEAU RECORDED
 Stage 4F:  EXP013 A COMPLETE/PASS；B COMPLETE/STRICT BOP GATE FAIL；C A-BASED REVISION AUTHORIZED/FORMAL NOT STARTED
@@ -65,12 +65,20 @@ Stage 4H:  EXP013F AUTHORIZED — GLM-Pose-L 筛选（分支 exp013f-glm-pose-l�
 
 ### EXP010/CPM 学习率控制
 
-- 状态为 `AUTHORIZED`；尚无 formal run 身份。
-- lab0 access 回传为 PASS；source commit 为
-  `29580f65abfeb7625bab252011c19399325b0fa2`。
-- environment image ID 为
-  `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`。
-- 当前没有 create、gate、smoke、audit 或 formal 启动完成的回传证据。
+- 状态为 `FAILED`（formal 崩溃，用户决定不重试，2026-08-30）。
+- formal run：`RUN-20260816-081032-formal-s42-a01`，lab0，seed 42，lr 8e-4；
+  2026-08-16 启动，日志止于 epoch 27 / iteration `166999/255920`（65.3%），
+  之后崩溃，无固定 Epoch 40 checkpoint 或最终评估。
+- 已完成评估（EVAL_SUMMARY）：E5 BOP AR `0.496205`、E10 `0.540775`、
+  E15 `0.567045`（已观测峰值）、E20 `0.513548`、E25 `0.533396`。
+- E21 起训练 loss 回升（loss_PM_R `0.0148→0.0153+`、total `0.167→0.187`），
+  呈高学习率不稳迹象。
+- 方向性解读（非 gate 结论）：EXP009（lr 8e-5）E30 的 `0.5994625144` 已高于
+  EXP010 全程已观测峰值，10 倍学习率没有更快超过 EXP009 平台；不支持
+  "CPM 失败主要来自学习率过低"。匹配比较在形式上未完成（无固定 E40）。
+- lab0 access PASS、source commit `29580f65abfeb7625bab252011c19399325b0fa2`、
+  environment image `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`
+  继续保留为事实。
 
 ### EXP011/CPM XYZ–Region 一致性诊断
 
