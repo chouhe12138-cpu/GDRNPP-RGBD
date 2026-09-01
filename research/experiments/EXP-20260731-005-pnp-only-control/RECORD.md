@@ -9,7 +9,12 @@
 - formal run：`RUN-20260811-063606-formal-s42-a01`
 - source commit：`652d7fd9d38f8ea5cea0c5a98cc9477b66623180`
 - checkpoint：`model_epoch_040.pth`，epoch 40 / iteration 255919
-- 历史配置已退出当前树，可在该 source commit 中恢复
+- 历史原始配置在 source commit 中；当前树提供
+  `configs/gdrn/lmo_pbr/research/controls/pnp_only/` 作为长期等价 matched control
+
+当前 control 只保留 EXP005 的科学控制条件，并按现有 `_base_` 配置体系重写；若要
+精确复现 2026-08-11 的正式结果，应 checkout 上述 source commit，而不是使用当前
+core 重新解释历史结果。
 
 首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
 只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable

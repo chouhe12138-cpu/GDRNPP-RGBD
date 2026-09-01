@@ -90,7 +90,7 @@ RUN chmod 0755 /usr/local/bin/build-gdrn-native /usr/local/bin/verify-gdrn-envir
     && /usr/local/bin/verify-gdrn-native
 
 RUN cd /workspace/gdrnpp \
-    && PYTHONPATH=/workspace/gdrnpp PYTHONPYCACHEPREFIX=/tmp/gdrnpp-pycache python -m pytest -q -o cache_dir=/tmp/gdrnpp-pytest-cache research/next_pose_head/tests research/exp013/tests research/diagnostics/pose_structure/tests
+    && PYTHONPATH=/workspace/gdrnpp PYTHONPYCACHEPREFIX=/tmp/gdrnpp-pycache python -m pytest -q -o cache_dir=/tmp/gdrnpp-pytest-cache research/tests research/next_pose_head/tests research/exp013/tests research/diagnostics/pose_structure/tests
 
 COPY docker/l40/10_nvidia.json /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 ENV __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json

@@ -5,13 +5,36 @@
 ```bash
 source /home/wsluser/miniconda3/etc/profile.d/conda.sh
 conda activate pytorch22
-PYTHONPATH="$PWD" pytest -q research/next_pose_head/tests research/exp013/tests \
-  research/diagnostics/pose_structure/tests
+PYTHONPATH="$PWD" pytest -q research/tests research/next_pose_head/tests \
+  research/exp013/tests research/diagnostics/pose_structure/tests
 python -m research.next_pose_head.preflight --device cpu
 python -m research.exp013.preflight --variant A --device cpu
 ```
 
 其他 EXP013 变体把 `A` 改为 `B/C/E/F`。D 仍暂停，不运行 formal。
+
+长期 PnP-only matched control 使用：
+
+```bash
+docker/l40/experiment.sh lab0 run EXP-20260731-005-pnp-only-control \
+  configs/gdrn/lmo_pbr/research/controls/pnp_only/smoke.py smoke
+```
+
+正式训练时把配置换为 `train.py`。该入口按当前代码体系维护，用于未来实验的统一
+matched comparison，不替代历史 EXP005 的精确复现。
+
+## 历史实验精确复现
+
+已退出 HEAD 的历史实验不要把旧 config 单独复制回当前 core。先从对应
+`research/experiments/*/RECORD.md` 读取 source commit，再用独立 worktree 恢复
+当时代码和配置，例如：
+
+```bash
+git worktree add ../gdrnpp-exp009 652d7fd9d38f8ea5cea0c5a98cc9477b66623180
+cd ../gdrnpp-exp009
+```
+
+复现完成后删除 worktree，不把历史执行框架重新并入当前 main。
 
 ## 服务器
 

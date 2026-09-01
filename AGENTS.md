@@ -43,6 +43,14 @@
 
 - 本地工作区是唯一代码修改来源；服务器只 checkout 确定 commit 并运行，不提交、
   不 push、不现场修代码。
+- 服务器不能直连 GitHub/Gitee。服务器运行前，本地先提交并以当前分支生成
+  `GDRNPP-RGBD-<short-sha>.bundle`；用户把 bundle 放入服务器 `transfer/` 后，
+  依次执行 `git bundle verify`、clone 到唯一的 `releases/GDRNPP-RGBD-<short-sha>`、
+  `git checkout --detach <full-sha>`，并确认 `git status --short` 为空。不要覆盖已有
+  release，也不要在服务器 release 中提交或修代码。
+- 图示历史流程中的 `prepare_release.sh`、`managed_experiment.sh` 已退出当前树，
+  不为复用旧命令而恢复；新 release 完成只读检查后统一使用
+  `docker/l40/experiment.sh` 的 `check/create/run/status/logs` 流程。
 - 本地 `.git` 历史是恢复兜底，禁止删除或重写：不删 `.git` 目录、不清空
   reflog、不用 filter-repo / rebase + force push 改写历史。删除内容一律用
   普通提交表达，让旧版本留在历史中；重要里程碑（实验定稿、gate 通过）打 tag
