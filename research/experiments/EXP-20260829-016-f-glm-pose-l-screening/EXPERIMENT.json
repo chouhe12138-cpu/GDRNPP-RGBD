@@ -4,9 +4,9 @@
   "title": "GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计)",
   "stage": "Stage 4H / GLM-Pose-L head screening",
   "role": "glm-pose-l-screening",
-  "status": "AUTHORIZED",
+  "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "AUTHORIZED_PLANNED_LAB1",
+  "decision": "COMPLETE_SCREEN_FAIL_2_OF_4_GATES",
   "protocol": {
     "research_question": "在冻结特征协议下,GLM-Pose-L(M1 官方输入管线 + M2 注意力池化替代 flatten/FC + M3 深度统计注入平移支路)能否在 teS 与 ADD 上超过 A/B/C 家族上限(0.684±0.001 BOP AR)且不损伤旋转,验证 GLM-Pose 设计文档的 M2+M3 方向?",
     "parent_experiment": "EXP-20260822-013-a-xyz-residual-bypass",
@@ -33,8 +33,8 @@
     },
     "baseline": {
       "exp013a": {"bop19_ar": 0.683956, "ar_reS": 0.498039, "ar_teS": 0.797693},
-      "exp013b": {"bop19_ar": 0.684058},
-      "exp013c_e40": {"bop19_ar": 0.684646, "ar_reS": 0.525029, "ar_teS": 0.794216, "add_s_0.1d": 0.496914},
+      "exp013b": {"bop19_ar": 0.683691},
+      "exp013c_e40": {"bop19_ar": 0.684646, "ar_reS": 0.525029, "ar_teS": 0.794233, "add_s_0.1d_target_micro": 0.496886},
       "exp005_official_head_continued_frozen": {"bop19_ar": 0.691912, "ar_reS": 0.544406, "ar_teS": 0.800923}
     },
     "acceptance_gate": {
@@ -52,6 +52,21 @@
     "design": "DESIGN.md",
     "local_gate": "LOCAL_GATE.json",
     "formal_config": "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/train.py",
-    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/eval.py"
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/eval.py",
+    "formal_run": "RUN-20260829-103858-formal-s42-a01",
+    "source_git_commit": "e924b96a5b05f61c70de1b56bf0f7e1a7f8a7bfb",
+    "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee",
+    "checkpoint_epoch_040_sha256": "300402ef66470b55c87bc7dbb4dc5edff6414b3f666fb3503d75ca47092c8228",
+    "console_log_sha256": "c08c9f437422ce9aad7062f18fe173c0c6db7cccf04eb1620cd3012f4e9296a5",
+    "score_epoch_040_sha256": "520eb3f8552d54514c446f9410ad54ff0289ebb2d162d38ebefbd2cc9773f01a",
+    "formal_epoch_040": {
+      "bop_ar": 0.6841291810841984,
+      "add_s_0.1d_target_micro": 0.5044982698961937,
+      "add_s_0.1d_macro_object": 0.5064653362887956,
+      "ar_reS": 0.5158016147635525,
+      "ar_teS": 0.7993079584775087,
+      "gates_passed": "2/4",
+      "screen_pass": false
+    }
   }
 }

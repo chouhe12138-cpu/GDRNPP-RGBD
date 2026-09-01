@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-08-30。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
+最后核对：2026-09-01。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
 
 Git branch、HEAD、远端跟踪和 worktree 属于运行时事实，不在本页固化。需要核对时直接执行 `git status --short --branch`、`git rev-parse HEAD` 和 `git rev-parse --abbrev-ref --symbolic-full-name @{u}`。
 
@@ -8,7 +8,7 @@ EXP011 CPM XYZ–Region 一致性固定权重诊断已完成。失败的早期 Q
 
 EXP012 已完整训练并评估到 E40。E15 曾出现主要集中于 rotation 的临时退化，但 E20 后恢复，E30–E40 进入稳定平台；EXP013 固定使用 E40 结果作为比较基准。
 
-EXP013E/F 均已完成 40 epoch 训练（`MANAGED_RUN_FINISH status=PASS`）。E 固定 E40：BOP AR `0.6886`、reS `0.5354`（进入 0.52–0.54 部分支撑带）；F 固定 E40 四条 gate 过 2 条（reS/BOP 过，teS/ADD 未过），判定 `SCREEN_FAIL`（边缘：teS 差 `0.0035`、ADD 差 `0.0062`，均在单评估噪声带内）。
+EXP013C/E/F 均已完成 40 epoch 训练（`MANAGED_RUN_FINISH status=PASS`）。C 改善 rotation 但 ADD gate 失败；E 的 reS `0.5354` 进入 0.52–0.54 部分支撑带；F 四条 gate 过 2 条，判定边缘 `SCREEN_FAIL`。EXP014-D 的 a01 无效证据保留，当前由用户暂停，不存在活动重训授权。
 
 ## 阶段状态
 
@@ -24,8 +24,8 @@ Stage 4:   EXP009 FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
 Stage 4C:  EXP010 FAILED — FORMAL CRASHED ~E27，USER NO-RETRY（E5–E25 评估保留为证据）
 Stage 4D:  EXP011 COMPLETE — MISMATCH_IMPORTANT
 Stage 4E:  EXP012 COMPLETE — E40 STABLE PLATEAU RECORDED
-Stage 4F:  EXP013 A COMPLETE/PASS；B COMPLETE/STRICT BOP GATE FAIL；C A-BASED REVISION AUTHORIZED/FORMAL NOT STARTED
-Stage 4G:  EXP014-D AUTHORIZED — IMAGENET FULL E2E（分支 exp014-d-fulltrain，目标 lab1；formal a01 因 CPP 渲染器覆盖事故与 OOM 作废，EGL 修复已提交，将以 EGL 重新 formal）
+Stage 4F:  EXP013 A COMPLETE/PASS；B COMPLETE/STRICT BOP GATE FAIL；C COMPLETE/SCREEN_FAIL_ROTATION_SUPPORTED
+Stage 4G:  EXP014-D PAUSED — formal a01 因 CPP 渲染器覆盖事故与 OOM 作废；EGL 修复保留，当前无活动重训授权
 Stage 4H:  EXP013E/F COMPLETE — E 官方头随机初始化对照：E40 BOP `0.6886`/reS `0.5354`（0.52–0.54 部分支撑带）；F GLM-Pose-L：E40 四条 gate 过 2/4 → `SCREEN_FAIL`（teS 差 0.0035、ADD 差 0.0062，边缘失败）
 ```
 
@@ -136,9 +136,9 @@ EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.49
   `MANAGED_RUN_FINISH status=PASS`（2026-08-31T12:04Z）。
 - 目的：官方 `ConvPnPNet` 头（9,029,513 可训参数）随机初始化、冻结 backbone/geometry，
   回答官方头 reS `0.5444` 是结构可读出还是预训练继承。
-- **E40（固定决策点）：BOP AR `0.688581`、reS `0.535409`、mspd `0.886574`、
-  mssd `0.666713`、vsd `0.512457`**。BOP AR 为全项目第三高（C2 `0.6930`、
-  EXP005 `0.6919` 之后），高于全部 EXP013 新头家族（0.6837~0.6846）。
+- **E40（固定决策点）：BOP AR `0.688581`、ADD(-S) target-micro `0.510727`、
+  macro-object `0.512940`、reS `0.535409`、teS `0.801153`**。该 BOP 高于
+  EXP013 A/B/C/F，但不作跨全项目排名。
 - reS `0.5354` 落入预注册的 0.52–0.54 带 → 判读「部分支撑：M2 与 M3 并重」；
   距 0.54 强支撑线差 `0.0046`。E 的 E35→E40 为退火末段跳升（BOP +0.009、
   reS +0.012），与 A/B 家族同形态。
@@ -147,8 +147,8 @@ EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.49
 
 - formal run：`RUN-20260829-103858-formal-s42-a01`（lab1，seed 42，commit e924b96），
   `MANAGED_RUN_FINISH status=PASS`（2026-08-31T14:09Z）。
-- **E40（固定决策点）：BOP AR `0.684129`、ADD(-S) macro `0.504498`、
-  reS `0.515802`、teS `0.799308`**。
+- **E40（固定决策点）：BOP AR `0.684129`、ADD(-S) target-micro `0.504498`、
+  macro-object `0.506465`、reS `0.515802`、teS `0.799308`**。
 - 四条 gate 判决：reS ≥0.4930 → `0.5158` **PASS**；BOP ≥0.6838 → `0.6841`
   **PASS**（+0.0003）；teS ≥0.8028 → `0.7993` **FAIL**（差 0.0035）；
   ADD ≥0.5107 → `0.5045` **FAIL**（差 0.0062）。四条全过才 PASS →
@@ -164,10 +164,13 @@ EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.49
 
 ### EXP013 E40 最终事实
 
-- A E40：BOP AR `0.683956`、ADD(-S) `0.510727`、AR_reS `0.498039`、AR_teS `0.797693`；相对 EXP012 的增量为 `+0.005156 / +0.016609`，逐物体非负 `5/8`，三项 gate 全部通过。
-- B E40：BOP AR `0.683691`、ADD(-S) `0.514187`、AR_reS `0.498039`、AR_teS `0.801153`；ADD 和逐物体 `5/8` 通过，但 BOP 增量 `+0.004891` 比冻结门槛少 `0.000109`，因此严格 gate 失败。
+- A E40：BOP AR `0.683956`、ADD(-S) target-micro `0.510727`、AR_reS `0.498039`、AR_teS `0.797693`；相对 EXP012 的增量为 `+0.005156 / +0.016609`，逐物体非负 `5/8`，三项 gate 全部通过。
+- B E40：BOP AR `0.683691`、ADD(-S) target-micro `0.514187`、AR_reS `0.498039`、AR_teS `0.801153`；ADD 和逐物体 `5/8` 通过，但 BOP 增量 `+0.004891` 比冻结门槛少 `0.000109`，因此严格 gate 失败。
 - B 与 A 的 BOP 差 `-0.000265` 位于 `±0.001` 区间，ADD 高 `+0.003460`，故 attention 按 B−A 规则有效；原 B-based C 因 B 未通过全部 EXP012 gate 而停止。
-- 2026-08-26 在任何 C formal run 之前，用户明确提供 A-based R/t decoupling 修订方案。revision 2 已完成本地 CPU/CUDA preflight 与 1 epoch、2048 iteration 无 renderer 真实数据 smoke；工程 gate PASS。用户随后明确要求提交、生成 bundle 并准备在 lab0 训练，因此 C 已授权，但 formal 尚未启动，必须使用新的确定 commit 建立只读 release。
+- C revision 2 formal `RUN-20260826-124748-formal-s42-a01` 已完成。E40 BOP AR
+  `0.684646`、ADD(-S) target-micro `0.496886`、macro-object `0.498841`、
+  AR_reS `0.525029`、AR_teS `0.794233`；rotation 与 translation-drop 条件通过，
+  但 ADD 总体 gate 失败，结论 `SCREEN_FAIL / ROTATION_SUPPORTED`。
 - A/B E40 的本地小样本结构诊断均保持权重哈希不变。结果显示几何残差、Region 和空间布局都被实际使用；R/t 共享梯度存在弱冲突或明显尺度失衡。该机制证据不替代 formal gate。
 
 - C1 固定 Epoch 40：BOP AR `0.6897416378`、ADD(-S) macro-object `0.5057`，
@@ -189,6 +192,9 @@ EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.49
 - EXP010：`research/experiments/EXP-20260816-010-cpm-official-lr-control/RECORD.md`
 - EXP011：`research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md`
 - EXP012：`research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md`
+- EXP013C：`research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/RECORD.md`
+- EXP013E：`research/experiments/EXP-20260829-015-e-official-head-random/RECORD.md`
+- EXP013F：`research/experiments/EXP-20260829-016-f-glm-pose-l-screening/RECORD.md`
 - 姿态头诊断快照：`research/POSE_HEAD_DIAGNOSTIC_HANDOFF_CN.md`
 - 服务器快照：`research/SERVER_RUNTIME_STATUS_CN.md`
 - 运行手册：`research/RUNBOOK_CN.md`

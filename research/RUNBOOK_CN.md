@@ -41,11 +41,15 @@ docker/l40/managed_experiment.sh <lab0|lab1> <EXP别名> create
 保护。该问题不写入 `AGENTS.md`：后者只保存长期 Agent 路由与安全规则，服务器
 操作故障和恢复步骤统一记录在本运行手册。
 
-原始 B-based C 的条件是 A、B 均通过相对 EXP012 E40 的门槛；由于 B 严格 BOP gate 失败，该版本没有运行。2026-08-26 在任何 C formal run 之前，C 明确修订为继承已通过 gate 的 A，并完成新的本地 CPU/CUDA preflight 与完整 1 epoch smoke。用户审阅后授权 revision 2，因此 metadata 为 `AUTHORIZED`；lab0 必须从授权后的新 commit 建立 release，并对 `EXP013C` 重新执行完整 `access→create→gate→smoke→audit48→launch→finalize` 序列，不能复用 A 的 run 或跳过门槛。
+原始 B-based C 的条件是 A、B 均通过相对 EXP012 E40 的门槛；由于 B 严格 BOP gate 失败，该版本没有运行。2026-08-26 在任何 C formal run 之前，C 明确修订为继承已通过 gate 的 A，并完成新的本地 CPU/CUDA preflight 与完整 1 epoch smoke。revision 2 formal `RUN-20260826-124748-formal-s42-a01` 已于 E40 完成并判为 `SCREEN_FAIL / ROTATION_SUPPORTED`。该 run 只读，不得重新 `launch` 或覆盖输出。
 
 A/B E40 完成后用 `python -m research.exp013.diagnostics` 运行 1,445 个 LM-O GT-bbox targets、五个 XYZ alpha 和 fixed-pred/synced/region0 三条路径。诊断不更新模型状态，也不替代正式精度 gate。
 
 ## EXP013D（ImageNet 全量端到端训练）
+
+当前状态为 `PAUSED`。formal a01 的 CPP 渲染器覆盖事故、E5 checkpoint 与 OOM
+证据继续保留；EGL 修复也保留，但在用户重新授权前不得执行下列 `launch` 流程。
+下列命令仅作为历史/恢复手册。
 
 分支 `exp014-d-fulltrain`，服务器离线时同样走 bundle 流程（上传
 `/data/labs/lab1/docker_data/chx/transfer/` → clone 到
@@ -72,6 +76,9 @@ docker/l40/managed_experiment.sh lab1 EXP013D finalize
 
 ## EXP013E（官方头随机初始化冻结对照）
 
+formal `RUN-20260829-080742-formal-s42-a01` 已完成固定 E40；以下启动序列仅保留作
+历史参考。现有 run 只读，不得重新 `launch` 或覆盖输出。
+
 分支 `exp013e-official-random`，目标 lab0，bundle 流程与 EXP013D 相同。lab0 对
 `EXP013E` 执行完整序列：
 
@@ -94,6 +101,9 @@ docker/l40/managed_experiment.sh lab0 EXP013E finalize
 RUN-20260829-063652-smoke-s42-a01 失败否决并废弃。
 
 ## EXP013F（GLM-Pose-L 头筛选：M2 注意力池化 + M3 深度统计）
+
+formal `RUN-20260829-103858-formal-s42-a01` 已完成固定 E40；以下启动序列仅保留作
+历史参考。现有 run 只读，不得重新 `launch` 或覆盖输出。
 
 分支 `exp013f-glm-pose-l`，lab1 bundle 流程（上传
 `/data/labs/lab1/docker_data/chx/transfer/` → clone 到

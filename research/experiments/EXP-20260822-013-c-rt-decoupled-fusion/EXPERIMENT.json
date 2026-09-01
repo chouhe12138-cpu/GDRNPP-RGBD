@@ -4,9 +4,9 @@
   "title": "Rotation/Translation 专用特征融合",
   "stage": "Stage 4F / conditional R-t decoupling",
   "role": "rt-decoupled-fusion",
-  "status": "AUTHORIZED",
+  "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "AUTHORIZED_A_BASED_PROTOCOL_REVISION_LOCAL_GATE_PASS",
+  "decision": "COMPLETE_SCREEN_FAIL_ROTATION_SUPPORTED",
   "protocol": {
     "protocol_revision": 2,
     "revision_date": "2026-08-26",
@@ -58,6 +58,22 @@
     "design": "DESIGN.md",
     "local_gate": "LOCAL_GATE.json",
     "formal_config": "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
-    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/eval.py"
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/eval.py",
+    "formal_run": "RUN-20260826-124748-formal-s42-a01",
+    "source_git_commit": "d702030c65347175aead005d046edc4f5e8bdd83",
+    "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee",
+    "checkpoint_epoch_040_sha256": "21ae8b074051fbfa7512684e2b623cb29529faa0c29f2e682171fb6fa3f6adf0",
+    "console_log_sha256": "2b6e0a2e66ab7f6ca3b8e217b42aded9ce6e8aa6bbe0001ede07c9441bd83f6e",
+    "score_epoch_040_sha256": "4fd692ed6e41939a4e45205a02346f8e8e82cc162cf8367d9aadd3f39303384d",
+    "formal_epoch_040": {
+      "bop_ar": 0.6846459054209918,
+      "add_s_0.1d_target_micro": 0.49688581314878894,
+      "add_s_0.1d_macro_object": 0.4988410279257608,
+      "ar_reS": 0.5250288350634372,
+      "ar_teS": 0.7942329873125721,
+      "rotation_gate_pass": true,
+      "translation_drop_gate_pass": true,
+      "overall_screen_pass": false
+    }
   }
 }

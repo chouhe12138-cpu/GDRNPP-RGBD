@@ -4,9 +4,9 @@
   "title": "ImageNet 预训练 ConvNeXt 全量端到端训练",
   "stage": "Stage 4F / full end-to-end training",
   "role": "d-fulltrain-imagenet",
-  "status": "AUTHORIZED",
+  "status": "PAUSED",
   "legacy_import": false,
-  "decision": "AUTHORIZED_USER_APPROVED_LOCAL_GATE_PASS",
+  "decision": "PAUSED_USER_NO_ACTIVE_RETRAIN",
   "protocol": {
     "protocol_revision": 1,
     "revision_date": "2026-08-27",

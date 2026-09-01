@@ -1,12 +1,25 @@
 # GDRNPP 服务器运行环境与实验进度交接
 
-最后更新：2026-08-30
+最后更新：2026-09-01
 
 本文同时保存带日期的服务器历史快照和可重复执行的只读检查说明。日期段落只描述
 当时已经回传的事实，不保证等同于当前 Git、GPU、容器或进程状态，也不因后续
 实验推进而反向改写。当前 Git 状态以实际 `git` 命令为准；当前服务器状态必须
 重新执行本文的只读检查。若历史段落中的“尚未提交”“正在运行”等表述与现在冲突，
 应按其段落日期理解，而不是当作实时事实。
+
+## 2026-09-01 更新
+
+- EXP013C formal `RUN-20260826-124748-formal-s42-a01`、EXP013E formal
+  `RUN-20260829-080742-formal-s42-a01` 与 EXP013F formal
+  `RUN-20260829-103858-formal-s42-a01` 均已回传完整 console、固定 E40 score 与
+  checkpoint；三者均记录 `MANAGED_RUN_FINISH status=PASS`。科学判决分别为
+  C `SCREEN_FAIL / ROTATION_SUPPORTED`、E `DIAGNOSTIC_PARTIAL_SUPPORT_M2_M3`、
+  F `SCREEN_FAIL_2_OF_4_GATES`。
+- EXP014-D formal a01 保持无效；EGL 修复保留，但用户已暂停 D，当前没有活动
+  重训授权。
+- 本节只更新已经回传的 run 事实，不代表服务器当前 GPU、容器或进程状态；执行
+  任何服务器动作前仍须重新运行本文的只读核验命令。
 
 ## 2026-08-30 更新
 

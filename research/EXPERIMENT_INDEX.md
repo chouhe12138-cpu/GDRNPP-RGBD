@@ -19,7 +19,7 @@
 | EXP-20260817-012-hierarchical-correspondence-head | Stage 4E / correspondence-preserving pose head | hierarchical-correspondence-head | COMPLETE | 层级密集 Correspondence Pose Head |
 | EXP-20260822-013-a-xyz-residual-bypass | Stage 4F / geometry-path ablation | xyz-residual-bypass | COMPLETE | XYZ-ROI2D 独立几何残差支路 |
 | EXP-20260822-013-b-geometry-attention-residual | Stage 4F / local geometry attention | geometry-attention-residual | COMPLETE | 局部几何注意力残差支路 |
-| EXP-20260822-013-c-rt-decoupled-fusion | Stage 4F / conditional R-t decoupling | rt-decoupled-fusion | AUTHORIZED | Rotation/Translation 专用特征融合 |
-| EXP-20260827-014-d-fulltrain-imagenet | Stage 4F / full end-to-end training | d-fulltrain-imagenet | AUTHORIZED | ImageNet 预训练 ConvNeXt 全量端到端训练 |
-| EXP-20260829-016-f-glm-pose-l-screening | Stage 4H / GLM-Pose-L head screening | glm-pose-l-screening | AUTHORIZED | GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计) |
-| EXP-20260829-015-e-official-head-random | Stage 4H / official-head random-init control | official-head-random | AUTHORIZED | 官方头随机初始化冻结对照 |
+| EXP-20260822-013-c-rt-decoupled-fusion | Stage 4F / conditional R-t decoupling | rt-decoupled-fusion | COMPLETE | Rotation/Translation 专用特征融合 |
+| EXP-20260827-014-d-fulltrain-imagenet | Stage 4F / full end-to-end training | d-fulltrain-imagenet | PAUSED | ImageNet 预训练 ConvNeXt 全量端到端训练 |
+| EXP-20260829-015-e-official-head-random | Stage 4H / official-head random-init control | official-head-random | COMPLETE | 官方头随机初始化冻结对照 |
+| EXP-20260829-016-f-glm-pose-l-screening | Stage 4H / GLM-Pose-L head screening | glm-pose-l-screening | COMPLETE | GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计) |

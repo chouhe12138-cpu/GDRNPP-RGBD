@@ -4,9 +4,9 @@
   "title": "官方头随机初始化冻结对照",
   "stage": "Stage 4H / official-head random-init control",
   "role": "official-head-random",
-  "status": "AUTHORIZED",
+  "status": "COMPLETE",
   "legacy_import": false,
-  "decision": "AUTHORIZED_PLANNED_LAB0",
+  "decision": "COMPLETE_DIAGNOSTIC_PARTIAL_SUPPORT_M2_M3",
   "protocol": {
     "research_question": "官方 ConvPnP 头在冻结特征协议下从随机初始化训练,能否达到 EXP005(官方头从预训练继续微调)的旋转水平(reS 0.5444)?即官方头的旋转优势是预训练继承还是结构可读出?",
     "parent_experiment": "EXP-20260731-005-pnp-only-control",
@@ -54,6 +54,20 @@
     "design": "DESIGN.md",
     "local_gate": "LOCAL_GATE.json",
     "formal_config": "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/train.py",
-    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/eval.py"
+    "eval_config": "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/eval.py",
+    "formal_run": "RUN-20260829-080742-formal-s42-a01",
+    "source_git_commit": "d231bf634b94807e01948cc7126f3f0e6d54582e",
+    "environment_image_id": "sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee",
+    "checkpoint_epoch_040_sha256": "0df045f4238b39611d04cc550fc91067dd41547c809200b5ac23d32be649aa2e",
+    "console_log_sha256": "e0d0f107241282526d72063d0faaf728c6c4e1dd4a73c2074011c110cdb77d33",
+    "score_epoch_040_sha256": "d164348318a8ed8c4d889f756ec0c77c94707db475c1818ff9be44586417cde3",
+    "formal_epoch_040": {
+      "bop_ar": 0.6885813148788927,
+      "add_s_0.1d_target_micro": 0.510726643598616,
+      "add_s_0.1d_macro_object": 0.5129398716640847,
+      "ar_reS": 0.5354094579008074,
+      "ar_teS": 0.8011534025374855,
+      "diagnostic_readout": "PARTIAL_SUPPORT_M2_M3"
+    }
   }
 }

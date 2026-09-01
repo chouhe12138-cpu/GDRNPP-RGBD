@@ -4,7 +4,7 @@
 |---|---|
 | 实验 ID | `EXP-20260827-014-d-fulltrain-imagenet` |
 | 分支 | `exp014-d-fulltrain` |
-| 状态 | `AUTHORIZED / RENDERER_FIX_COMMITTED / FORMAL_A01_INVALIDATED / RETRAIN_PLANNED` |
+| 状态 | `PAUSED / FORMAL_A01_INVALIDATED / EGL_FIX_RETAINED / NO_ACTIVE_RETRAIN` |
 | 服务器 | lab1 |
 | 环境镜像 | `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`（沿用 EXP013） |
 | 交付方式 | 完整 Git bundle（服务器无法连 GitHub/Gitee） |
@@ -65,9 +65,8 @@ SHA-256 `04d86dc4c10d35eb688a22eedff61c75e8e1827a69d735177c1dd9f7be4f2a89`，
   smoke/audit48 的 cpp 覆盖同步移入 POSE_NET（否则修复后本地 smoke 将继承 egl
   并在无 GL 的 WSL 崩溃）；preflight 改为校验嵌套键并断言 `egl`。合并值已在
   本地 conda pytorch22 验证（train=egl, smoke/audit48=cpp），EXP013 回归测试通过。
-- 决定：废弃 a01 并清理其 release 与训练产物（用户执行），以修复后的 commit
-  重新 formal：egl、从头训练。预注册决策规则不变（主对照 0.690399、次对照
-  0.683956、SCREEN 0.686 先查环境、固定 epoch_040、seed 42）。
+- a01 继续判为无效并保留证据。EGL 修复后的从头重训方案及预注册决策规则保留，
+  但用户现已暂停 D；当前没有活动重训授权，不得据旧授权自动创建或启动新 run。
 
 ## 最终结果
 

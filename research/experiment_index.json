@@ -1,5 +1,5 @@
 {
-  "experiment_count": 18,
+  "experiment_count": 19,
   "experiments": [
     {
       "decision": "BASELINE_VERIFIED",
@@ -152,43 +152,43 @@
       "title": "局部几何注意力残差支路"
     },
     {
-      "decision": "AUTHORIZED_A_BASED_PROTOCOL_REVISION_LOCAL_GATE_PASS",
+      "decision": "COMPLETE_SCREEN_FAIL_ROTATION_SUPPORTED",
       "experiment_id": "EXP-20260822-013-c-rt-decoupled-fusion",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/EXPERIMENT.json",
       "role": "rt-decoupled-fusion",
       "stage": "Stage 4F / conditional R-t decoupling",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "Rotation/Translation 专用特征融合"
     },
     {
-      "decision": "AUTHORIZED_USER_APPROVED_LOCAL_GATE_PASS",
+      "decision": "PAUSED_USER_NO_ACTIVE_RETRAIN",
       "experiment_id": "EXP-20260827-014-d-fulltrain-imagenet",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260827-014-d-fulltrain-imagenet/EXPERIMENT.json",
       "role": "d-fulltrain-imagenet",
       "stage": "Stage 4F / full end-to-end training",
-      "status": "AUTHORIZED",
+      "status": "PAUSED",
       "title": "ImageNet 预训练 ConvNeXt 全量端到端训练"
     },
     {
-      "decision": "AUTHORIZED_PLANNED_LAB0",
+      "decision": "COMPLETE_DIAGNOSTIC_PARTIAL_SUPPORT_M2_M3",
       "experiment_id": "EXP-20260829-015-e-official-head-random",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260829-015-e-official-head-random/EXPERIMENT.json",
       "role": "official-head-random",
       "stage": "Stage 4H / official-head random-init control",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "官方头随机初始化冻结对照"
     },
     {
-      "decision": "AUTHORIZED_PLANNED_LAB1",
+      "decision": "COMPLETE_SCREEN_FAIL_2_OF_4_GATES",
       "experiment_id": "EXP-20260829-016-f-glm-pose-l-screening",
       "legacy_import": false,
       "metadata_path": "research/experiments/EXP-20260829-016-f-glm-pose-l-screening/EXPERIMENT.json",
       "role": "glm-pose-l-screening",
       "stage": "Stage 4H / GLM-Pose-L head screening",
-      "status": "AUTHORIZED",
+      "status": "COMPLETE",
       "title": "GLM-Pose-L 头筛选(M2 注意力池化 + M3 深度统计)"
     }
   ],

@@ -2,7 +2,8 @@
 
 ## 状态
 
-- 本地门禁:v2(见 LOCAL_GATE.json);服务器:未启动(lab1)。
+- 最终状态：`COMPLETE / SCREEN_FAIL_2_OF_4_GATES`；本地门禁 v2 见
+  `LOCAL_GATE.json`，formal 已在 lab1 完成。
 - 分支 `exp013f-glm-pose-l`,bundle `GDRNPP-RGBD-<sha>.bundle` 位于
   `E:\6D姿态估计\EXP-013\实验F\`。
 
@@ -55,11 +56,11 @@
   未动(0.8028/0.5107/0.4930/0.6838 为用户批准的契约)。
 - 审计后复跑:F 单测 7 项 + 全套 28 项、preflight F CPU,全部 PASS。
 
-## 2026-08-30 formal 训练进度(E5–E15 评估完成,训练至 E20)
+## Formal E5–E40 轨迹
 
 formal run `RUN-20260829-103858-formal-s42-a01`(lab1,seed 42,commit e924b96)。
 
-| Epoch | BOP AR | ADD(-S) macro | AR_reS | AR_teS |
+| Epoch | BOP AR | ADD(-S) target-micro | AR_reS | AR_teS |
 |---:|---:|---:|---:|---:|
 | 5 | 0.575645 | 0.329412 | 0.285582 | 0.704037 |
 | 10 | 0.638674 | 0.452595 | 0.408766 | 0.765398 |
@@ -70,20 +71,24 @@ formal run `RUN-20260829-103858-formal-s42-a01`(lab1,seed 42,commit e924b96)。
 | 35 | 0.672293 | 0.501730 | 0.486044 | 0.784775 |
 | 40（正式 gate） | **0.684129** | **0.504498** | **0.515802** | **0.799308** |
 
-- 全程单调上升,无任何 epoch 回落;E35 与 A 同期差距 `0.007`,逐段收窄。
-- 四条 gate 的 E35 位置:BOP `0.6723`(差 0.0115)、ADD macro `0.5017`(差 0.009)、
+- BOP AR 在八个固定评估点单调上升；其他分量存在正常波动。E35 与 A 同期差距
+  `0.007`，到 E40 收窄。
+- 四条 gate 的 E35 位置:BOP `0.6723`(差 0.0115)、ADD target-micro `0.5017`(差 0.009)、
   reS `0.4860`(差 0.007)、teS `0.7848`(差 0.018);teS 仍是最难项,
   M3 的 teS 增益至今未显现。
 
-## 2026-08-31 训练进度更新
+## 2026-08-31 历史训练进度快照
 
-- 训练至 E38(95%,lr 退火至 6e-5),E40 评估待落地。
+- 当时训练至 E38（95%，lr 退火至 6e-5），E40 尚待评估；该快照已由下节最终
+  E40 结果取代。
 
 ## 2026-08-31 E40 最终结果与 gate 判决
 
 - `MANAGED_RUN_FINISH status=PASS`(2026-08-31T14:09Z),40/40 epoch 完成。
-- 固定 E40:BOP AR `0.6841291810841984`、ADD(-S) macro `0.5044982698961937`、
+- 固定 E40:BOP AR `0.6841291810841984`、ADD(-S) target-micro `0.5044982698961937`、
   reS `0.5158016147635525`、teS `0.7993079584775087`。
+- 由八个逐物体 recall 等权派生的 ADD(-S) macro-object 为 `0.5064653363`；
+  gate 冻结使用 target-micro 口径，因此该派生值不改变判决。
 - 四条 gate 判决:
   - reS ≥ 0.4930:`0.5158` **PASS**;
   - BOP ≥ 0.6838:`0.6841` **PASS**(+0.0003);
@@ -97,3 +102,9 @@ formal run `RUN-20260829-103858-formal-s42-a01`(lab1,seed 42,commit e924b96)。
   平移优势,也不足以独立跨过 0.8028 门槛。
 - 逐物体 E40 ADD(-S):ape 0.486、can 0.804、cat 0.462、driller 0.775、
   duck 0.122、eggbox 0.378、glue 0.750、holepuncher 0.275。
+- E40 checkpoint：`389532060` bytes，epoch 40 / iteration `255919`，439 个模型
+  张量，含 optimizer 与 scheduler；SHA-256
+  `300402ef66470b55c87bc7dbb4dc5edff6414b3f666fb3503d75ca47092c8228`。
+- console SHA-256：`c08c9f437422ce9aad7062f18fe173c0c6db7cccf04eb1620cd3012f4e9296a5`；
+  E40 score SHA-256：`520eb3f8552d54514c446f9410ad54ff0289ebb2d162d38ebefbd2cc9773f01a`。
+- 外置证据位于 `E:\6D姿态估计\EXP-013\实验F\`，不进入 Git。

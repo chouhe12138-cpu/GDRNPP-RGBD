@@ -26,6 +26,7 @@ EXPERIMENT_STATES = {
     "PLANNED",
     "AUTHORIZED",
     "RUNNING",
+    "PAUSED",
     "COMPLETE",
     "FAILED",
     "TRIGGERED",
