@@ -43,6 +43,10 @@
 
 - 本地工作区是唯一代码修改来源；服务器只 checkout 确定 commit 并运行，不提交、
   不 push、不现场修代码。
+- 本地 `.git` 历史是恢复兜底，禁止删除或重写：不删 `.git` 目录、不清空
+  reflog、不用 filter-repo / rebase + force push 改写历史。删除内容一律用
+  普通提交表达，让旧版本留在历史中；重要里程碑（实验定稿、gate 通过）打 tag
+  并随 push 同步到远端。
 - 普通 Python/config 变更复用稳定镜像；只有依赖、Dockerfile、C++/CUDA 或 ABI
   变化才重建镜像。
 - 正式训练期间不 pull、不修改 checkout、不替换镜像。
