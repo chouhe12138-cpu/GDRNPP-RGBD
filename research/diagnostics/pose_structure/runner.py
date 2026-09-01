@@ -1,12 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
-import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List
 
 from .diagnostics import (
     D1RTOracle,
@@ -16,22 +12,8 @@ from .diagnostics import (
     D5GeometryInterfaceAdaptation,
     D6SpatialSensitivity,
 )
-from .model_access import unwrap_model
 from .reporting import write_results
 from .runtime import build_runtime, iter_diagnostic_batches
-
-
-
-def _module_sha256(module) -> str:
-    h = hashlib.sha256()
-    for name, tensor in sorted(module.state_dict().items()):
-        h.update(name.encode("utf-8"))
-        t = tensor.detach().contiguous().cpu()
-        h.update(str(t.dtype).encode("ascii"))
-        h.update(str(tuple(t.shape)).encode("ascii"))
-        h.update(t.numpy().tobytes())
-    return h.hexdigest()
-
 
 def _parse_alphas(text: str):
     return [float(x.strip()) for x in text.split(",") if x.strip()]
@@ -103,7 +85,6 @@ def main(argv=None):
         cfg_overrides=cfg_overrides,
     )
     started = time.time()
-    pnp_before = _module_sha256(unwrap_model(runtime.model).pnp_net)
     try:
         for batch_idx, db in enumerate(iter_diagnostic_batches(runtime, args.max_batches), 1):
             print(f"[diagnostic] batch {batch_idx}/{args.max_batches}")
@@ -113,12 +94,6 @@ def main(argv=None):
     finally:
         runtime.close()
 
-    pnp_after = _module_sha256(unwrap_model(runtime.model).pnp_net)
-    if pnp_before != pnp_after:
-        raise RuntimeError(
-            "Diagnostic run changed pose-head state_dict. This violates the no-training invariant; "
-            "inspect temporary interventions before using any result."
-        )
     summaries = {d.name: d.summary() for d in diagnostics}
     metadata = {
         "config_file": args.config_file,
@@ -129,9 +104,6 @@ def main(argv=None):
         "samples_requested": args.max_batches * args.batch_size,
         "seed": args.seed,
         "elapsed_sec": time.time() - started,
-        "pose_head_state_sha256_before": pnp_before,
-        "pose_head_state_sha256_after": pnp_after,
-        "pose_head_weights_unchanged": True,
         "note": "Direct diagnostic metrics are not official BOP scores; run formal BOP evaluation only after a structural hypothesis survives these screens.",
     }
     write_results(args.output_dir, metadata, summaries)

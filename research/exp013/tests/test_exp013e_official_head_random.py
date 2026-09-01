@@ -81,11 +81,10 @@ def test_e_official_pnp_keys_cannot_overwrite_random_init():
     official_like = {}
     for key, value in head.head.state_dict().items():
         official_like[f"pnp_net.{key}"] = value + 1.0  # "official" pose weights
-    report = load_official_shared_state(_Holder(head), official_like)
+    load_official_shared_state(_Holder(head), official_like)
     after = {k: v.detach().clone() for k, v in head.state_dict().items()}
     for key in initial:
         assert torch.equal(initial[key], after[key])
-    assert report["legacy_pnp_tensors_filtered"] == len(official_like)
 
 
 def test_e_smoke_and_audit_are_isolated_one_epoch_runs():

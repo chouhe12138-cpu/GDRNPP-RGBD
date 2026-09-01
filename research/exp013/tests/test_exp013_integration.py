@@ -8,7 +8,7 @@ from mmcv import Config
 
 from core.gdrn_modeling.engine.engine_utils import geometry_supervision_enabled
 
-from research.pose_head_diagnostic.run_information_flow import (
+from research.exp013.interventions import (
     EXP013_THREE_PATH_CONDITIONS,
     apply_cpm_xyz_region_intervention,
     cpm_xyz_region_condition,
