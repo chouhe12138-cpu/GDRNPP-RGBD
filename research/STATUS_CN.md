@@ -1,200 +1,29 @@
 # 当前研究状态
 
-最后核对：2026-09-01。本页只汇总已经由记录、日志、checkpoint、正式评估、哈希或 QC 支持的当前事实；服务器实时状态必须重新执行只读检查。
+最后核对：2026-09-01。
 
-Git branch、HEAD、远端跟踪和 worktree 属于运行时事实，不在本页固化。需要核对时直接执行 `git status --short --branch`、`git rev-parse HEAD` 和 `git rev-parse --abbrev-ref --symbolic-full-name @{u}`。
+## 当前结论
 
-EXP011 CPM XYZ–Region 一致性固定权重诊断已完成。失败的早期 QC run 均保留；最终 full a02 在 RTX 4060 上完成 1,445 targets × 10 conditions 和 BOP19，QC PASS，预注册结论为 `MISMATCH_IMPORTANT`。
+- EXP012 已完成 40 epoch，E40 BOP AR `0.678800`、ADD(-S) `0.494118`、
+  AR_reS `0.491349`、AR_teS `0.791926`，是 EXP013 的固定比较基准。
+- EXP013A 通过相对 EXP012 的正式门槛；B 的 ADD 改善但严格 BOP 门槛差
+  `0.000109`；C 支持 R/t 解耦改善 rotation，但总体 ADD 门槛失败。
+- EXP013E 官方头随机初始化对照完成：BOP `0.688581`、reS `0.535409`，对
+  “结构可读出与预训练继承并重”提供部分支持。
+- EXP013F GLM-Pose-L 完成：BOP `0.684129`、reS `0.515802`，四项门槛通过
+  2 项，结论为边缘 `SCREEN_FAIL`。
+- EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
+  当前 `PAUSED`，没有重训授权。
 
-EXP012 已完整训练并评估到 E40。E15 曾出现主要集中于 rotation 的临时退化，但 E20 后恢复，E30–E40 进入稳定平台；EXP013 固定使用 E40 结果作为比较基准。
+## 当前代码边界
 
-EXP013C/E/F 均已完成 40 epoch 训练（`MANAGED_RUN_FINISH status=PASS`）。C 改善 rotation 但 ADD gate 失败；E 的 reS `0.5354` 进入 0.52–0.54 部分支撑带；F 四条 gate 过 2 条，判定边缘 `SCREEN_FAIL`。EXP014-D 的 a01 无效证据保留，当前由用户暂停，不存在活动重训授权。
+- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D 和当前结构诊断。
+- EXP001–011 的科学结论保留在 RECORD；旧专用执行代码和 managed experiment
+  审计框架已退出当前工作树，可通过 Git 历史恢复。
+- 当前没有活动服务器训练。新运行必须先由用户明确选择实验和配置，再使用
+  `docker/l40/experiment.sh`。
 
-## 阶段状态
+## 下一步
 
-```text
-Stage 1:   COMPLETE — FAIL
-Stage 2:   COMPLETE — PASS_XYZ_GEOMETRY
-Stage 3A:  COMPLETE — CALIBRATION_MISMATCH
-Stage 3B:  COMPLETE — PATCH_PNP_UNDERUTILIZATION
-Stage 3C0: EXP005/B COMPLETE
-Stage 3C1: C1 COMPLETE — C1_SCREEN_FAIL
-Stage 3C2: C2 COMPLETE — C2_SCREEN_FAIL
-Stage 4:   EXP009 FIXED EPOCH 40 COMPLETE — CPM_SCREEN_FAIL
-Stage 4C:  EXP010 FAILED — FORMAL CRASHED ~E27，USER NO-RETRY（E5–E25 评估保留为证据）
-Stage 4D:  EXP011 COMPLETE — MISMATCH_IMPORTANT
-Stage 4E:  EXP012 COMPLETE — E40 STABLE PLATEAU RECORDED
-Stage 4F:  EXP013 A COMPLETE/PASS；B COMPLETE/STRICT BOP GATE FAIL；C COMPLETE/SCREEN_FAIL_ROTATION_SUPPORTED
-Stage 4G:  EXP014-D PAUSED — formal a01 因 CPP 渲染器覆盖事故与 OOM 作废；EGL 修复保留，当前无活动重训授权
-Stage 4H:  EXP013E/F COMPLETE — E 官方头随机初始化对照：E40 BOP `0.6886`/reS `0.5354`（0.52–0.54 部分支撑带）；F GLM-Pose-L：E40 四条 gate 过 2/4 → `SCREEN_FAIL`（teS 差 0.0035、ADD 差 0.0062，边缘失败）
-```
-
-## 当前实验事实
-
-### EXP005/B
-
-- formal run：`RUN-20260811-063606-formal-s42-a01`；固定 Epoch 40 完成。
-- BOP AR `0.6919123414`；ADD(-S)@0.1d macro-object `0.5065743945`。
-- 外部权重 `E:\\6D姿态估计\\EXP-005\\model_epoch_040.pth`，大小
-  `519078612` bytes，SHA-256
-  `39c0128526f68cf9c4f7a1780ff095e71be8cdada186136eb8699d99d68d009e`。
-- 本地读取为 Epoch 40 / iteration `255919`，包含 optimizer、scheduler 和
-  392 个模型张量。没有服务器端原文件 SHA，未记录两端哈希一致。
-
-### EXP009/CPM
-
-- formal run：`RUN-20260811-063626-formal-s42-a01`。
-- 早期训练/恢复日志记录过 Epoch 38 / iteration `243123/255920` 和
-  `CUDA error: unspecified launch failure`；这些中断证据继续保留。
-- 后续外部固定 Epoch 40 权重
-  `E:\\6D姿态估计\\EXP-009\\model_epoch_040.pth` 已核验，大小
-  `387752090` bytes，SHA-256
-  `d447569bf7a1034bb57f38c90ef25bbaac8f1bb7ef3b9d74ef9db75eb32f040d`。
-- Epoch 40 权重可读，记录 Epoch 40 / iteration `255919`，包含 optimizer、
-  scheduler 和 384 个模型张量。
-- 新下载的完整 `console.log` 记录 Epoch 40 / iteration `255919/255920`、
-  checkpoint 保存和 `FINAL_EVAL_REUSED periodic_epoch=40`；SHA-256 为
-  `258be3940b53012abb5099ee4582a75923df306e2bba994917d82502e26547e0`。
-- 固定 Epoch 40 BOP AR `0.5983921569`；训练 `EVAL_SUMMARY` 的
-  ADD(-S)@0.1d `0.3806228374` 实际是 target-micro recall，早期记录曾误标为
-  macro-object。由 console 中八个逐物体 recall 等权计算的 macro-object 为
-  `0.3768665461`；逐物体非负 `2/8`。该语义修正不改变三项 gate 均失败和
-  `CPM_SCREEN_FAIL` 结论。
-- Epoch 35：BOP AR `0.5994232987`、ADD(-S) `0.3861591696`，仅保留为中间结果。
-- Epoch 30 checkpoint SHA-256 为
-  `d5fabd8ad3f2be5ecf3fcc52a18386d151732f7593a0daa2ca22181c0add5ce0`；
-  BOP AR `0.5994625144`。已有预览诊断不指定造成响应的根因。
-
-### EXP010/CPM 学习率控制
-
-- 状态为 `FAILED`（formal 崩溃，用户决定不重试，2026-08-30）。
-- formal run：`RUN-20260816-081032-formal-s42-a01`，lab0，seed 42，lr 8e-4；
-  2026-08-16 启动，日志止于 epoch 27 / iteration `166999/255920`（65.3%），
-  之后崩溃，无固定 Epoch 40 checkpoint 或最终评估。
-- 已完成评估（EVAL_SUMMARY）：E5 BOP AR `0.496205`、E10 `0.540775`、
-  E15 `0.567045`（已观测峰值）、E20 `0.513548`、E25 `0.533396`。
-- E21 起训练 loss 回升（loss_PM_R `0.0148→0.0153+`、total `0.167→0.187`），
-  呈高学习率不稳迹象。
-- 方向性解读（非 gate 结论）：EXP009（lr 8e-5）E30 的 `0.5994625144` 已高于
-  EXP010 全程已观测峰值，10 倍学习率没有更快超过 EXP009 平台；不支持
-  "CPM 失败主要来自学习率过低"。匹配比较在形式上未完成（无固定 E40）。
-- lab0 access PASS、source commit `29580f65abfeb7625bab252011c19399325b0fa2`、
-  environment image `sha256:f3055cb660032bbb4c1b7cfd9b1840a6c98359d0562a3a4f0601f7238f7291ee`
-  继续保留为事实。
-
-### EXP011/CPM XYZ–Region 一致性诊断
-
-- 最终 run：`RUN-20260817-023144-full-s20260817-a02`；固定 EXP009 E40
-  checkpoint，CUDA FP32，1,445 targets × 10 conditions，QC PASS。
-- Pred Region 下 GT-XYZ effect：BOP AR `-0.2894763552`、macro ADD(-S)
-  `-0.2796477506`；GT Region 下分别为 `-0.1381130334`、`-0.1024982420`。
-- interaction：BOP `+0.1513633218`、macro ADD(-S) `+0.1771495085`；rescue
-  ratio 分别为 `0.5229`、`0.6335`，且 ADD interaction 为正的物体为 `8/8`。
-- 预注册 decision：`MISMATCH_IMPORTANT`。该结论支持 XYZ–Region 不一致是
-  GT-XYZ oracle 恶化的重要污染因素；GT Region 在 Pred XYZ 下本身降低绝对
-  性能，因此它不是可直接部署的性能改进，也未证明不一致是唯一根因。
-
-### EXP012/层级密集 Correspondence Pose Head
-
-- 状态：`COMPLETE / EPOCH_040`。
-- 正式实现 source commit：`2ca752b3f091292172044209f7c8651280d377bd`。
-- 40 epochs 已完整训练并每 5 epoch 评估；此前“E15 后停止”的旧记录已由 E20–E40 正式结果纠正。
-- 冻结 backbone/geometry head，只训练 868,746 参数的 `HierarchicalCorrespondencePnPNet`；保留逐像素 metric XYZ↔absolute ROI2D，先局部编码，再聚合 fine/mid 摘要与 high-level 4×4 空间网格。
-- Region 只作为零启动辅助残差，不参与 grouping/pooling；后期仍使用共享 2208→256→256 pose representation 输出 allo rot6d 与 centroid-z translation。
-- 本地 CPU/CUDA full-model forward/backward、optimizer step、official shared-state migration 和 strict checkpoint roundtrip 均 PASS。这些只证明工程链可执行，不证明性能。
-
-正式评估：
-
-| Epoch | BOP AR | ADD(-S)@0.1d | AR_reS | AR_teS |
-|---:|---:|---:|---:|---:|
-| 5 | 0.642973 | 0.489273 | 0.345790 | 0.783391 |
-| 10 | 0.645972 | 0.473356 | 0.428835 | 0.773472 |
-| 15 | 0.544083 | 0.377163 | 0.124798 | 0.798847 |
-| 20 | 0.644362 | 0.428374 | — | — |
-| 25 | 0.671084 | 0.474048 | — | — |
-| 30 | 0.678768 | 0.493426 | — | — |
-| 35 | 0.679061 | 0.492042 | — | — |
-| 40 | **0.678800** | **0.494118** | **0.491349** | **0.791926** |
-
-- E15 pose 泛化曾严重下降，主要变化发生在 rotation；E20 后恢复，E30–E40 的 BOP AR 稳定在约 `0.679`。因此 E15 诊断只描述该训练阶段，不能再解释为不可恢复的最终崩塌。
-- Region×0 在 E5/E10/E15 都造成大幅退化：BOP AR 分别约为 `0.642784→0.353449`、`0.646028→0.316653`、`0.544002→0.251550`。这说明 EXP012 对 Region 输入有强依赖，但依赖强度没有在 E15 突然跃升，不能据此断言 Region 是 E15 崩塌唯一原因。
-- Pred XYZ→GT XYZ 的 Three-Path alpha 诊断中，fixed Region 与 synced Region 都没有稳定 pose rescue；E5/E10 最终 Three-Path summary 和 E15 Three-Path 均 QC PASS。
-- E10↔E15 checkpoint interpolation endpoints QC PASS。BOP AR `0.646009→0.636141→0.600161→0.574572→0.544127`，AR_reS 同样单调下降；AR_teS 不呈相同行为。该证据支持参数连线上存在连续的 rotation-specific 泛化恶化方向，但不等同于真实训练轨迹。
-- Activation drift QC=`FAIL`，只保留为线索，不作为主要诊断证据。
-
-EXP012 的结论边界：
-
-- 已被实验直接支持：EXP012 在 E15 有 rotation-specific 临时退化，随后恢复至 E40 稳定平台；Region 是强依赖输入；E5/E10/E15 阶段改善 XYZ 或同步 Region 没有稳定 rescue learned pose。
-- 合理但尚未证实：R/t 共享后期 latent 可能造成不同优化需求之间的干扰；learned pose decoder 可能形成了对 Region 或训练分布的 shortcut。
-- 尚未证明：“共享 R/t latent 导致崩塌”“Region 是唯一根因”“joint R/t 本身错误”“PnP 必须成为最终部署结构”。
-
-EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.491349`、AR_teS `0.791926`。
-
-### EXP013E/官方头随机初始化对照（COMPLETE）
-
-- formal run：`RUN-20260829-080742-formal-s42-a01`（lab0，seed 42，commit d231bf6），
-  `MANAGED_RUN_FINISH status=PASS`（2026-08-31T12:04Z）。
-- 目的：官方 `ConvPnPNet` 头（9,029,513 可训参数）随机初始化、冻结 backbone/geometry，
-  回答官方头 reS `0.5444` 是结构可读出还是预训练继承。
-- **E40（固定决策点）：BOP AR `0.688581`、ADD(-S) target-micro `0.510727`、
-  macro-object `0.512940`、reS `0.535409`、teS `0.801153`**。该 BOP 高于
-  EXP013 A/B/C/F，但不作跨全项目排名。
-- reS `0.5354` 落入预注册的 0.52–0.54 带 → 判读「部分支撑：M2 与 M3 并重」；
-  距 0.54 强支撑线差 `0.0046`。E 的 E35→E40 为退火末段跳升（BOP +0.009、
-  reS +0.012），与 A/B 家族同形态。
-
-### EXP013F/GLM-Pose-L 筛选（COMPLETE）
-
-- formal run：`RUN-20260829-103858-formal-s42-a01`（lab1，seed 42，commit e924b96），
-  `MANAGED_RUN_FINISH status=PASS`（2026-08-31T14:09Z）。
-- **E40（固定决策点）：BOP AR `0.684129`、ADD(-S) target-micro `0.504498`、
-  macro-object `0.506465`、reS `0.515802`、teS `0.799308`**。
-- 四条 gate 判决：reS ≥0.4930 → `0.5158` **PASS**；BOP ≥0.6838 → `0.6841`
-  **PASS**（+0.0003）；teS ≥0.8028 → `0.7993` **FAIL**（差 0.0035）；
-  ADD ≥0.5107 → `0.5045` **FAIL**（差 0.0062）。四条全过才 PASS →
-  **`SCREEN_FAIL`**；teS 与 ADD 的差距均在单评估噪声带（±0.01）内，属边缘失败。
-- 正面事实：reS `0.5158` 为家族第二高旋转（C `0.5250` 之后，A/B 为 `0.4980`），
-  注意力池化在旋转上的读出能力得到验证；BOP AR `0.6841` 高于 A（`0.6840`）与
-  B（`0.6837`）；teS `0.7993` 高于 A（`0.7977`）、低于 B（`0.8012`）——
-  M3 深度统计未表现出超越 B 的平移优势。
-- 逐物体 E40 ADD(-S)：ape 0.486、can 0.804、cat 0.462、driller 0.775、
-  duck 0.122、eggbox 0.378、glue 0.750、holepuncher 0.275。
-
-## 其他已完成事实
-
-### EXP013 E40 最终事实
-
-- A E40：BOP AR `0.683956`、ADD(-S) target-micro `0.510727`、AR_reS `0.498039`、AR_teS `0.797693`；相对 EXP012 的增量为 `+0.005156 / +0.016609`，逐物体非负 `5/8`，三项 gate 全部通过。
-- B E40：BOP AR `0.683691`、ADD(-S) target-micro `0.514187`、AR_reS `0.498039`、AR_teS `0.801153`；ADD 和逐物体 `5/8` 通过，但 BOP 增量 `+0.004891` 比冻结门槛少 `0.000109`，因此严格 gate 失败。
-- B 与 A 的 BOP 差 `-0.000265` 位于 `±0.001` 区间，ADD 高 `+0.003460`，故 attention 按 B−A 规则有效；原 B-based C 因 B 未通过全部 EXP012 gate 而停止。
-- C revision 2 formal `RUN-20260826-124748-formal-s42-a01` 已完成。E40 BOP AR
-  `0.684646`、ADD(-S) target-micro `0.496886`、macro-object `0.498841`、
-  AR_reS `0.525029`、AR_teS `0.794233`；rotation 与 translation-drop 条件通过，
-  但 ADD 总体 gate 失败，结论 `SCREEN_FAIL / ROTATION_SUPPORTED`。
-- A/B E40 的本地小样本结构诊断均保持权重哈希不变。结果显示几何残差、Region 和空间布局都被实际使用；R/t 共享梯度存在弱冲突或明显尺度失衡。该机制证据不替代 formal gate。
-
-- C1 固定 Epoch 40：BOP AR `0.6897416378`、ADD(-S) macro-object `0.5057`，
-  结论 `C1_SCREEN_FAIL`。
-- C2 固定 Epoch 40：BOP AR `0.6930057670`，结论 `C2_SCREEN_FAIL`；历史
-  ADD(-S) 未生成，保持缺失。
-- EXP007 official Patch-PnP full 已完成；C1/B/C2 固定 checkpoint 的同协议
-  full 尚未全部完成。
-- EXP005、EXP009 的首次 managed smoke 是无效基础设施 run，均无 checkpoint
-  或科学指标；原目录保留，不计入模型结果。
-
-## 关键入口
-
-- 实验索引：`research/EXPERIMENT_INDEX.md`
-- 研究计划：`research/RESEARCH_PLAN.md`
-- Stage 3C 总览：`research/STAGE_03C_EXPERIMENT_OVERVIEW.md`
-- EXP005：`research/experiments/EXP-20260731-005-pnp-only-control/RECORD.md`
-- EXP009：`research/experiments/EXP-20260809-009-cpm-head/RECORD.md`
-- EXP010：`research/experiments/EXP-20260816-010-cpm-official-lr-control/RECORD.md`
-- EXP011：`research/experiments/EXP-20260817-011-cpm-xyz-region-consistency-diagnostic/RECORD.md`
-- EXP012：`research/experiments/EXP-20260817-012-hierarchical-correspondence-head/RECORD.md`
-- EXP013C：`research/experiments/EXP-20260822-013-c-rt-decoupled-fusion/RECORD.md`
-- EXP013E：`research/experiments/EXP-20260829-015-e-official-head-random/RECORD.md`
-- EXP013F：`research/experiments/EXP-20260829-016-f-glm-pose-l-screening/RECORD.md`
-- 姿态头诊断快照：`research/POSE_HEAD_DIAGNOSTIC_HANDOFF_CN.md`
-- 服务器快照：`research/SERVER_RUNTIME_STATUS_CN.md`
-- 运行手册：`research/RUNBOOK_CN.md`
+先基于 EXP012/013E/F 的结果确定下一条方法假设；不自动恢复 D，也不因单次
+边缘差距自动增加 seed。完整数值与结论边界见实验索引中的 RECORD。

@@ -1,15 +1,11 @@
-# EXP-20260817-012 层级密集 Correspondence Pose Head
+# EXP012 — Hierarchical Correspondence Pose Head
 
-## 当前状态
+- 状态：`COMPLETE / EPOCH_040`
+- 正式源码 commit：`2ca752b3f091292172044209f7c8651280d377bd`
+- 配置：`configs/gdrn/lmo_pbr/research/exp012_hierarchical_corr_head/train.py`
+- seed：42；40 epoch
 
-- 状态：`COMPLETE / EPOCH_040`。
-- 正式实现 source commit：`2ca752b3f091292172044209f7c8651280d377bd`。
-- 40 epoch 已完整训练并按每 5 epoch 评估。此前“E15 后停止”的记录已由 E20–E40 正式结果纠正。
-- EXP013 使用 E40 作为冻结比较基准，不按 E15 的临时低点比较。
-
-## 正式评估事实
-
-| Epoch | BOP AR | ADD(-S)@0.1d | AR_reS | AR_teS |
+| Epoch | BOP AR | ADD(-S) | AR_reS | AR_teS |
 |---:|---:|---:|---:|---:|
 | 5 | 0.642973 | 0.489273 | 0.345790 | 0.783391 |
 | 10 | 0.645972 | 0.473356 | 0.428835 | 0.773472 |
@@ -20,17 +16,6 @@
 | 35 | 0.679061 | 0.492042 | — | — |
 | 40 | **0.678800** | **0.494118** | **0.491349** | **0.791926** |
 
-E15 是训练中期的临时 rotation 退化，不是最终状态。模型从 E20 开始恢复，E30–E40 的 BOP AR 稳定在约 `0.679`，因此最终判断应基于 E40。
-
-## 诊断事实与边界
-
-E5/E10/E15 的 Region×0、Three-Path 和 E10↔E15 checkpoint interpolation 仍是有效的阶段性诊断：它们说明当时的输出强依赖 Region，而且 E10→E15 的退化主要集中于 rotation。但 E20–E40 的恢复证明，不能再据此声称结构在 E15 已发生不可恢复的后期崩塌。
-
-这些结果没有证明 Region 依赖有害，也没有证明 R/t 共享 latent 是原因。它们支持 EXP013 继续分别检验独立 XYZ 路径、局部几何 attention 和 R/t 解耦。
-
-## EXP013 冻结基准
-
-- BOP AR：`0.678800`
-- ADD(-S)：`0.494118`
-- AR_reS：`0.491349`
-- AR_teS：`0.791926`
+E15 是 rotation-specific 临时退化，E20 后恢复，E30–E40 形成稳定平台。
+Region 是强依赖输入，但现有证据没有证明 Region 或共享 R/t latent 是唯一原因。
+E40 是 EXP013 的固定比较基准。

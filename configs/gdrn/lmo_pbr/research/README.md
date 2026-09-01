@@ -1,20 +1,7 @@
-# Future research configs
+# LM-O 当前研究配置
 
-`exp013/` contains three preregistered pose-head variants. A/B formal configs
-are authorized only after their local gates are recorded; C remains executable
-for local engineering validation while its experiment metadata stays `PLANNED`
-until both A and B pass their fixed E40 gates.
+保留的配置分为三层：`_base_` 定义 LM-O 评估和 40-epoch 训练协议，
+`templates/pose_head` 提供新实验模板，EXP012 与 EXP013 A–F/D 是当前论文链。
 
-This opt-in hierarchy is for experiments created after the current B/C2 runs.
-Existing Stage 3C configs remain in their original locations and are not
-re-parented.
-
-Layers:
-
-1. `_base_/lmo_gt_eval.py` defines the official checkpoint and LM-O GT-box evaluation.
-2. `_base_/pbr40_screening.py` adds the frozen 40-epoch PBR screening budget.
-3. `templates/pose_head/` shows train/smoke/eval leaf responsibilities.
-
-Create a new experiment-specific directory from the template, replace its
-identity and model intervention, register `EXPERIMENT.json`, and validate the
-fully resolved config before running. Seed-only configs are not created.
+每个实验的 `train.py`、`smoke.py`、`eval.py` 分别用于正式训练、本地/服务器小跑和
+明确 checkpoint 评估。启动器通过配置覆盖设置唯一 OUTPUT_DIR，不复制训练循环。
