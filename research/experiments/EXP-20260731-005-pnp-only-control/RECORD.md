@@ -1,11 +1,34 @@
-# EXP005 — Patch-PnP-Only Control
+# EXP005 — Patch-PnP-Only Adaptation Control
 
-- 状态：`COMPLETE / EPOCH_040`
+## 协议与运行
+
+- 状态：`COMPLETE / EPOCH_040_MATCHED_CONTROL`
+- 问题：只适应官方 Patch-PnP，是否足以解释后续新姿态头的改善？
+- 训练：LM-PBR 50 scenes；LM-O BOP19 GT-box evaluation；40 epoch；seed `42`
+- 冻结 backbone/geometry head，只训练官方 Patch-PnP；不按中间 LM-O 结果选模
 - formal run：`RUN-20260811-063606-formal-s42-a01`
-- seed：42
+- source commit：`652d7fd9d38f8ea5cea0c5a98cc9477b66623180`
 - checkpoint：`model_epoch_040.pth`，epoch 40 / iteration 255919
-- 结果：BOP AR `0.691912`；ADD(-S) macro-object `0.506574`
+- 历史配置已退出当前树，可在该 source commit 中恢复
 
-该实验只适应原始 Patch-PnP，作为后续结构实验的 matched control。早期 managed
-smoke 是无效基础设施 run，不计入科学结果。历史专用配置和执行框架已从当前树
-移除，可由 Git 历史恢复。
+首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
+只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable
+cache 与异常返回后，smoke/audit 通过且另建目录，没有覆盖失败 run。
+
+## 固定 E40 结果
+
+| 指标 | 结果 |
+|---|---:|
+| BOP AR | 0.6919123414 |
+| ADD(-S)@0.1d macro-object | 0.5065743945 |
+
+逐物体 ADD(-S)@0.1d：
+
+| obj | 1 | 5 | 6 | 8 | 9 | 10 | 11 | 12 |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| recall | 0.525714 | 0.814070 | 0.461988 | 0.815000 | 0.077778 | 0.411111 | 0.750000 | 0.215000 |
+
+E15 的中间 BOP AR 虽更高，但协议固定使用 E40，不据 LM-O test 选 checkpoint。
+该结果接近官方基线，说明单独重训 Patch-PnP 没有形成大幅改善；EXP005 只作为
+matched-training control，不作为方法贡献。外置 checkpoint 位于
+`E:\6D姿态估计\EXP-005\model_epoch_040.pth`。
