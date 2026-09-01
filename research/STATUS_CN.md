@@ -8,6 +8,8 @@ EXP011 CPM XYZ–Region 一致性固定权重诊断已完成。失败的早期 Q
 
 EXP012 已完整训练并评估到 E40。E15 曾出现主要集中于 rotation 的临时退化，但 E20 后恢复，E30–E40 进入稳定平台；EXP013 固定使用 E40 结果作为比较基准。
 
+EXP013E/F 均已完成 40 epoch 训练（`MANAGED_RUN_FINISH status=PASS`）。E 固定 E40：BOP AR `0.6886`、reS `0.5354`（进入 0.52–0.54 部分支撑带）；F 固定 E40 四条 gate 过 2 条（reS/BOP 过，teS/ADD 未过），判定 `SCREEN_FAIL`（边缘：teS 差 `0.0035`、ADD 差 `0.0062`，均在单评估噪声带内）。
+
 ## 阶段状态
 
 ```text
@@ -24,7 +26,7 @@ Stage 4D:  EXP011 COMPLETE — MISMATCH_IMPORTANT
 Stage 4E:  EXP012 COMPLETE — E40 STABLE PLATEAU RECORDED
 Stage 4F:  EXP013 A COMPLETE/PASS；B COMPLETE/STRICT BOP GATE FAIL；C A-BASED REVISION AUTHORIZED/FORMAL NOT STARTED
 Stage 4G:  EXP014-D AUTHORIZED — IMAGENET FULL E2E（分支 exp014-d-fulltrain，目标 lab1；formal a01 因 CPP 渲染器覆盖事故与 OOM 作废，EGL 修复已提交，将以 EGL 重新 formal）
-Stage 4H:  EXP013F AUTHORIZED — GLM-Pose-L 筛选（分支 exp013f-glm-pose-l，目标 lab1；M2 注意力池化 + M3 深度统计，本地门禁 v2 通过）
+Stage 4H:  EXP013E/F COMPLETE — E 官方头随机初始化对照：E40 BOP `0.6886`/reS `0.5354`（0.52–0.54 部分支撑带）；F GLM-Pose-L：E40 四条 gate 过 2/4 → `SCREEN_FAIL`（teS 差 0.0035、ADD 差 0.0062，边缘失败）
 ```
 
 ## 当前实验事实
@@ -127,6 +129,36 @@ EXP012 的结论边界：
 - 尚未证明：“共享 R/t latent 导致崩塌”“Region 是唯一根因”“joint R/t 本身错误”“PnP 必须成为最终部署结构”。
 
 EXP012 E40 冻结基准为 BOP AR `0.678800`、ADD(-S) `0.494118`、AR_reS `0.491349`、AR_teS `0.791926`。
+
+### EXP013E/官方头随机初始化对照（COMPLETE）
+
+- formal run：`RUN-20260829-080742-formal-s42-a01`（lab0，seed 42，commit d231bf6），
+  `MANAGED_RUN_FINISH status=PASS`（2026-08-31T12:04Z）。
+- 目的：官方 `ConvPnPNet` 头（9,029,513 可训参数）随机初始化、冻结 backbone/geometry，
+  回答官方头 reS `0.5444` 是结构可读出还是预训练继承。
+- **E40（固定决策点）：BOP AR `0.688581`、reS `0.535409`、mspd `0.886574`、
+  mssd `0.666713`、vsd `0.512457`**。BOP AR 为全项目第三高（C2 `0.6930`、
+  EXP005 `0.6919` 之后），高于全部 EXP013 新头家族（0.6837~0.6846）。
+- reS `0.5354` 落入预注册的 0.52–0.54 带 → 判读「部分支撑：M2 与 M3 并重」；
+  距 0.54 强支撑线差 `0.0046`。E 的 E35→E40 为退火末段跳升（BOP +0.009、
+  reS +0.012），与 A/B 家族同形态。
+
+### EXP013F/GLM-Pose-L 筛选（COMPLETE）
+
+- formal run：`RUN-20260829-103858-formal-s42-a01`（lab1，seed 42，commit e924b96），
+  `MANAGED_RUN_FINISH status=PASS`（2026-08-31T14:09Z）。
+- **E40（固定决策点）：BOP AR `0.684129`、ADD(-S) macro `0.504498`、
+  reS `0.515802`、teS `0.799308`**。
+- 四条 gate 判决：reS ≥0.4930 → `0.5158` **PASS**；BOP ≥0.6838 → `0.6841`
+  **PASS**（+0.0003）；teS ≥0.8028 → `0.7993` **FAIL**（差 0.0035）；
+  ADD ≥0.5107 → `0.5045` **FAIL**（差 0.0062）。四条全过才 PASS →
+  **`SCREEN_FAIL`**；teS 与 ADD 的差距均在单评估噪声带（±0.01）内，属边缘失败。
+- 正面事实：reS `0.5158` 为家族第二高旋转（C `0.5250` 之后，A/B 为 `0.4980`），
+  注意力池化在旋转上的读出能力得到验证；BOP AR `0.6841` 高于 A（`0.6840`）与
+  B（`0.6837`）；teS `0.7993` 高于 A（`0.7977`）、低于 B（`0.8012`）——
+  M3 深度统计未表现出超越 B 的平移优势。
+- 逐物体 E40 ADD(-S)：ape 0.486、can 0.804、cat 0.462、driller 0.775、
+  duck 0.122、eggbox 0.378、glue 0.750、holepuncher 0.275。
 
 ## 其他已完成事实
 
