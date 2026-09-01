@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 usage() {
-    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C|EXP013D|EXP013F access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
+    echo "usage: $0 lab0|lab1 EXP005|EXP009|EXP010|EXP012|EXP013A|EXP013B|EXP013C|EXP013D|EXP013E|EXP013F access|preserve|create|gate|smoke|audit48|launch|status|watch|finalize" >&2
     exit 2
 }
 
@@ -71,6 +71,12 @@ case "${experiment}" in
         config_root="configs/gdrn/lmo_pbr/research/exp013/d_fulltrain"
         isolation_role="FULL_TRAIN"
         ;;
+    EXP013E)
+        experiment_id="EXP-20260829-015-e-official-head-random"
+        config_root="configs/gdrn/lmo_pbr/research/exp013/e_official_head_random"
+        isolation_role="PNP_REPLACEMENT"
+        exp013_variant="E"
+        ;;
     EXP013F)
         experiment_id="EXP-20260829-016-f-glm-pose-l-screening"
         config_root="configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l"
@@ -83,9 +89,10 @@ esac
 case "${experiment}:${machine}" in
     EXP013A:lab0|EXP013B:lab1|EXP013C:lab0) ;;
     EXP013D:lab1) ;;
+    EXP013E:lab0) ;;
     EXP013F:lab1) ;;
-    EXP013A:*|EXP013B:*|EXP013C:*|EXP013F:*)
-        echo "FAIL: fixed server mapping is EXP013A=lab0, EXP013B=lab1, EXP013C=lab0, EXP013F=lab1" >&2
+    EXP013A:*|EXP013B:*|EXP013C:*|EXP013E:*|EXP013F:*)
+        echo "FAIL: fixed server mapping is EXP013A=lab0, EXP013B=lab1, EXP013C=lab0, EXP013E=lab0, EXP013F=lab1" >&2
         exit 1
         ;;
 esac

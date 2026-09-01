@@ -70,6 +70,29 @@ docker/l40/managed_experiment.sh lab1 EXP013D finalize
 `E:\6D姿态估计\EXP-014\`，容器内放入 `$TORCH_HOME/hub/checkpoints/`（或 HF 缓存），
 避免离线训练启动时下载失败。
 
+## EXP013E（官方头随机初始化冻结对照）
+
+分支 `exp013e-official-random`，目标 lab0，bundle 流程与 EXP013D 相同。lab0 对
+`EXP013E` 执行完整序列：
+
+```bash
+docker/l40/managed_experiment.sh lab0 EXP013E access
+docker/l40/managed_experiment.sh lab0 EXP013E create
+docker/l40/managed_experiment.sh lab0 EXP013E gate
+docker/l40/managed_experiment.sh lab0 EXP013E smoke
+docker/l40/managed_experiment.sh lab0 EXP013E audit48
+docker/l40/managed_experiment.sh lab0 EXP013E launch
+docker/l40/managed_experiment.sh lab0 EXP013E finalize
+```
+
+与 EXP013A/B/C 的关键差异：头为官方 `ConvPnPNet` **随机初始化**（经
+`OfficialConvPnPNetRandomInit` wrapper，键名 `pnp_net.head.*` 与官方 ckpt 的
+`pnp_net.*` 永不重名——`MODEL.WEIGHTS` 直接使用原始官方 ckpt，无需任何派生
+权重文件）。训练渲染器为**关闭**状态（冻结几何监督关闭，引擎不构造 CPP/EGL
+渲染器）；决策点固定 epoch_040；预注册读数为诊断型（reS ≥0.54 / 0.52–0.54 /
+<0.52 三档解释规则）。历史备注：v1 的 pnp 剥离派生权重方案已被
+RUN-20260829-063652-smoke-s42-a01 失败否决并废弃。
+
 ## EXP013F（GLM-Pose-L 头筛选：M2 注意力池化 + M3 深度统计）
 
 分支 `exp013f-glm-pose-l`，lab1 bundle 流程（上传

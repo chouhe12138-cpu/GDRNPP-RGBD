@@ -20,6 +20,9 @@ from core.gdrn_modeling.models.heads.exp013_geometry_pnp_net import (
     XYZResidualBypassPnPNet,
 )
 from core.gdrn_modeling.models.heads.glm_pose_net import GLMPoseLNet
+from core.gdrn_modeling.models.heads.official_head_random_init import (
+    OfficialConvPnPNetRandomInit,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +41,10 @@ VARIANTS = {
     "C": (
         "configs/gdrn/lmo_pbr/research/exp013/c_rt_decoupled/train.py",
         RTDecoupledGeometryPnPNet,
+    ),
+    "E": (
+        "configs/gdrn/lmo_pbr/research/exp013/e_official_head_random/train.py",
+        OfficialConvPnPNetRandomInit,
     ),
     "F": (
         "configs/gdrn/lmo_pbr/research/exp013/f_glm_pose_l/train.py",
@@ -85,10 +92,26 @@ def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
         raise RuntimeError(f"Unexpected pose head: {pnp.INIT_CFG.type}")
     if not pnp.WITH_2D_COORD or pnp.COORD_2D_TYPE != "abs":
         raise RuntimeError("EXP013 requires absolute ROI2D")
-    if not pnp.REGION_ATTENTION or not pnp.INIT_CFG.use_region_aux:
-        raise RuntimeError("EXP013 keeps the EXP012 Region main path")
-    if pnp.MASK_ATTENTION != "mul":
-        raise RuntimeError("EXP013 requires visible-mask multiplication")
+    if expected_type is OfficialConvPnPNetRandomInit:
+        # EXP013E rebuilds the official head with its native flags; it must
+        # not inherit any EXP013-family head settings.
+        if pnp.INIT_CFG.get("act") != "gelu" or pnp.INIT_CFG.get("norm") != "GN":
+            raise RuntimeError("EXP013E must mirror the official head norm/act")
+        if pnp.INIT_CFG.get("flat_op") != "flatten" or not pnp.INIT_CFG.get(
+            "denormalize_by_extent"
+        ):
+            raise RuntimeError("EXP013E must keep the official flatten-fc1 design")
+        if "use_region_aux" in pnp.INIT_CFG or "geometry_scale_init" in pnp.INIT_CFG:
+            raise RuntimeError("EXP013E must not inherit EXP013 head settings")
+        if pnp.MASK_ATTENTION != "none":
+            raise RuntimeError("EXP013E keeps the official no-mask-gating design")
+        if not pnp.REGION_ATTENTION:
+            raise RuntimeError("EXP013E keeps the official region attention")
+    else:
+        if not pnp.REGION_ATTENTION or not pnp.INIT_CFG.use_region_aux:
+            raise RuntimeError("EXP013 keeps the EXP012 Region main path")
+        if pnp.MASK_ATTENTION != "mul":
+            raise RuntimeError("EXP013 requires visible-mask multiplication")
     if cfg.SOLVER.TOTAL_EPOCHS != 40 or cfg.SOLVER.IMS_PER_BATCH != 48:
         raise RuntimeError(
             "EXP013 formal protocol requires 40 epochs and batch size 48"
@@ -102,6 +125,12 @@ def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
             raise RuntimeError("A-based EXP013C must disable frozen geometry supervision")
         if "attention_scale_init" in pnp.INIT_CFG:
             raise RuntimeError("A-based EXP013C must not inherit B attention settings")
+    if expected_type is OfficialConvPnPNetRandomInit:
+        if pose.GEO_HEAD.get("TRAIN_SUPERVISION", True):
+            raise RuntimeError(
+                "EXP013E must disable frozen geometry supervision so no CPP/EGL "
+                "training renderer is ever constructed"
+            )
     if expected_type is GLMPoseLNet:
         if pose.GEO_HEAD.get("TRAIN_SUPERVISION", True):
             raise RuntimeError(
@@ -360,9 +389,9 @@ def main() -> int:
     relative_config, expected_type = VARIANTS[args.variant]
     config_path = (args.config or PROJECT_ROOT / relative_config).resolve()
     weights_path = args.weights.resolve()
-    actual_hash = sha256(weights_path)
-    if actual_hash != EXPECTED_WEIGHT_SHA256:
-        raise RuntimeError(f"Unexpected official checkpoint hash: {actual_hash}")
+    official_hash = sha256(weights_path)
+    if official_hash != EXPECTED_WEIGHT_SHA256:
+        raise RuntimeError(f"Unexpected official checkpoint hash: {official_hash}")
     if args.device == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA requested but unavailable")
     cfg = Config.fromfile(str(config_path))
@@ -404,7 +433,7 @@ def main() -> int:
                 "config": str(config_path),
                 "device": args.device,
                 "dtype": "float32",
-                "official_checkpoint_sha256": actual_hash,
+                "official_checkpoint_sha256": official_hash,
                 "only_pnp_net_trainable": True,
                 "full_model_forward_backward_optimizer_step": True,
                 "strict_roundtrip": not args.skip_round_trip,

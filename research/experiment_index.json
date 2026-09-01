@@ -172,6 +172,16 @@
       "title": "ImageNet 预训练 ConvNeXt 全量端到端训练"
     },
     {
+      "decision": "AUTHORIZED_PLANNED_LAB0",
+      "experiment_id": "EXP-20260829-015-e-official-head-random",
+      "legacy_import": false,
+      "metadata_path": "research/experiments/EXP-20260829-015-e-official-head-random/EXPERIMENT.json",
+      "role": "official-head-random",
+      "stage": "Stage 4H / official-head random-init control",
+      "status": "AUTHORIZED",
+      "title": "官方头随机初始化冻结对照"
+    },
+    {
       "decision": "AUTHORIZED_PLANNED_LAB1",
       "experiment_id": "EXP-20260829-016-f-glm-pose-l-screening",
       "legacy_import": false,
