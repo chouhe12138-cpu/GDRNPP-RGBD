@@ -34,6 +34,13 @@ CLI parsing、模型构建和 dataset parsing，但 launcher 未设置
 没有完成 smoke，也没有产生科学指标，只作为基础设施失败保留，不进入 EXP005
 科学结果。
 
+2026-09-02 的 `RUN-20260902-044659-smoke-s42-a01` 已通过 release/container/
+runtime gate、CUDA/native、config/CLI、模型与 optimizer 构建、dataset dict cache
+及 dataloader 创建，并进入 iteration 0 的训练循环；但 DataLoader worker 在取得首个
+training batch 前尝试把背景路径缓存写入只读 CWD 的 `.cache`，以
+`OSError: [Errno 30] Read-only file system` 退出。该 run 未完成 optimizer step、
+没有科学指标，只作为基础设施失败保留，不进入 EXP005 科学结果。
+
 首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
 只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable
 cache 与异常返回后，smoke/audit 通过且另建目录，没有覆盖失败 run。

@@ -23,6 +23,14 @@ from lib.utils.config_utils import try_get_key
 logger = logging.getLogger(__name__)
 
 
+def resolve_bg_cache_path(bg_type, hashed_file_name, environ=None):
+    """Resolve the background-list cache without requiring a writable CWD."""
+
+    environ = os.environ if environ is None else environ
+    cache_root = environ.get("XDG_CACHE_HOME", ".cache")
+    return osp.join(cache_root, "bg_paths_{}_{}.pkl".format(bg_type, hashed_file_name))
+
+
 class Base_DatasetFromList(data.Dataset):
     """# https://github.com/facebookresearch/detectron2/blob/master/detectron2/
     data/common.py Wrap a list to a torch Dataset.
@@ -347,7 +355,7 @@ class Base_DatasetFromList(data.Dataset):
         hashed_file_name = hashlib.md5(
             ("{}_{}_{}_get_bg_imgs".format(bg_root, num_bg_imgs, bg_type)).encode("utf-8")
         ).hexdigest()
-        cache_path = osp.join(".cache/bg_paths_{}_{}.pkl".format(bg_type, hashed_file_name))
+        cache_path = resolve_bg_cache_path(bg_type, hashed_file_name)
         mmcv.mkdir_or_exist(osp.dirname(cache_path))
         if osp.exists(cache_path):
             logger.info("get bg_paths from cache file: {}".format(cache_path))

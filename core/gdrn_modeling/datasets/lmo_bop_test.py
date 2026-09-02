@@ -27,6 +27,21 @@ logger = logging.getLogger(__name__)
 DATASETS_ROOT = osp.normpath(osp.join(PROJ_ROOT, "datasets"))
 
 
+def resolve_dataset_cache_root(environ=None):
+    """Resolve the machine-local dataset cache used by the runtime launcher."""
+
+    environ = os.environ if environ is None else environ
+    root = osp.normpath(
+        environ.get("GDRN_DATASET_CACHE_DIR", osp.join(PROJ_ROOT, ".cache"))
+    )
+    if not osp.isabs(root):
+        raise ValueError("GDRN_DATASET_CACHE_DIR must be an absolute path")
+    return root
+
+
+DATASET_CACHE_ROOT = resolve_dataset_cache_root()
+
+
 class LMO_BOP_TEST_Dataset(object):
     """lmo bop test splits."""
 
@@ -55,7 +70,7 @@ class LMO_BOP_TEST_Dataset(object):
         self.height = data_cfg["height"]  # 480
         self.width = data_cfg["width"]  # 640
 
-        self.cache_dir = data_cfg.get("cache_dir", osp.join(PROJ_ROOT, ".cache"))  # .cache
+        self.cache_dir = data_cfg.get("cache_dir", DATASET_CACHE_ROOT)
         self.use_cache = data_cfg.get("use_cache", True)
         self.num_to_load = data_cfg["num_to_load"]  # -1
         self.filter_invalid = data_cfg.get("filter_invalid", True)
@@ -325,7 +340,7 @@ SPLITS_LMO = dict(
         with_depth=True,  # (load depth path here, but may not use it)
         height=480,
         width=640,
-        cache_dir=osp.join(PROJ_ROOT, ".cache"),
+        cache_dir=DATASET_CACHE_ROOT,
         use_cache=True,
         num_to_load=-1,
         filter_invalid=False,
@@ -357,7 +372,7 @@ for obj in ref.lmo_full.objects:
                 with_depth=True,  # (load depth path here, but may not use it)
                 height=480,
                 width=640,
-                cache_dir=osp.join(PROJ_ROOT, ".cache"),
+                cache_dir=DATASET_CACHE_ROOT,
                 use_cache=True,
                 num_to_load=-1,
                 filter_invalid=False,
