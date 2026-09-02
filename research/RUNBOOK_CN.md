@@ -44,6 +44,48 @@ cd ../gdrnpp-exp009
 
 先读 `research/SERVER_SAFETY_CN.md`，确认代码 checkout、数据、权重、镜像和 GPU。
 
+### Bundle release 固定流程
+
+不要依赖当前工作目录解析 `transfer/...` 或 `releases/...`。`git bundle verify` 需要 Git
+仓库上下文，因此先创建一次性 bare verification repo；它位于 `/tmp`，不作为 release。
+下面以 `lab0`、short SHA `3cfbceb` 为例，实际使用时只替换四个标量。整个流程放在
+subshell 中并启用失败即停止，前一步失败后不会继续 clone 或 checkout：
+
+```bash
+(
+set -Eeuo pipefail
+
+machine=lab0
+owner=chx
+short_sha=3cfbceb
+full_sha=3cfbceb94252c1fc35b9f81350d2b6a0c068d97a
+
+root="/data/labs/${machine}/docker_data/${owner}"
+bundle="${root}/transfer/GDRNPP-RGBD-${short_sha}.bundle"
+release="${root}/releases/GDRNPP-RGBD-${short_sha}"
+
+test "$(id -un)" = "${machine}"
+test -f "${bundle}"
+test ! -e "${release}"
+
+verify_repo="$(mktemp -d "/tmp/gdrnpp-bundle-verify-${short_sha}.XXXXXX")"
+git -c init.defaultBranch=main -C "${verify_repo}" init --bare --quiet
+git -C "${verify_repo}" bundle verify "${bundle}"
+
+git clone --no-checkout "${bundle}" "${release}"
+git -C "${release}" checkout --detach "${full_sha}"
+test "$(git -C "${release}" rev-parse HEAD)" = "${full_sha}"
+test -z "$(git -C "${release}" status --short)"
+
+git -C "${release}" status --short --branch
+echo "RELEASE_CHECK PASS commit=${full_sha}"
+)
+```
+
+预期最后两行包含 `HEAD (no branch)` 与 `RELEASE_CHECK PASS`。目标 release 已存在时
+命令会停止，不覆盖、不删除也不复用。release 创建后必须从该目录使用当前统一入口；
+图示历史中的 `prepare_release.sh` 和 `managed_experiment.sh` 不再使用。
+
 ```bash
 docker/l40/experiment.sh lab0 check
 docker/l40/experiment.sh lab0 create gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9
