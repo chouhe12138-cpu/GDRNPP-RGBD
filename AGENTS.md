@@ -51,6 +51,9 @@
 - 图示历史流程中的 `prepare_release.sh`、`managed_experiment.sh` 已退出当前树，
   不为复用旧命令而恢复；新 release 完成只读检查后统一使用
   `docker/l40/experiment.sh` 的 `check/create/run/status/logs` 流程。
+- 向用户提供服务器命令时优先使用可单独复制的一行命令、绝对路径和显式参数；避免
+  依赖当前目录、反斜杠续行或复制后仍需拼接的片段。必须使用多步 gate 时给出完整
+  subshell，并确保任一步失败即停止。
 - 本地 `.git` 历史是恢复兜底，禁止删除或重写：不删 `.git` 目录、不清空
   reflog、不用 filter-repo / rebase + force push 改写历史。删除内容一律用
   普通提交表达，让旧版本留在历史中；重要里程碑（实验定稿、gate 通过）打 tag

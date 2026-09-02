@@ -99,8 +99,13 @@ renderer 和无梯度用途的 geometry loss。BOP evaluation 使用独立的
 formal `RUN-20260902-133725-formal-s42-a01` 从修复前 source `33f285b` 启动。该 run 的
 pose-head 梯度不因冻结 geometry loss 改变，但不具备新的完整 metadata、clean-tree/
 protocol gate 和 checkpoint-before-evaluation 保证，因此标记为
-`SUPERSEDED_PENDING_STOP`，不作为修复后的 canonical formal。旧输出保留；是否停止
-仍由用户执行，Agent 不自动操作服务器任务。
+`SUPERSEDED_STOPPED`，不作为修复后的 canonical formal；旧输出保留。
+
+修复后服务器 smoke `RUN-20260902-152755-smoke-s42-a01` 使用 source `6b4d412`、
+`smoke.py`、LM-PBR local train、batch 4、1 epoch（2048 iterations），`exit_code=0`；
+生成 `run_metadata.json`、meta/train/checkpoints 结构并正常结束。该 run 证明新的
+clean-tree/config/renderer/mount gate 与训练链路可用，不作为性能结论。用户已明确授权
+从同一 clean release 启动 canonical formal。
 
 ## 预注册 formal gate
 

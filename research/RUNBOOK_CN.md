@@ -179,6 +179,12 @@ formal 必须是 seed 42、LM-PBR、LM-O GT-box、40 epoch、batch 48、每 5 ep
 与 evaluation。每次 run 的根目录写入 `run_metadata.json`，保存完整 source commit、
 image ID、image build revision、config、mode 与 run ID。
 
+给远端终端的日常 `check/run/status/logs` 命令优先写成单行并使用 release 绝对路径，
+不使用反斜杠续行。shell 提示符显示的当前 release 不代表现有容器使用同一源码；每次
+`run` 前由 launcher 的 mount gate 核对 `/workspace/gdrnpp` source。若报
+`mount /workspace/gdrnpp has source ..., expected ...`，说明容器仍绑定旧 release，
+必须按“已有容器的受控替换”检查并重建，不能绕过 gate 或在服务器内修改源码。
+
 ### Renderer 配置边界
 
 - `MODEL.POSE_NET.GEO_HEAD.TRAIN_SUPERVISION` 和

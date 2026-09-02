@@ -14,9 +14,9 @@
   2 项，结论为边缘 `SCREEN_FAIL`。
 - EXP017 已按 EXP013A 主体实现 rotation-only spatial residual adapter；新增参数
   `13,000`。运行框架复核已将冻结 geometry 的训练 renderer 关闭，同时保留 CPP BOP
-  evaluation，并补齐 clean-tree/protocol/metadata/checkpoint-order gate。用户报告修复前
-  formal 已启动；该 run 不能作为修复后的 canonical formal，等待用户提供 run ID 并
-  决定停止后，从新 release 重跑。
+  evaluation，并补齐 clean-tree/protocol/metadata/checkpoint-order gate。修复前 formal
+  已停止并保留；source `6b4d412` 的服务器 smoke 以 `exit_code=0` 完成，用户已授权
+  从同一 release 启动 canonical formal。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 
