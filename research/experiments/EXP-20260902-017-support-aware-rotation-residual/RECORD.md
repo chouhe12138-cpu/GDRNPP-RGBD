@@ -9,8 +9,9 @@
 - experiment ID：`EXP-20260902-017-support-aware-rotation-residual`
 - 配置：
   `configs/gdrn/lmo_pbr/research/exp017/support_aware_rotation_residual/train.py`
-- 基础源码：`5d284946defad56d11c28b40d7a903ae632aa5a5`；当前实现未提交，正式运行前必须
-  先由用户授权提交并记录最终 source commit。
+- 基础源码：`5d284946defad56d11c28b40d7a903ae632aa5a5`；EXP017 实现 commit：
+  `6815761`。formal source commit 尚未选择，必须以最终服务器 release 的 detached
+  commit 为准写回记录。
 - formal 协议与 A matched：seed 42、LM-PBR train、LM-O BOP19 GT-box、batch 48、
   40 epoch、Ranger lr `8e-4`、weight decay `0.01`、warmup 200、冻结 backbone/geometry，
   E40 唯一决策点；不从 A E40 warm-start pose head。
@@ -92,4 +93,5 @@ AR_teS `0.797693`。EXP017 E40 必须同时满足：
 
 实现、单测、CPU preflight 和本地真实小批次 smoke 已证明代码链路满足请求的结构和
 隔离约束，可以进入“请求 formal 训练授权”阶段；这不等于 formal 已获授权或方法有效。
-在用户明确授权前，不提交、不制作服务器 release、不启动 40 epoch 训练。
+本地实现已提交，可以制作服务器 release；尚未获得 formal 训练授权，不启动 40 epoch
+训练。

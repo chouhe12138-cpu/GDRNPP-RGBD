@@ -13,8 +13,8 @@
 - EXP013F GLM-Pose-L 完成：BOP `0.684129`、reS `0.515802`，四项门槛通过
   2 项，结论为边缘 `SCREEN_FAIL`。
 - EXP017 已按 EXP013A 主体实现 rotation-only spatial residual adapter；新增参数
-  `13,000`，相关测试、CPU preflight 和本地真实 LM-PBR 小批次 smoke 均通过，尚未
-  提交或启动 formal。
+  `13,000`，相关测试、CPU preflight 和本地真实 LM-PBR 小批次 smoke 均通过；实现
+  commit 为 `6815761`，尚未启动 formal。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 
@@ -31,6 +31,6 @@
 
 ## 下一步
 
-EXP017 本地门禁已经满足，下一步是在用户确认最终 diff、commit/release 和 GPU 后请求
-formal 训练授权；不自动恢复 D，也不因单次边缘差距自动增加 seed。完整数值与结论
-边界见实验索引中的 RECORD。
+EXP017 本地门禁已经满足，实现已提交；下一步是生成并转移 release bundle，用户完成
+服务器只读检查并确认 GPU 后，再单独请求 formal 训练授权。不自动恢复 D，也不因单次
+边缘差距自动增加 seed。完整数值与结论边界见实验索引中的 RECORD。
