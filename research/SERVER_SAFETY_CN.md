@@ -13,7 +13,9 @@ nvidia-smi -i 1   # lab1
 ```
 
 - `lab0` 只使用物理 GPU 0，`lab1` 只使用物理 GPU 1。
-- 发现活动计算进程、未知同名容器或路径权限异常时停止，不猜测资源归属。
+- 发现未知同名容器或路径权限异常时停止，不猜测资源归属。GPU 可与其他任务共享；
+  launcher 默认要求至少 `12000 MiB` 空闲显存，可按任务用
+  `GDRN_MIN_FREE_GPU_MB` 显式覆盖，其他 compute process 本身不构成拒绝条件。
 - 不运行 `sudo docker`、`docker system prune`，不停止、删除或重命名其他容器。
 
 ## 项目隔离

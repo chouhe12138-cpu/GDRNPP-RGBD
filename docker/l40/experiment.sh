@@ -132,10 +132,25 @@ start_owned_container() {
     fi
 }
 
-require_idle_gpu() {
-    local active
+require_gpu_capacity() {
+    local required_mb="${GDRN_MIN_FREE_GPU_MB:-12000}" free_mb active
+    [[ "${required_mb}" =~ ^[0-9]+$ ]] || \
+        fail "GDRN_MIN_FREE_GPU_MB must be a non-negative integer: ${required_mb}"
+    free_mb="$(nvidia-smi -i "${gpu_id}" --query-gpu=memory.free --format=csv,noheader,nounits)" || \
+        fail "cannot query free memory for GPU ${gpu_id}"
+    free_mb="${free_mb//[[:space:]]/}"
+    [[ "${free_mb}" =~ ^[0-9]+$ ]] || fail "invalid free-memory value for GPU ${gpu_id}: ${free_mb}"
     active="$(nvidia-smi -i "${gpu_id}" --query-compute-apps=pid,process_name,used_memory --format=csv,noheader 2>/dev/null || true)"
-    [[ -z "${active}" ]] || fail "GPU ${gpu_id} already has active compute processes: ${active}"
+    if [[ -n "${active}" ]]; then
+        printf 'GPU_CAPACITY WARNING gpu=%s active_compute_processes:\n%s\n' "${gpu_id}" "${active}"
+    fi
+    if (( free_mb < required_mb )); then
+        printf 'GPU_CAPACITY FAIL gpu=%s free_mb=%s required_mb=%s\n' \
+            "${gpu_id}" "${free_mb}" "${required_mb}" >&2
+        return 1
+    fi
+    printf 'GPU_CAPACITY PASS gpu=%s free_mb=%s required_mb=%s\n' \
+        "${gpu_id}" "${free_mb}" "${required_mb}"
 }
 
 require_idle_container() {
@@ -263,7 +278,7 @@ launch() {
     local mode="$1" config="$2" checkpoint_container="${3:-}" run_id run_host run_container commit image_ref command
     check_host
     start_owned_container
-    require_idle_gpu
+    require_gpu_capacity
     require_idle_container
     runtime_gate "${config}"
     run_id="$(next_run_id "${mode}")"

@@ -53,6 +53,55 @@ def test_eval_command_places_all_overrides_after_opts():
     ]
 
 
+def test_gpu_capacity_allows_other_processes_when_memory_is_sufficient():
+    result = _source_and_run(
+        "gpu_id=0\n"
+        "GDRN_MIN_FREE_GPU_MB=8000\n"
+        "nvidia-smi() {\n"
+        "  case \"$*\" in\n"
+        "    *--query-gpu=memory.free*) echo 20000 ;;\n"
+        "    *--query-compute-apps=*) echo '4321, python, 5000 MiB' ;;\n"
+        "  esac\n"
+        "}\n"
+        "require_gpu_capacity"
+    )
+    assert result.stdout.splitlines() == [
+        "GPU_CAPACITY WARNING gpu=0 active_compute_processes:",
+        "4321, python, 5000 MiB",
+        "GPU_CAPACITY PASS gpu=0 free_mb=20000 required_mb=8000",
+    ]
+
+
+def test_gpu_capacity_rejects_insufficient_free_memory():
+    result = _source_and_run(
+        "gpu_id=0\n"
+        "nvidia-smi() {\n"
+        "  case \"$*\" in\n"
+        "    *--query-gpu=memory.free*) echo 7000 ;;\n"
+        "    *--query-compute-apps=*) return 0 ;;\n"
+        "  esac\n"
+        "}\n"
+        "require_gpu_capacity",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert result.stderr.strip() == (
+        "GPU_CAPACITY FAIL gpu=0 free_mb=7000 required_mb=12000"
+    )
+
+
+def test_idle_container_still_rejects_duplicate_gdrn_process():
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        "fake_docker() { return 0; }\n"
+        "require_idle_container",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "already active in test-container" in result.stderr
+
+
 def test_launcher_overrides_satisfy_real_dict_action_parser_contract():
     parser = my_default_argument_parser()
 
