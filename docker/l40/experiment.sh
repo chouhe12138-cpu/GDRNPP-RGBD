@@ -224,6 +224,16 @@ require_dataset_cache() {
         fail "container dataset cache is not writable: ${expected}"
 }
 
+require_bop_renderer_path() {
+    local expected="/opt/bop_renderer/build" actual
+    actual="$("${docker_bin}" exec "${container}" printenv BOP_RENDERER_PATH)" || \
+        fail "container BOP_RENDERER_PATH is not set"
+    [[ "${actual}" == "${expected}" ]] || \
+        fail "container BOP_RENDERER_PATH=${actual}, expected ${expected}"
+    "${docker_bin}" exec "${container}" test -d "${expected}" || \
+        fail "container bop_renderer build directory is missing: ${expected}"
+}
+
 require_cuda() {
     "${docker_bin}" exec "${container}" python -c \
         'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; assert torch.cuda.device_count() == 1, torch.cuda.device_count()' || \
@@ -254,6 +264,7 @@ runtime_gate() {
     verify_required_mounts
     require_writable_output
     require_dataset_cache
+    require_bop_renderer_path
     require_cuda
     verify_environment
     verify_native
@@ -355,6 +366,7 @@ main() {
             --env HOME=/home/gdrn --env CUDA_VISIBLE_DEVICES=0 \
             --env XDG_CACHE_HOME=/home/gdrn/.cache \
             --env GDRN_DATASET_CACHE_DIR=/home/gdrn/.cache/gdrnpp_datasets \
+            --env BOP_RENDERER_PATH=/opt/bop_renderer/build \
             --mount "type=bind,src=${repo_root},dst=/workspace/gdrnpp,readonly" \
             --mount "type=bind,src=${root}/datasets/BOP_DATASETS,dst=/workspace/gdrnpp/datasets/BOP_DATASETS,readonly" \
             --mount "type=bind,src=${root}/datasets/VOC,dst=/workspace/gdrnpp/datasets/VOCdevkit,readonly" \

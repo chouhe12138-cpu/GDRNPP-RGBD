@@ -73,6 +73,17 @@ round-trip，以及 learned/uniform/position/token intervention。
 PyTorch `_version` 判断 Ranger `.data` 参数更新而产生假阴性；改为逐值快照后 a02
 通过。a01 不进入科学结论。
 
+### 服务器 smoke
+
+- `RUN-20260902-130841-smoke-s42-a01`：`INFRA_FAILED`。source `3cfbceb94252`，
+  image `gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9`。
+- runtime/config gate 通过后，在模型构建前的 online renderer 初始化失败：容器可从
+  image `PYTHONPATH` 导入 `bop_renderer`，但 launcher 未向只读 release 容器注入
+  `BOP_RENDERER_PATH=/opt/bop_renderer/build`；repo mount 又遮蔽了 image 内
+  `/workspace/gdrnpp/bop_renderer` symlink。
+- 该 run 没有构建模型、没有 optimizer step，不进入科学结论。修复限定为 launcher
+  显式环境变量和对应 runtime gate，不修改 EXP017、训练协议或镜像。
+
 ## 预注册 formal gate
 
 冻结基准为 EXP013A E40：BOP `0.683956`、ADD `0.510727`、AR_reS `0.498039`、

@@ -138,6 +138,7 @@ def test_runtime_gate_calls_every_lightweight_check():
         "verify_required_mounts() { echo mounts; }\n"
         "require_writable_output() { echo output; }\n"
         "require_dataset_cache() { echo dataset-cache; }\n"
+        "require_bop_renderer_path() { echo bop-renderer; }\n"
         "require_cuda() { echo cuda; }\n"
         "verify_environment() { echo environment; }\n"
         "verify_native() { echo native; }\n"
@@ -149,6 +150,7 @@ def test_runtime_gate_calls_every_lightweight_check():
         "mounts",
         "output",
         "dataset-cache",
+        "bop-renderer",
         "cuda",
         "environment",
         "native",
@@ -184,6 +186,34 @@ def test_dataset_cache_env_and_runtime_gate_contract_are_explicit():
     assert source.index("require_dataset_cache()") < source.index(
         'runtime_gate "${config}"'
     )
+
+
+def test_bop_renderer_path_env_and_runtime_gate_contract_are_explicit():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    expected = "/opt/bop_renderer/build"
+
+    assert f"--env BOP_RENDERER_PATH={expected}" in source
+    assert "printenv BOP_RENDERER_PATH" in source
+    assert 'test -d "${expected}"' in source
+    assert source.index("require_bop_renderer_path()") < source.index(
+        'runtime_gate "${config}"'
+    )
+
+
+def test_bop_renderer_path_gate_accepts_expected_container_directory():
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        "fake_docker() {\n"
+        "  case \"$*\" in\n"
+        "    *'printenv BOP_RENDERER_PATH') echo /opt/bop_renderer/build ;;\n"
+        "    *'test -d /opt/bop_renderer/build') return 0 ;;\n"
+        "    *) return 1 ;;\n"
+        "  esac\n"
+        "}\n"
+        "require_bop_renderer_path"
+    )
+    assert result.returncode == 0
 
 
 def _git(repo: Path, *args: str) -> str:
