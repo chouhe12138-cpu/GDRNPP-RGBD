@@ -96,10 +96,11 @@ renderer 和无梯度用途的 geometry loss。BOP evaluation 使用独立的
 `PASS`，去除训练 renderer 后的真实 LM-PBR CPU smoke `PASS`；本轮 WSL CUDA 不可见，
 没有重复本地 GPU smoke。
 
-用户报告已有 formal 从修复前 source `33f285b` 启动，但尚未提供 run ID。该 run 的
+formal `RUN-20260902-133725-formal-s42-a01` 从修复前 source `33f285b` 启动。该 run 的
 pose-head 梯度不因冻结 geometry loss 改变，但不具备新的完整 metadata、clean-tree/
-protocol gate 和 checkpoint-before-evaluation 保证，因此不能作为修复后的 canonical
-formal；是否停止仍由用户执行，Agent 不自动操作服务器任务。
+protocol gate 和 checkpoint-before-evaluation 保证，因此标记为
+`SUPERSEDED_PENDING_STOP`，不作为修复后的 canonical formal。旧输出保留；是否停止
+仍由用户执行，Agent 不自动操作服务器任务。
 
 ## 预注册 formal gate
 
