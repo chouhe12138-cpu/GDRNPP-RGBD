@@ -14,10 +14,15 @@
   方法统一比较，不替代 EXP005 历史 source commit 的精确复现。
 - 服务器只是运行端，本地工作区是唯一代码修改来源；服务器隔离规则优先于运行
   便利性。
-- 2026-09-01 起采用轻量实验工作流：一份 RECORD、一个中央索引、一个安全启动器，
-  不再维护环境身份、哈希证据链、manifest/state/index 多层框架。
+- 采用轻量实验工作流：一份 RECORD、一个中央索引、一个安全启动器。服务器正式
+  流程固定为 bundle/只读 release → `experiment.sh create` → `run`/`eval`；create
+  自动执行 image/source compatibility gate 和 native hydration。output/home/cache
+  外置可写，GPU 允许共享并以剩余显存 gate 控制；不维护哈希证据链或
+  manifest/state/index 多层框架。
 - “紧凑 RECORD”不等于只保留状态：正式曲线、指标口径、预注册门槛、决定性
   逐物体/条件结果和失败边界属于科学证据，必须随 RECORD 保留；只删除重复状态、
   文件哈希和基础设施审计噪声。
 - 不恢复 `experiment_system`、`managed_runtime`、旧 server scripts 或旧
   EXPERIMENT/ACCEPTANCE JSON；当前 E/F 代码直接保留，不从历史分支重新合并。
+- launcher、cache、native hydration 等上线失败只属于基础设施验证，不写成模型或
+  科学实验失败；smoke 通过同样只证明执行链可用，不替代正式指标。

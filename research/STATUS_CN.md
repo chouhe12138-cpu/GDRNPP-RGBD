@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-01。
+最后核对：2026-09-02。
 
 ## 当前结论
 
@@ -20,6 +20,9 @@
 - 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D 和当前结构诊断。
 - EXP001–011 的科学结论保留在 RECORD；旧专用执行代码和 managed experiment
   审计框架已退出当前工作树，可通过 Git 历史恢复。
+- lightweight framework 已由 EXP013F 在 lab0/lab1 双机 smoke 验证，EXP005
+  matched control smoke 也完成；先前 launcher/cache/native 问题均为基础设施迁移
+  失败，不属于科学结果。
 - 当前没有活动服务器训练。新运行必须先由用户明确选择实验和配置，再使用
   `docker/l40/experiment.sh`。
 

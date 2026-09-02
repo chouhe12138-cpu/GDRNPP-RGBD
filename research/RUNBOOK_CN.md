@@ -42,16 +42,18 @@ cd ../gdrnpp-exp009
 
 ```bash
 docker/l40/experiment.sh lab0 check
-docker/l40/experiment.sh lab0 create gdrnpp-l40:stable
+docker/l40/experiment.sh lab0 create gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9
 docker/l40/experiment.sh lab0 run EXP-... configs/.../smoke.py smoke
 docker/l40/experiment.sh lab0 run EXP-... configs/.../train.py formal
 docker/l40/experiment.sh lab0 status
 docker/l40/experiment.sh lab0 logs EXP-.../RUN-...
 ```
 
-fresh bundle release checkout 后，`create IMAGE_REF` 会先核对镜像 revision 与当前
-native/环境输入是否兼容，再自动从镜像补齐 Git ignored native artifacts；无需手工
-复制 `.so`。标准流程保持为 bundle/checkout → `create` → `run`/`eval`。
+正式流程为 bundle/只读 release checkout → `create IMAGE_REF` → `run`/`eval`。
+`create` 会核对 image revision 与当前 native/环境输入，并自动补齐 Git ignored
+native artifacts，无需手工复制 `.so`。output、home、XDG runtime cache 与 dataset
+cache 使用外部可写挂载；GPU 可共享，默认要求至少 `12000 MiB` 空闲显存，可用
+`GDRN_MIN_FREE_GPU_MB` 显式覆盖。
 
 独立评估使用：
 

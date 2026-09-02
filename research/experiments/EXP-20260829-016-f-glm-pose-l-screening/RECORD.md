@@ -15,6 +15,10 @@ smoke `KeyError: roi_depth_stats`；同时统计作用在整图而非 ROI，batc
 v2 将统计统一到 online/offline 的 ROI crop，固定为 shape `[4]` 后通过本地门禁。
 v1 没有正式指标，不进入科学结果。
 
+2026-09-02 使用最终 lightweight framework 分别在 lab0、lab1 完成 smoke，训练
+链路正常；该双机运行只验证 release/container/runtime 契约，不增加或改变 EXP013F
+的科学结果。
+
 ## 正式轨迹
 
 | Epoch | BOP AR | ADD(-S) target-micro | AR_reS | AR_teS |
