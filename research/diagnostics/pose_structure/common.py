@@ -14,6 +14,7 @@ class CapturedPoseCall:
     mask_attention: Optional[torch.Tensor]
     raw_rot: torch.Tensor
     raw_t: torch.Tensor
+    depth_stats: Optional[torch.Tensor] = None
 
     def detached(self) -> "CapturedPoseCall":
         def _d(x):
@@ -26,6 +27,7 @@ class CapturedPoseCall:
             mask_attention=_d(self.mask_attention),
             raw_rot=self.raw_rot.detach(),
             raw_t=self.raw_t.detach(),
+            depth_stats=_d(self.depth_stats),
         )
 
 

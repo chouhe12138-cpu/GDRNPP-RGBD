@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import torch
 from torch import nn
 
 from .common import CapturedPoseCall, PosePrediction
+
+
+_UNSET = object()
 
 
 def unwrap_model(model: nn.Module) -> nn.Module:
@@ -41,6 +43,10 @@ def make_model_kwargs(batch: Dict[str, Any], do_loss: bool) -> Dict[str, Any]:
         roi_coord_2d=batch.get("roi_coord_2d"),
         roi_coord_2d_rel=batch.get("roi_coord_2d_rel"),
         roi_extents=batch.get("roi_extent"),
+        # EXP013F diagnostics must reproduce the formal head input.  The
+        # previous diagnostic capture omitted this field and therefore
+        # silently re-ran GLMPoseLNet with zero-padded depth statistics.
+        depth_stats=batch.get("roi_depth_stats"),
         do_loss=do_loss,
     )
 
@@ -65,6 +71,7 @@ class _HeadForwardCapture:
             region = kwargs.get("region", args[0] if len(args) > 0 else None)
             extents = kwargs.get("extents", args[1] if len(args) > 1 else None)
             mask_attention = kwargs.get("mask_attention", args[2] if len(args) > 2 else None)
+            depth_stats = kwargs.get("depth_stats", args[3] if len(args) > 3 else None)
             out = owner._orig(coor_feat, *args, **kwargs)
             raw_rot, raw_t = out
             owner.call = CapturedPoseCall(
@@ -74,6 +81,7 @@ class _HeadForwardCapture:
                 mask_attention=mask_attention,
                 raw_rot=raw_rot,
                 raw_t=raw_t,
+                depth_stats=depth_stats,
             )
             return out
 
@@ -142,13 +150,26 @@ def decode_raw_pose(cfg, raw_rot: torch.Tensor, raw_t: torch.Tensor, batch: Dict
     return PosePrediction(rot=pred_rot, trans=pred_trans, raw_rot=raw_rot, raw_t=raw_t)
 
 
-def call_head(head: nn.Module, call: CapturedPoseCall, *, coor_feat=None, region=None, extents=None, mask_attention=None):
-    return head(
-        call.coor_feat if coor_feat is None else coor_feat,
+def call_head(
+    head: nn.Module,
+    call: CapturedPoseCall,
+    *,
+    coor_feat=None,
+    region=None,
+    extents=None,
+    mask_attention=None,
+    depth_stats=_UNSET,
+):
+    kwargs = dict(
         region=call.region if region is None else region,
         extents=call.extents if extents is None else extents,
         mask_attention=call.mask_attention if mask_attention is None else mask_attention,
     )
+    if depth_stats is not _UNSET:
+        kwargs["depth_stats"] = depth_stats
+    elif call.depth_stats is not None:
+        kwargs["depth_stats"] = call.depth_stats
+    return head(call.coor_feat if coor_feat is None else coor_feat, **kwargs)
 
 
 @contextlib.contextmanager
