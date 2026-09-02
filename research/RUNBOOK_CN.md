@@ -86,6 +86,74 @@ echo "RELEASE_CHECK PASS commit=${full_sha}"
 命令会停止，不覆盖、不删除也不复用。release 创建后必须从该目录使用当前统一入口；
 图示历史中的 `prepare_release.sh` 和 `managed_experiment.sh` 不再使用。
 
+### 已有容器的受控替换
+
+`create` 不覆盖同名容器。仅在用户明确授权替换精确容器、只读检查确认标签归属，并且
+容器内没有 `main_gdrn.py` 后，才执行下面的受控替换。示例对应 EXP017 的 `lab0`
+release；旧 mount 必须与已检查到的值精确一致，否则停止，不猜测也不删除：
+
+```bash
+(
+set -Eeuo pipefail
+
+machine=lab0
+container=gdrnpp_chx_lab0
+expected_old_repo=/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-c1e0dfa
+new_repo=/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-3cfbceb
+image_ref=gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9
+
+test "$(id -un)" = "${machine}"
+test "$(git -C "${new_repo}" rev-parse HEAD)" = \
+  3cfbceb94252c1fc35b9f81350d2b6a0c068d97a
+test -z "$(git -C "${new_repo}" status --short)"
+test "$(/usr/bin/docker inspect "${container}" \
+  --format '{{index .Config.Labels "gdrnpp.project"}}')" = GDRNPP-RGBD
+test "$(/usr/bin/docker inspect "${container}" \
+  --format '{{index .Config.Labels "gdrnpp.machine"}}')" = "${machine}"
+
+mounted_repo="$(/usr/bin/docker inspect "${container}" \
+  --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
+test "${mounted_repo}" = "${expected_old_repo}"
+
+if /usr/bin/docker exec "${container}" pgrep -f '[m]ain_gdrn.py' >/dev/null 2>&1; then
+  echo "REFUSE: main_gdrn.py is active in ${container}" >&2
+  exit 1
+fi
+
+/usr/bin/docker stop "${container}"
+/usr/bin/docker rm "${container}"
+
+cd "${new_repo}"
+docker/l40/experiment.sh "${machine}" create "${image_ref}"
+
+mounted_repo="$(/usr/bin/docker inspect "${container}" \
+  --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
+mounted_rw="$(/usr/bin/docker inspect "${container}" \
+  --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.RW}}{{end}}{{end}}')"
+test "${mounted_repo}" = "${new_repo}"
+test "${mounted_rw}" = false
+
+docker/l40/experiment.sh "${machine}" check
+docker/l40/experiment.sh "${machine}" status
+echo "CONTAINER_REPLACEMENT PASS container=${container} release=${new_repo}"
+)
+```
+
+替换只影响经过上述 gate 的项目容器，不操作宿主机其他 Python 进程。若 GPU 上有其他
+任务，仍由 launcher 的 free-memory gate 决定是否允许启动。先运行独立 smoke；拿到
+`RUN_ID` 后使用 `status`/`logs` 检查，formal 必须再次获得明确授权：
+
+```bash
+cd /data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-3cfbceb
+docker/l40/experiment.sh lab0 run \
+  EXP-20260902-017-support-aware-rotation-residual \
+  configs/gdrn/lmo_pbr/research/exp017/support_aware_rotation_residual/smoke.py smoke
+docker/l40/experiment.sh lab0 status
+# 将上一条 run 命令返回的 RUN_ID 代入：
+docker/l40/experiment.sh lab0 logs \
+  EXP-20260902-017-support-aware-rotation-residual/RUN-...
+```
+
 ```bash
 docker/l40/experiment.sh lab0 check
 docker/l40/experiment.sh lab0 create gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9
