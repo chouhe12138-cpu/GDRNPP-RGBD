@@ -88,6 +88,7 @@ def test_runtime_gate_calls_every_lightweight_check():
         "require_owned_container() { echo ownership; }\n"
         "verify_required_mounts() { echo mounts; }\n"
         "require_writable_output() { echo output; }\n"
+        "require_dataset_cache() { echo dataset-cache; }\n"
         "require_cuda() { echo cuda; }\n"
         "verify_environment() { echo environment; }\n"
         "verify_native() { echo native; }\n"
@@ -98,6 +99,7 @@ def test_runtime_gate_calls_every_lightweight_check():
         "ownership",
         "mounts",
         "output",
+        "dataset-cache",
         "cuda",
         "environment",
         "native",
@@ -116,6 +118,20 @@ def test_gate_precedes_run_directory_creation_and_nested_targets_are_created():
         '${repo_root}/datasets/VOCdevkit',
         '${repo_root}/pretrained_models',
         '${repo_root}/output',
+        '${root}/cache/gdrnpp_datasets',
         '${root}/home/.cache',
     ):
         assert f'"{target}"' in source
+
+
+def test_dataset_cache_env_and_runtime_gate_contract_are_explicit():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    expected = "/home/gdrn/.cache/gdrnpp_datasets"
+
+    assert f"--env GDRN_DATASET_CACHE_DIR={expected}" in source
+    assert 'require_mount "${root}/cache" /home/gdrn/.cache true' in source
+    assert 'printenv GDRN_DATASET_CACHE_DIR' in source
+    assert 'test -w "${expected}"' in source
+    assert source.index("require_dataset_cache()") < source.index(
+        'runtime_gate "${config}"'
+    )

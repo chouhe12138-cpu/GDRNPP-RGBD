@@ -27,6 +27,13 @@ core 重新解释历史结果。
 初始化或训练，没有 checkpoint 和指标，只作为 launcher 基础设施失败保留，不进入
 EXP005 科学结果；train/eval override 随后统一修正为 `KEY=VALUE`。
 
+2026-09-02 的 `RUN-20260902-043259-smoke-s42-a01` 已通过 runtime/native gate、
+CLI parsing、模型构建和 dataset parsing，但 launcher 未设置
+`GDRN_DATASET_CACHE_DIR`，保存 dataset cache 时因只读 repo 下的
+`/workspace/gdrnpp/.cache` 报 `OSError: [Errno 30] Read-only file system`。该 run
+没有完成 smoke，也没有产生科学指标，只作为基础设施失败保留，不进入 EXP005
+科学结果。
+
 首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
 只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable
 cache 与异常返回后，smoke/audit 通过且另建目录，没有覆盖失败 run。

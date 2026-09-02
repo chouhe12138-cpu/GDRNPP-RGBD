@@ -122,6 +122,16 @@ require_writable_output() {
         fail "container output mount is not writable"
 }
 
+require_dataset_cache() {
+    local expected="/home/gdrn/.cache/gdrnpp_datasets" actual
+    actual="$("${docker_bin}" exec "${container}" printenv GDRN_DATASET_CACHE_DIR)" || \
+        fail "container GDRN_DATASET_CACHE_DIR is not set"
+    [[ "${actual}" == "${expected}" ]] || \
+        fail "container GDRN_DATASET_CACHE_DIR=${actual}, expected ${expected}"
+    "${docker_bin}" exec "${container}" test -w "${expected}" || \
+        fail "container dataset cache is not writable: ${expected}"
+}
+
 require_cuda() {
     "${docker_bin}" exec "${container}" python -c \
         'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; assert torch.cuda.device_count() == 1, torch.cuda.device_count()' || \
@@ -151,6 +161,7 @@ runtime_gate() {
     require_owned_container
     verify_required_mounts
     require_writable_output
+    require_dataset_cache
     require_cuda
     verify_environment
     verify_native
@@ -240,6 +251,7 @@ main() {
             "${repo_root}/output" \
             "${root}/outputs" \
             "${root}/cache" \
+            "${root}/cache/gdrnpp_datasets" \
             "${root}/home/.cache"
         "${docker_bin}" run -d \
             --gpus "device=${gpu_id}" \
@@ -248,6 +260,7 @@ main() {
             --label "gdrnpp.project=GDRNPP-RGBD" --label "gdrnpp.machine=${machine}" \
             --env HOME=/home/gdrn --env CUDA_VISIBLE_DEVICES=0 \
             --env XDG_CACHE_HOME=/home/gdrn/.cache \
+            --env GDRN_DATASET_CACHE_DIR=/home/gdrn/.cache/gdrnpp_datasets \
             --mount "type=bind,src=${repo_root},dst=/workspace/gdrnpp,readonly" \
             --mount "type=bind,src=${root}/datasets/BOP_DATASETS,dst=/workspace/gdrnpp/datasets/BOP_DATASETS,readonly" \
             --mount "type=bind,src=${root}/datasets/VOC,dst=/workspace/gdrnpp/datasets/VOCdevkit,readonly" \
