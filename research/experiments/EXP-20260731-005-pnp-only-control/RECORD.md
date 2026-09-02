@@ -16,34 +16,17 @@
 精确复现 2026-08-11 的正式结果，应 checkout 上述 source commit，而不是使用当前
 core 重新解释历史结果。
 
-2026-09-02 的 `RUN-20260902-034930-smoke-s42-a01` 因 launcher 构造训练命令时
-遗漏 `--opts`，被 `main_gdrn.py` 以 `unrecognized arguments: OUTPUT_DIR ...`
-拒绝。该 run 未进入模型构建或训练，没有 checkpoint 和指标，只作为 launcher
-基础设施失败保留，不进入 EXP005 科学结果。后续修复同时覆盖 train/eval override。
+2026-09-02 的 bundle/fresh-readonly-release 迁移验证先后暴露并修复了 launcher
+override、`DictAction` 格式、dataset cache 和背景路径 cache 契约。对应的
+`RUN-20260902-034930-smoke-s42-a01`、`RUN-20260902-042118-smoke-s42-a01`、
+`RUN-20260902-043259-smoke-s42-a01` 与 `RUN-20260902-044659-smoke-s42-a01` 均为
+迁移基础设施验证；早期 `RUN-20260811-052852-smoke-s42-a01` 也属于已退出的
+managed 流程验证。这些 run 不是科学实验失败，也不进入 EXP005 科学结果。
 
-2026-09-02 的 `RUN-20260902-042118-smoke-s42-a01` 已通过 runtime/native gate，
-但 launcher 将 mmcv `DictAction` 的 override 写成 `KEY VALUE`，解析阶段报
-`ValueError: not enough values to unpack (expected 2, got 1)`。该 run 未进入模型
-初始化或训练，没有 checkpoint 和指标，只作为 launcher 基础设施失败保留，不进入
-EXP005 科学结果；train/eval override 随后统一修正为 `KEY=VALUE`。
-
-2026-09-02 的 `RUN-20260902-043259-smoke-s42-a01` 已通过 runtime/native gate、
-CLI parsing、模型构建和 dataset parsing，但 launcher 未设置
-`GDRN_DATASET_CACHE_DIR`，保存 dataset cache 时因只读 repo 下的
-`/workspace/gdrnpp/.cache` 报 `OSError: [Errno 30] Read-only file system`。该 run
-没有完成 smoke，也没有产生科学指标，只作为基础设施失败保留，不进入 EXP005
-科学结果。
-
-2026-09-02 的 `RUN-20260902-044659-smoke-s42-a01` 已通过 release/container/
-runtime gate、CUDA/native、config/CLI、模型与 optimizer 构建、dataset dict cache
-及 dataloader 创建，并进入 iteration 0 的训练循环；但 DataLoader worker 在取得首个
-training batch 前尝试把背景路径缓存写入只读 CWD 的 `.cache`，以
-`OSError: [Errno 30] Read-only file system` 退出。该 run 未完成 optimizer step、
-没有科学指标，只作为基础设施失败保留，不进入 EXP005 科学结果。
-
-首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
-只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable
-cache 与异常返回后，smoke/audit 通过且另建目录，没有覆盖失败 run。
+最终 smoke `RUN-20260902-050035-smoke-s42-a01` 成功完成 2048/2048 iterations：
+forward/backward 正常、loss finite，并保存 `model_epoch_001.pth`。它验证了当前
+lightweight launcher 的只读 mount、CLI、runtime/CUDA/native gate、dataset/XDG
+cache 与训练闭环；该 smoke 仍不作为正式科学指标。
 
 ## 固定 E40 结果
 

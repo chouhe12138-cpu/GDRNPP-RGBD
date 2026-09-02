@@ -49,6 +49,10 @@ docker/l40/experiment.sh lab0 status
 docker/l40/experiment.sh lab0 logs EXP-.../RUN-...
 ```
 
+fresh bundle release checkout 后，`create IMAGE_REF` 会先核对镜像 revision 与当前
+native/环境输入是否兼容，再自动从镜像补齐 Git ignored native artifacts；无需手工
+复制 `.so`。标准流程保持为 bundle/checkout → `create` → `run`/`eval`。
+
 独立评估使用：
 
 ```bash

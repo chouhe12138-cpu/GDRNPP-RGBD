@@ -16,10 +16,87 @@ EOF
 
 owner="chx"
 docker_bin="/usr/bin/docker"
+native_input_paths=(
+    docker/l40/Dockerfile
+    docker/l40/requirements.lock
+    docker/l40/build_native.sh
+    docker/l40/vendor
+    core/csrc
+    lib/egl_renderer
+)
+native_artifact_globs=(
+    'core/csrc/fps/_ext*.so'
+    'core/csrc/flow/flow_cuda*.so'
+    'core/csrc/ransac_voting/ransac_voting*.so'
+    'core/csrc/torch_nndistance/torch_nndistance_aten*.so'
+    'core/csrc/uncertainty_pnp/_ext*.so'
+    'lib/egl_renderer/CppEGLRenderer*.so'
+)
 
 fail() {
     echo "FAIL: $*" >&2
     exit 1
+}
+
+image_revision() {
+    "${docker_bin}" image inspect "$1" \
+        --format '{{index .Config.Labels "org.opencontainers.image.revision"}}'
+}
+
+require_image_source_compatibility() {
+    local image_ref="$1" revision changed
+    revision="$(image_revision "${image_ref}")" || fail "cannot read image revision: ${image_ref}"
+    [[ "${revision}" =~ ^[0-9a-fA-F]{7,40}$ ]] || \
+        fail "image ${image_ref} has no usable org.opencontainers.image.revision"
+    git -C "${repo_root}" cat-file -e "${revision}^{commit}" 2>/dev/null || \
+        fail "image revision ${revision} is not present in this release history"
+    git -C "${repo_root}" merge-base --is-ancestor "${revision}" HEAD || \
+        fail "image revision ${revision} is not an ancestor of current HEAD"
+    changed="$(git -C "${repo_root}" diff --name-only "${revision}..HEAD" -- "${native_input_paths[@]}")" || \
+        fail "cannot compare image revision ${revision} with current HEAD"
+    [[ -z "${changed}" ]] || \
+        fail "native/environment inputs changed since image ${revision}; rebuild image: ${changed//$'\n'/, }"
+    echo "IMAGE_COMPATIBILITY PASS image=${image_ref} revision=${revision}"
+}
+
+require_native_artifacts() {
+    local pattern
+    for pattern in "${native_artifact_globs[@]}"; do
+        compgen -G "${repo_root}/${pattern}" >/dev/null || \
+            fail "missing hydrated native artifact: ${pattern}"
+    done
+    [[ -d "${repo_root}/core/csrc/uncertainty_pnp/lib" ]] || \
+        fail "missing hydrated native artifact directory: core/csrc/uncertainty_pnp/lib"
+    compgen -G "${repo_root}/core/csrc/uncertainty_pnp/lib/*.so*" >/dev/null || \
+        fail "missing shared libraries in core/csrc/uncertainty_pnp/lib"
+}
+
+hydrate_native_artifacts() {
+    local image_ref="$1" tracked_changes
+    "${docker_bin}" run --rm --entrypoint bash \
+        --label "gdrnpp.project=GDRNPP-RGBD" --label "gdrnpp.machine=${machine}" \
+        "${image_ref}" -lc '
+        set -Eeuo pipefail
+        cd /workspace/gdrnpp
+        shopt -s nullglob
+        artifacts=(
+            core/csrc/fps/_ext*.so
+            core/csrc/flow/flow_cuda*.so
+            core/csrc/ransac_voting/ransac_voting*.so
+            core/csrc/torch_nndistance/torch_nndistance_aten*.so
+            core/csrc/uncertainty_pnp/_ext*.so
+            core/csrc/uncertainty_pnp/lib
+            lib/egl_renderer/CppEGLRenderer*.so
+        )
+        ((${#artifacts[@]} > 0))
+        tar -cf - "${artifacts[@]}"
+    ' | tar -xf - -C "${repo_root}"
+    require_native_artifacts
+    git -C "${repo_root}" diff --check || fail "hydration left an invalid tracked diff"
+    tracked_changes="$(git -C "${repo_root}" status --porcelain --untracked-files=no)"
+    [[ -z "${tracked_changes}" ]] || \
+        fail "hydration modified tracked source: ${tracked_changes//$'\n'/, }"
+    echo "NATIVE_HYDRATION PASS image=${image_ref}"
 }
 
 check_host() {
@@ -244,6 +321,8 @@ main() {
         check_host
         container_exists && fail "container name already exists: ${container}"
         "${docker_bin}" image inspect "${image_ref}" >/dev/null 2>&1 || fail "image not found: ${image_ref}"
+        require_image_source_compatibility "${image_ref}"
+        hydrate_native_artifacts "${image_ref}"
         mkdir -p \
             "${repo_root}/datasets/BOP_DATASETS" \
             "${repo_root}/datasets/VOCdevkit" \

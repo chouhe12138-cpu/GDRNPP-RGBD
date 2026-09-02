@@ -11,11 +11,11 @@ ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "docker/l40/experiment.sh"
 
 
-def _source_and_run(body: str) -> subprocess.CompletedProcess[str]:
+def _source_and_run(body: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
     command = f"source {shlex.quote(str(LAUNCHER))}\n{body}"
     return subprocess.run(
         ["bash", "-c", command],
-        check=True,
+        check=check,
         capture_output=True,
         text=True,
     )
@@ -135,3 +135,85 @@ def test_dataset_cache_env_and_runtime_gate_contract_are_explicit():
     assert source.index("require_dataset_cache()") < source.index(
         'runtime_gate "${config}"'
     )
+
+
+def _git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def test_image_compatibility_rejects_changed_native_inputs(tmp_path):
+    source = LAUNCHER.read_text(encoding="utf-8")
+    input_block = source.split("native_input_paths=(", 1)[1].split(")", 1)[0]
+    for path in (
+        "docker/l40/Dockerfile",
+        "docker/l40/requirements.lock",
+        "docker/l40/build_native.sh",
+        "docker/l40/vendor",
+        "core/csrc",
+        "lib/egl_renderer",
+    ):
+        assert path in input_block
+
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.name", "Launcher Test")
+    _git(tmp_path, "config", "user.email", "launcher@example.invalid")
+    native_source = tmp_path / "core/csrc/example.cpp"
+    native_source.parent.mkdir(parents=True)
+    native_source.write_text("baseline\n", encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("baseline\n", encoding="utf-8")
+    _git(tmp_path, "add", ".")
+    _git(tmp_path, "commit", "-qm", "baseline")
+    image_commit = _git(tmp_path, "rev-parse", "HEAD")
+
+    (tmp_path / "notes.txt").write_text("non-native change\n", encoding="utf-8")
+    _git(tmp_path, "commit", "-qam", "non-native change")
+    compatible = _source_and_run(
+        f"repo_root={shlex.quote(str(tmp_path))}\n"
+        f"image_revision() {{ echo {image_commit}; }}\n"
+        "require_image_source_compatibility test-image"
+    )
+    assert compatible.stdout.startswith("IMAGE_COMPATIBILITY PASS")
+
+    native_source.write_text("native change\n", encoding="utf-8")
+    _git(tmp_path, "commit", "-qam", "native change")
+    incompatible = _source_and_run(
+        f"repo_root={shlex.quote(str(tmp_path))}\n"
+        f"image_revision() {{ echo {image_commit}; }}\n"
+        "require_image_source_compatibility test-image",
+        check=False,
+    )
+    assert incompatible.returncode != 0
+    assert "rebuild image" in incompatible.stderr
+
+
+def test_native_hydration_contract_covers_required_artifacts(tmp_path):
+    artifacts = (
+        "core/csrc/fps/_ext.test.so",
+        "core/csrc/flow/flow_cuda.test.so",
+        "core/csrc/ransac_voting/ransac_voting.test.so",
+        "core/csrc/torch_nndistance/torch_nndistance_aten.test.so",
+        "core/csrc/uncertainty_pnp/_ext.test.so",
+        "core/csrc/uncertainty_pnp/lib/libceres.so",
+        "lib/egl_renderer/CppEGLRenderer.test.so",
+    )
+    for relative in artifacts:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+
+    _source_and_run(
+        f"repo_root={shlex.quote(str(tmp_path))}\nrequire_native_artifacts"
+    )
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert '"${docker_bin}" run --rm --entrypoint bash' in source
+    assert 'git -C "${repo_root}" diff --check' in source
+    assert "status --porcelain --untracked-files=no" in source
+    assert source.index('require_image_source_compatibility "${image_ref}"') < source.index(
+        'hydrate_native_artifacts "${image_ref}"'
+    ) < source.index('"${docker_bin}" run -d')
