@@ -12,12 +12,15 @@
   “结构可读出与预训练继承并重”提供部分支持。
 - EXP013F GLM-Pose-L 完成：BOP `0.684129`、reS `0.515802`，四项门槛通过
   2 项，结论为边缘 `SCREEN_FAIL`。
+- EXP017 已按 EXP013A 主体实现 rotation-only spatial residual adapter；新增参数
+  `13,000`，相关测试、CPU preflight 和本地真实 LM-PBR 小批次 smoke 均通过，尚未
+  提交或启动 formal。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 
 ## 当前代码边界
 
-- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D 和当前结构诊断。
+- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017 和当前结构诊断。
 - EXP001–011 的科学结论保留在 RECORD；旧专用执行代码和 managed experiment
   审计框架已退出当前工作树，可通过 Git 历史恢复。
 - lightweight framework 已由 EXP013F 在 lab0/lab1 双机 smoke 验证，EXP005
@@ -28,5 +31,6 @@
 
 ## 下一步
 
-先基于 EXP012/013E/F 的结果确定下一条方法假设；不自动恢复 D，也不因单次
-边缘差距自动增加 seed。完整数值与结论边界见实验索引中的 RECORD。
+EXP017 本地门禁已经满足，下一步是在用户确认最终 diff、commit/release 和 GPU 后请求
+formal 训练授权；不自动恢复 D，也不因单次边缘差距自动增加 seed。完整数值与结论
+边界见实验索引中的 RECORD。

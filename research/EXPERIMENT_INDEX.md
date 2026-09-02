@@ -23,3 +23,4 @@
 | EXP014-D Full Train | PAUSED | a01 无效，无活动重训授权 | [RECORD](experiments/EXP-20260827-014-d-fulltrain-imagenet/RECORD.md) |
 | EXP013E Official Random | COMPLETE | 部分支持 M2/M3 并重 | [RECORD](experiments/EXP-20260829-015-e-official-head-random/RECORD.md) |
 | EXP013F GLM-Pose-L | COMPLETE / FAIL | 2/4 gate，边缘失败 | [RECORD](experiments/EXP-20260829-016-f-glm-pose-l-screening/RECORD.md) |
+| EXP017 Rotation Residual | IMPLEMENTED / LOCAL GATES PASS | 等待 formal 训练授权 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |

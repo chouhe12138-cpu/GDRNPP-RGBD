@@ -9,9 +9,13 @@ PYTHONPATH="$PWD" pytest -q research/tests research/next_pose_head/tests \
   research/exp013/tests research/diagnostics/pose_structure/tests
 python -m research.next_pose_head.preflight --device cpu
 python -m research.exp013.preflight --variant A --device cpu
+python -m research.exp017.preflight --device cpu
+python -m research.exp017.real_smoke --device cuda:0 --batch-size 2 --num-workers 0
 ```
 
 其他 EXP013 变体把 `A` 改为 `B/C/E/F`。D 仍暂停，不运行 formal。
+EXP017 的 `real_smoke` 只执行一个真实小批次和三个受限 optimizer step；服务器一 epoch
+smoke 使用 EXP017 的 `smoke.py`，不得把本地 smoke 当作 formal。
 
 长期 PnP-only matched control 使用：
 
