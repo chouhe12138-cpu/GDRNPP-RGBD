@@ -16,6 +16,11 @@
 精确复现 2026-08-11 的正式结果，应 checkout 上述 source commit，而不是使用当前
 core 重新解释历史结果。
 
+2026-09-02 的 `RUN-20260902-034930-smoke-s42-a01` 因 launcher 构造训练命令时
+遗漏 `--opts`，被 `main_gdrn.py` 以 `unrecognized arguments: OUTPUT_DIR ...`
+拒绝。该 run 未进入模型构建或训练，没有 checkpoint 和指标，只作为 launcher
+基础设施失败保留，不进入 EXP005 科学结果。后续修复同时覆盖 train/eval override。
+
 首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
 只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable
 cache 与异常返回后，smoke/audit 通过且另建目录，没有覆盖失败 run。

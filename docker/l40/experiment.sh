@@ -14,24 +14,8 @@ EOF
     exit 2
 }
 
-[[ $# -ge 2 ]] || usage
-machine="$1"
-action="$2"
-shift 2
-
-case "${machine}" in
-    lab0) gpu_id=0 ;;
-    lab1) gpu_id=1 ;;
-    *) usage ;;
-esac
-
 owner="chx"
-root="/data/labs/${machine}/docker_data/${owner}"
-container="gdrnpp_${owner}_${machine}"
 docker_bin="/usr/bin/docker"
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd -- "${script_dir}/../.." && pwd)"
-output_root="${root}/outputs/experiments"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -95,6 +79,85 @@ resolve_config() {
     printf '%s\n' "${resolved#${repo_root}/}"
 }
 
+build_train_command() {
+    local config="$1" run_container="$2"
+    printf 'core/gdrn_modeling/train_gdrn.sh %q 0 --opts OUTPUT_DIR %q' \
+        "${config}" "${run_container}"
+}
+
+build_eval_command() {
+    local config="$1" checkpoint_container="$2" run_container="$3"
+    printf 'python core/gdrn_modeling/main_gdrn.py --config-file %q --num-gpus 1 --eval-only --opts MODEL.WEIGHTS %q OUTPUT_DIR %q' \
+        "${config}" "${checkpoint_container}" "${run_container}"
+}
+
+require_mount() {
+    local expected_source="$1" expected_destination="$2" expected_rw="$3"
+    local actual_source="" actual_destination="" actual_rw=""
+    while IFS=$'\t' read -r actual_source actual_destination actual_rw; do
+        if [[ "${actual_destination}" == "${expected_destination}" ]]; then
+            [[ "${actual_source}" == "$(realpath -e -- "${expected_source}")" ]] || \
+                fail "mount ${expected_destination} has source ${actual_source}, expected ${expected_source}"
+            [[ "${actual_rw}" == "${expected_rw}" ]] || \
+                fail "mount ${expected_destination} rw=${actual_rw}, expected ${expected_rw}"
+            return
+        fi
+    done < <("${docker_bin}" inspect "${container}" \
+        --format '{{range .Mounts}}{{printf "%s\t%s\t%t\n" .Source .Destination .RW}}{{end}}')
+    fail "missing required mount: ${expected_destination}"
+}
+
+verify_required_mounts() {
+    require_mount "${repo_root}" /workspace/gdrnpp false
+    require_mount "${root}/datasets/BOP_DATASETS" /workspace/gdrnpp/datasets/BOP_DATASETS false
+    require_mount "${root}/datasets/VOC" /workspace/gdrnpp/datasets/VOCdevkit false
+    require_mount "${root}/weights" /workspace/gdrnpp/pretrained_models false
+    require_mount "${root}/outputs" /workspace/gdrnpp/output true
+    require_mount "${root}/cache" /home/gdrn/.cache true
+    require_mount "${root}/home" /home/gdrn true
+}
+
+require_writable_output() {
+    "${docker_bin}" exec "${container}" test -w /workspace/gdrnpp/output || \
+        fail "container output mount is not writable"
+}
+
+require_cuda() {
+    "${docker_bin}" exec "${container}" python -c \
+        'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; assert torch.cuda.device_count() == 1, torch.cuda.device_count()' || \
+        fail "container CUDA gate failed"
+}
+
+verify_environment() {
+    "${docker_bin}" exec "${container}" /usr/local/bin/verify-gdrn-environment || \
+        fail "verify-gdrn-environment failed"
+}
+
+verify_native() {
+    "${docker_bin}" exec "${container}" /usr/local/bin/verify-gdrn-native || \
+        fail "verify-gdrn-native failed"
+}
+
+load_runtime_config() {
+    local config="$1"
+    "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp \
+        "${container}" python -c \
+        'import sys; from mmcv import Config; Config.fromfile(sys.argv[1])' \
+        "/workspace/gdrnpp/${config}" || fail "container config load failed: ${config}"
+}
+
+runtime_gate() {
+    local config="$1"
+    require_owned_container
+    verify_required_mounts
+    require_writable_output
+    require_cuda
+    verify_environment
+    verify_native
+    load_runtime_config "${config}"
+    echo "RUNTIME_GATE PASS container=${container} config=${config}"
+}
+
 next_run_id() {
     local mode="$1" stamp attempt candidate
     stamp="$(date -u +%Y%m%d-%H%M%S)"
@@ -114,6 +177,7 @@ launch() {
     start_owned_container
     require_idle_gpu
     require_idle_container
+    runtime_gate "${config}"
     run_id="$(next_run_id "${mode}")"
     run_host="${output_root}/${experiment_id}/${run_id}"
     run_container="/workspace/gdrnpp/output/experiments/${experiment_id}/${run_id}"
@@ -124,16 +188,34 @@ launch() {
         "${experiment_id}" "${run_id}" "${mode}" "${config}" "${commit}" "${image_ref}" \
         > "${run_host}/console.log"
     if [[ "${mode}" == "eval" ]]; then
-        command="python core/gdrn_modeling/main_gdrn.py --config-file ${config} --num-gpus 1 --eval-only MODEL.WEIGHTS ${checkpoint_container} OUTPUT_DIR ${run_container}"
+        command="$(build_eval_command "${config}" "${checkpoint_container}" "${run_container}")"
     else
-        command="core/gdrn_modeling/train_gdrn.sh ${config} 0 OUTPUT_DIR ${run_container}"
+        command="$(build_train_command "${config}" "${run_container}")"
     fi
     "${docker_bin}" exec -d "${container}" bash -lc \
         "cd /workspace/gdrnpp && { ${command}; code=\$?; printf '%s\\n' \"\${code}\" > ${run_container}/exit_code; exit \"\${code}\"; } >> ${run_container}/console.log 2>&1"
     echo "RUN_LAUNCHED experiment=${experiment_id} run=${run_id} output=${run_host}"
 }
 
-case "${action}" in
+main() {
+    [[ $# -ge 2 ]] || usage
+    machine="$1"
+    action="$2"
+    shift 2
+
+    case "${machine}" in
+        lab0) gpu_id=0 ;;
+        lab1) gpu_id=1 ;;
+        *) usage ;;
+    esac
+
+    root="/data/labs/${machine}/docker_data/${owner}"
+    container="gdrnpp_${owner}_${machine}"
+    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+    repo_root="$(cd -- "${script_dir}/../.." && pwd)"
+    output_root="${root}/outputs/experiments"
+
+    case "${action}" in
     check)
         [[ $# -eq 0 ]] || usage
         check_host
@@ -151,7 +233,14 @@ case "${action}" in
         check_host
         container_exists && fail "container name already exists: ${container}"
         "${docker_bin}" image inspect "${image_ref}" >/dev/null 2>&1 || fail "image not found: ${image_ref}"
-        mkdir -p "${root}/outputs" "${root}/cache" "${root}/home"
+        mkdir -p \
+            "${repo_root}/datasets/BOP_DATASETS" \
+            "${repo_root}/datasets/VOCdevkit" \
+            "${repo_root}/pretrained_models" \
+            "${repo_root}/output" \
+            "${root}/outputs" \
+            "${root}/cache" \
+            "${root}/home/.cache"
         "${docker_bin}" run -d \
             --gpus "device=${gpu_id}" \
             --user "$(id -u):$(id -g)" \
@@ -204,5 +293,10 @@ case "${action}" in
         [[ -f "${requested}/console.log" ]] || fail "missing console.log: ${requested}"
         tail -f "${requested}/console.log"
         ;;
-    *) usage ;;
-esac
+        *) usage ;;
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

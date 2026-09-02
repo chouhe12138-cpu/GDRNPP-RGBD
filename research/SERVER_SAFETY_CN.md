@@ -26,3 +26,7 @@ nvidia-smi -i 1   # lab1
 
 安全入口：`docker/l40/experiment.sh`。脚本拒绝输出覆盖和非项目容器，也不会执行
 stop/remove/prune。
+
+`run/eval` 在创建 run 目录前执行统一 runtime gate：复核 ownership 和全部 bind
+mount、output 可写、单卡 CUDA、环境与 native verifier，并在容器内用
+`mmcv.Config.fromfile` 加载目标配置。任一项失败都不会启动训练/评估。
