@@ -81,14 +81,14 @@ resolve_config() {
 
 build_train_command() {
     local config="$1" run_container="$2"
-    printf 'core/gdrn_modeling/train_gdrn.sh %q 0 --opts OUTPUT_DIR %q' \
-        "${config}" "${run_container}"
+    printf 'core/gdrn_modeling/train_gdrn.sh %q 0 --opts %q' \
+        "${config}" "OUTPUT_DIR=${run_container}"
 }
 
 build_eval_command() {
     local config="$1" checkpoint_container="$2" run_container="$3"
-    printf 'python core/gdrn_modeling/main_gdrn.py --config-file %q --num-gpus 1 --eval-only --opts MODEL.WEIGHTS %q OUTPUT_DIR %q' \
-        "${config}" "${checkpoint_container}" "${run_container}"
+    printf 'python core/gdrn_modeling/main_gdrn.py --config-file %q --num-gpus 1 --eval-only --opts %q %q' \
+        "${config}" "MODEL.WEIGHTS=${checkpoint_container}" "OUTPUT_DIR=${run_container}"
 }
 
 require_mount() {

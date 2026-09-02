@@ -4,6 +4,8 @@ import shlex
 import subprocess
 from pathlib import Path
 
+from core.utils.default_args_setup import my_default_argument_parser
+
 
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "docker/l40/experiment.sh"
@@ -28,8 +30,7 @@ def test_train_command_places_output_override_after_opts():
         "configs/research/smoke.py",
         "0",
         "--opts",
-        "OUTPUT_DIR",
-        "/workspace/gdrnpp/output/run",
+        "OUTPUT_DIR=/workspace/gdrnpp/output/run",
     ]
 
 
@@ -47,11 +48,38 @@ def test_eval_command_places_all_overrides_after_opts():
         "1",
         "--eval-only",
         "--opts",
-        "MODEL.WEIGHTS",
-        "/workspace/gdrnpp/output/model.pth",
-        "OUTPUT_DIR",
-        "/workspace/gdrnpp/output/eval",
+        "MODEL.WEIGHTS=/workspace/gdrnpp/output/model.pth",
+        "OUTPUT_DIR=/workspace/gdrnpp/output/eval",
     ]
+
+
+def test_launcher_overrides_satisfy_real_dict_action_parser_contract():
+    parser = my_default_argument_parser()
+
+    train_args = parser.parse_args(
+        [
+            "--config-file",
+            "configs/research/train.py",
+            "--opts",
+            "OUTPUT_DIR=/workspace/gdrnpp/output/train",
+        ]
+    )
+    assert train_args.opts == {"OUTPUT_DIR": "/workspace/gdrnpp/output/train"}
+
+    eval_args = parser.parse_args(
+        [
+            "--config-file",
+            "configs/research/eval.py",
+            "--eval-only",
+            "--opts",
+            "MODEL.WEIGHTS=/workspace/gdrnpp/output/model.pth",
+            "OUTPUT_DIR=/workspace/gdrnpp/output/eval",
+        ]
+    )
+    assert eval_args.opts == {
+        "MODEL.WEIGHTS": "/workspace/gdrnpp/output/model.pth",
+        "OUTPUT_DIR": "/workspace/gdrnpp/output/eval",
+    }
 
 
 def test_runtime_gate_calls_every_lightweight_check():

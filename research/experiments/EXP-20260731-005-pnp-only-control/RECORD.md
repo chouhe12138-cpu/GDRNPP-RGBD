@@ -21,6 +21,12 @@ core 重新解释历史结果。
 拒绝。该 run 未进入模型构建或训练，没有 checkpoint 和指标，只作为 launcher
 基础设施失败保留，不进入 EXP005 科学结果。后续修复同时覆盖 train/eval override。
 
+2026-09-02 的 `RUN-20260902-042118-smoke-s42-a01` 已通过 runtime/native gate，
+但 launcher 将 mmcv `DictAction` 的 override 写成 `KEY VALUE`，解析阶段报
+`ValueError: not enough values to unpack (expected 2, got 1)`。该 run 未进入模型
+初始化或训练，没有 checkpoint 和指标，只作为 launcher 基础设施失败保留，不进入
+EXP005 科学结果；train/eval override 随后统一修正为 `KEY=VALUE`。
+
 首次 managed smoke `RUN-20260811-052852-smoke-s42-a01` 因 dataset cache 指向
 只读 release 而失败，没有 checkpoint 或指标，不进入科学结果。修正 writable
 cache 与异常返回后，smoke/audit 通过且另建目录，没有覆盖失败 run。
