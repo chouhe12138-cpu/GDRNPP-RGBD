@@ -13,8 +13,10 @@
 - EXP013F GLM-Pose-L 完成：BOP `0.684129`、reS `0.515802`，四项门槛通过
   2 项，结论为边缘 `SCREEN_FAIL`。
 - EXP017 已按 EXP013A 主体实现 rotation-only spatial residual adapter；新增参数
-  `13,000`，相关测试、CPU preflight 和本地真实 LM-PBR 小批次 smoke 均通过；实现
-  commit 为 `6815761`，尚未启动 formal。
+  `13,000`。运行框架复核已将冻结 geometry 的训练 renderer 关闭，同时保留 CPP BOP
+  evaluation，并补齐 clean-tree/protocol/metadata/checkpoint-order gate。用户报告修复前
+  formal 已启动；该 run 不能作为修复后的 canonical formal，等待用户提供 run ID 并
+  决定停止后，从新 release 重跑。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 

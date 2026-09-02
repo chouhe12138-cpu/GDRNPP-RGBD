@@ -25,6 +25,7 @@ from research.exp013.preflight import (
     profile_head,
     synthetic_full_inputs,
 )
+from research.run_contract import validate_research_run_config
 
 
 CONFIG = (
@@ -42,6 +43,15 @@ def _config_dict(value):
 
 
 def validate_config(cfg: Config, a_cfg: Config) -> None:
+    contract = validate_research_run_config(
+        cfg,
+        mode="formal",
+        expected_experiment_id=EXPERIMENT_ID,
+    )
+    if contract["training_geometry_supervision"] or contract["training_renderer"] is not None:
+        raise RuntimeError("EXP017 must not construct a training geometry renderer")
+    if contract["evaluation_renderer"] != "cpp":
+        raise RuntimeError("EXP017 preregisters the CPP BOP evaluation renderer")
     if cfg.EXPERIMENT_ID != EXPERIMENT_ID:
         raise RuntimeError(f"Unexpected EXP017 ID: {cfg.EXPERIMENT_ID!r}")
     if cfg.SEED != 42:

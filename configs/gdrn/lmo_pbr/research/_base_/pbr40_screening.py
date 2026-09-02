@@ -9,6 +9,16 @@ DATALOADER = dict(
     FILTER_VISIB_THR=0.3,
 )
 
+# Pose-head screening freezes the geometry producer.  Its predictions are still
+# consumed by the pose head, but rendered GT geometry and geometry losses are
+# unnecessary.  Full-training experiments must explicitly override both fields.
+MODEL = dict(
+    POSE_NET=dict(
+        XYZ_RENDERER=None,
+        GEO_HEAD=dict(TRAIN_SUPERVISION=False),
+    )
+)
+
 SOLVER = dict(
     IMS_PER_BATCH=48,
     REFERENCE_BS=48,

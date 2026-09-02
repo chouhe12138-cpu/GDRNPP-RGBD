@@ -488,6 +488,36 @@ class GDRN_Lite(LightningLite):
                 if self.is_global_zero:
                     log_first_n(logging.INFO, "iteration {} backward finished.".format(iteration), n=2)
 
+                # Persist the completed epoch before periodic evaluation.  BOP
+                # evaluation is external and may fail independently; it must
+                # not prevent recovery of training that already completed.
+                checkpoint_due = (iteration + 1) % periodic_checkpointer.period == 0 or (
+                    periodic_checkpointer.max_iter is not None
+                    and (iteration + 1) >= periodic_checkpointer.max_iter
+                )
+                if checkpoint_due:
+                    if hasattr(optimizer, "consolidate_state_dict"):  # for ddp_sharded
+                        optimizer.consolidate_state_dict()
+                if structured_checkpoints:
+                    if checkpoint_due and self.is_global_zero:
+                        checkpoint_name = f"model_epoch_{int(epoch):03d}"
+                        checkpointer.save(
+                            checkpoint_name,
+                            iteration=iteration,
+                            epoch=epoch,
+                        )
+                        checkpoint_path = osp.join(
+                            checkpoint_dir,
+                            f"{checkpoint_name}.pth",
+                        )
+                        recent_checkpoint_paths.append(checkpoint_path)
+                        while len(recent_checkpoint_paths) > recent_to_keep:
+                            old_checkpoint = recent_checkpoint_paths.pop(0)
+                            if osp.isfile(old_checkpoint):
+                                os.remove(old_checkpoint)
+                else:
+                    periodic_checkpointer.step(iteration, epoch=epoch)
+
                 if (
                     should_evaluate_epoch(
                         iteration,
@@ -567,33 +597,6 @@ class GDRN_Lite(LightningLite):
 
                             gt_mask_vis = batch["roi_mask"][vis_i].detach().cpu().numpy()
                             tbx_writer.add_image("gt_mask", gt_mask_vis, iteration)
-                checkpoint_due = (iteration + 1) % periodic_checkpointer.period == 0 or (
-                    periodic_checkpointer.max_iter is not None
-                    and (iteration + 1) >= periodic_checkpointer.max_iter
-                )
-                if checkpoint_due:
-                    if hasattr(optimizer, "consolidate_state_dict"):  # for ddp_sharded
-                        optimizer.consolidate_state_dict()
-                if structured_checkpoints:
-                    if checkpoint_due and self.is_global_zero:
-                        checkpoint_name = f"model_epoch_{int(epoch):03d}"
-                        checkpointer.save(
-                            checkpoint_name,
-                            iteration=iteration,
-                            epoch=epoch,
-                        )
-                        checkpoint_path = osp.join(
-                            checkpoint_dir,
-                            f"{checkpoint_name}.pth",
-                        )
-                        recent_checkpoint_paths.append(checkpoint_path)
-                        while len(recent_checkpoint_paths) > recent_to_keep:
-                            old_checkpoint = recent_checkpoint_paths.pop(0)
-                            if osp.isfile(old_checkpoint):
-                                os.remove(old_checkpoint)
-                else:
-                    periodic_checkpointer.step(iteration, epoch=epoch)
-
 
 def vis_train_data(data, obj_names, cfg):
     for i, d in enumerate(data):

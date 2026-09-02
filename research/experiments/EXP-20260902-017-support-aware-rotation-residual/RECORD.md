@@ -84,6 +84,23 @@ PyTorch `_version` 判断 Ranger `.data` 参数更新而产生假阴性；改为
 - 该 run 没有构建模型、没有 optimizer step，不进入科学结论。修复限定为 launcher
   显式环境变量和对应 runtime gate，不修改 EXP017、训练协议或镜像。
 
+### 运行框架复核
+
+2026-09-02 复核发现 EXP017 继承的 EXP013A 配置只冻结 geometry head，却没有显式将
+`GEO_HEAD.TRAIN_SUPERVISION` 设为 `False`，因此默认值 `True` 仍触发训练阶段 CPP
+renderer 和无梯度用途的 geometry loss。BOP evaluation 使用独立的
+`VAL.RENDERER_TYPE`，不应随训练 renderer 一起关闭。
+
+修复后共享 pose-head screening 配置为：训练 supervision `False`、训练 renderer
+`None`、BOP evaluation renderer `cpp`。完整相关测试 `96 passed`，CPU preflight
+`PASS`，去除训练 renderer 后的真实 LM-PBR CPU smoke `PASS`；本轮 WSL CUDA 不可见，
+没有重复本地 GPU smoke。
+
+用户报告已有 formal 从修复前 source `33f285b` 启动，但尚未提供 run ID。该 run 的
+pose-head 梯度不因冻结 geometry loss 改变，但不具备新的完整 metadata、clean-tree/
+protocol gate 和 checkpoint-before-evaluation 保证，因此不能作为修复后的 canonical
+formal；是否停止仍由用户执行，Agent 不自动操作服务器任务。
+
 ## 预注册 formal gate
 
 冻结基准为 EXP013A E40：BOP `0.683956`、ADD `0.510727`、AR_reS `0.498039`、

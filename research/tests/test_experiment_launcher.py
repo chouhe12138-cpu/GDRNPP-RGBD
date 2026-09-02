@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shlex
 import subprocess
 from pathlib import Path
@@ -134,6 +135,7 @@ def test_launcher_overrides_satisfy_real_dict_action_parser_contract():
 def test_runtime_gate_calls_every_lightweight_check():
     result = _source_and_run(
         "container=test-container\n"
+        "require_clean_worktree() { echo clean; }\n"
         "require_owned_container() { echo ownership; }\n"
         "verify_required_mounts() { echo mounts; }\n"
         "require_writable_output() { echo output; }\n"
@@ -143,9 +145,11 @@ def test_runtime_gate_calls_every_lightweight_check():
         "verify_environment() { echo environment; }\n"
         "verify_native() { echo native; }\n"
         "load_runtime_config() { echo config:$1; }\n"
-        "runtime_gate configs/research/train.py"
+        "validate_run_config() { echo contract:$1:$2; }\n"
+        "runtime_gate formal configs/research/train.py"
     )
     assert result.stdout.splitlines() == [
+        "clean",
         "ownership",
         "mounts",
         "output",
@@ -155,13 +159,14 @@ def test_runtime_gate_calls_every_lightweight_check():
         "environment",
         "native",
         "config:configs/research/train.py",
-        "RUNTIME_GATE PASS container=test-container config=configs/research/train.py",
+        "contract:formal:configs/research/train.py",
+        "RUNTIME_GATE PASS container=test-container mode=formal config=configs/research/train.py",
     ]
 
 
 def test_gate_precedes_run_directory_creation_and_nested_targets_are_created():
     source = LAUNCHER.read_text(encoding="utf-8")
-    assert source.index('runtime_gate "${config}"') < source.index(
+    assert source.index('runtime_gate "${mode}" "${config}"') < source.index(
         'run_id="$(next_run_id "${mode}")"'
     )
     for target in (
@@ -184,7 +189,7 @@ def test_dataset_cache_env_and_runtime_gate_contract_are_explicit():
     assert 'printenv GDRN_DATASET_CACHE_DIR' in source
     assert 'test -w "${expected}"' in source
     assert source.index("require_dataset_cache()") < source.index(
-        'runtime_gate "${config}"'
+        "runtime_gate()"
     )
 
 
@@ -196,7 +201,7 @@ def test_bop_renderer_path_env_and_runtime_gate_contract_are_explicit():
     assert "printenv BOP_RENDERER_PATH" in source
     assert 'test -d "${expected}"' in source
     assert source.index("require_bop_renderer_path()") < source.index(
-        'runtime_gate "${config}"'
+        "runtime_gate()"
     )
 
 
@@ -224,6 +229,48 @@ def _git(repo: Path, *args: str) -> str:
         text=True,
     )
     return result.stdout.strip()
+
+
+def test_clean_worktree_gate_rejects_untracked_source(tmp_path):
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.name", "Launcher Test")
+    _git(tmp_path, "config", "user.email", "launcher@example.invalid")
+    tracked = tmp_path / "tracked.txt"
+    tracked.write_text("baseline\n", encoding="utf-8")
+    _git(tmp_path, "add", "tracked.txt")
+    _git(tmp_path, "commit", "-qm", "baseline")
+
+    clean = _source_and_run(
+        f"repo_root={shlex.quote(str(tmp_path))}\nrequire_clean_worktree"
+    )
+    assert clean.returncode == 0
+
+    (tmp_path / "untracked.txt").write_text("dirty\n", encoding="utf-8")
+    dirty = _source_and_run(
+        f"repo_root={shlex.quote(str(tmp_path))}\nrequire_clean_worktree",
+        check=False,
+    )
+    assert dirty.returncode != 0
+    assert "Git working tree must be clean" in dirty.stderr
+
+
+def test_run_metadata_records_full_source_and_image_revisions(tmp_path):
+    metadata = tmp_path / "run_metadata.json"
+    full_commit = "a" * 40
+    image_id = "sha256:" + "b" * 64
+    image_revision = "c" * 40
+    _source_and_run(
+        "experiment_id=EXP-test\n"
+        f"write_run_metadata {shlex.quote(str(metadata))} RUN-test formal "
+        "configs/test.py "
+        f"{full_commit} image:test {image_id} {image_revision}"
+    )
+    payload = json.loads(metadata.read_text(encoding="utf-8"))
+    assert payload["source_commit"] == full_commit
+    assert payload["source_tree_clean"] is True
+    assert payload["image_id"] == image_id
+    assert payload["image_build_revision"] == image_revision
+    assert payload["config"] == "configs/test.py"
 
 
 def test_image_compatibility_rejects_changed_native_inputs(tmp_path):

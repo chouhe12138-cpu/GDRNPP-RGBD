@@ -46,7 +46,17 @@ cd ../gdrnpp-exp009
 
 ### Bundle release 固定流程
 
-不要依赖当前工作目录解析 `transfer/...` 或 `releases/...`。`git bundle verify` 需要 Git
+本地统一使用下面的入口创建 bundle；脚本强制当前分支为 `main`、working tree（包括
+untracked 文件）为空、目标 bundle 不存在，并在创建后执行完整验证：
+
+```bash
+docker/l40/create_bundle.sh
+```
+
+bundle 默认写入 `.local/release/GDRNPP-RGBD-<short-sha>.bundle`。不要直接用裸
+`git bundle create` 绕过 clean-tree gate。
+
+服务器不要依赖当前工作目录解析 `transfer/...` 或 `releases/...`。`git bundle verify` 需要 Git
 仓库上下文，因此先创建一次性 bare verification repo；它位于 `/tmp`，不作为 release。
 下面以 `lab0`、short SHA `3cfbceb` 为例，实际使用时只替换四个标量。整个流程放在
 subshell 中并启用失败即停止，前一步失败后不会继续 clone 或 checkout：
@@ -162,6 +172,29 @@ docker/l40/experiment.sh lab0 run EXP-... configs/.../train.py formal
 docker/l40/experiment.sh lab0 status
 docker/l40/experiment.sh lab0 logs EXP-.../RUN-...
 ```
+
+`run`/`eval` 在创建运行目录前再次强制 working tree clean，并加载 effective config
+执行共享 contract：smoke 必须是 1 epoch、batch 不超过 8、无 periodic evaluation；
+formal 必须是 seed 42、LM-PBR、LM-O GT-box、40 epoch、batch 48、每 5 epoch checkpoint
+与 evaluation。每次 run 的根目录写入 `run_metadata.json`，保存完整 source commit、
+image ID、image build revision、config、mode 与 run ID。
+
+### Renderer 配置边界
+
+- `MODEL.POSE_NET.GEO_HEAD.TRAIN_SUPERVISION` 和
+  `MODEL.POSE_NET.XYZ_RENDERER` 只控制训练阶段 rendered GT geometry。允许值为
+  `cpp`、`egl`；禁用统一写 `None`，解析器也接受 `False`、`none`、`false`、
+  `disabled`。geometry head 冻结时必须同时关闭 supervision 和训练 renderer。
+- `VAL.RENDERER_TYPE` 只控制 BOP evaluation，允许 `cpp` 或 `egl`。关闭训练 renderer
+  不得清空这个字段。当前 research screening 与独立 evaluation 统一使用 `cpp`。
+- 本地单测/preflight 不创建 renderer；pose-head-only real smoke 使用真实 LM-PBR batch，
+  但不生成无梯度用途的 rendered GT geometry。服务器 lab0/lab1 从镜像提供
+  `/opt/bop_renderer/build`，launcher 统一注入并验证 `BOP_RENDERER_PATH`。
+- 需要端到端训练 geometry head 的实验必须显式设置
+  `TRAIN_SUPERVISION=True`，并从 `cpp`/`egl` 中明确选择训练 renderer。
+
+训练 loop 在每个预定 evaluation 点先保存 epoch checkpoint，再运行 BOP evaluation；
+因此 evaluation 异常不会抹掉已经完成的 epoch 状态。
 
 正式流程为 bundle/只读 release checkout → `create IMAGE_REF` → `run`/`eval`。
 `create` 会核对 image revision 与当前 native/环境输入，并自动补齐 Git ignored

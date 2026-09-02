@@ -47,7 +47,8 @@ def test_formal_config_contracts_and_head_types():
         assert pose.PNP_NET.REGION_ATTENTION
         assert pose.PNP_NET.MASK_ATTENTION == "mul"
         assert pose.XYZ_ONLINE is True
-        assert geometry_supervision_enabled(cfg) is (variant not in ("C", "F"))
+        assert geometry_supervision_enabled(cfg) is False
+        assert pose.XYZ_RENDERER is None
         if variant == "C":
             assert "attention_scale_init" not in pose.PNP_NET.INIT_CFG
             assert pose.PNP_NET.INIT_CFG.geometry_scale_r_init == 0.1

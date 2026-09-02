@@ -21,6 +21,7 @@ from core.gdrn_modeling.models.heads.glm_pose_net import GLMPoseLNet
 from core.gdrn_modeling.models.heads.official_head_random_init import (
     OfficialConvPnPNetRandomInit,
 )
+from research.run_contract import validate_research_run_config
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +56,7 @@ def checkpoint_model_state(path: Path) -> dict[str, torch.Tensor]:
 
 
 def validate_config(cfg: Config, expected_type: type[torch.nn.Module]) -> None:
+    validate_research_run_config(cfg, mode="formal")
     pose = cfg.MODEL.POSE_NET
     pnp = pose.PNP_NET
     if not pose.BACKBONE.FREEZE or not pose.GEO_HEAD.FREEZE or pnp.FREEZE:

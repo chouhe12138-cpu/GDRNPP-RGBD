@@ -38,6 +38,14 @@ fail() {
     exit 1
 }
 
+require_clean_worktree() {
+    local status
+    status="$(git -C "${repo_root}" status --porcelain --untracked-files=all)" || \
+        fail "cannot inspect Git working tree"
+    [[ -z "${status}" ]] || \
+        fail "Git working tree must be clean: ${status//$'\n'/, }"
+}
+
 image_revision() {
     "${docker_bin}" image inspect "$1" \
         --format '{{index .Config.Labels "org.opencontainers.image.revision"}}'
@@ -258,8 +266,19 @@ load_runtime_config() {
         "/workspace/gdrnpp/${config}" || fail "container config load failed: ${config}"
 }
 
+validate_run_config() {
+    local mode="$1" config="$2"
+    "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp \
+        "${container}" python -m research.run_contract \
+        --config "/workspace/gdrnpp/${config}" \
+        --mode "${mode}" \
+        --experiment-id "${experiment_id}" || \
+        fail "research run contract failed: mode=${mode} config=${config}"
+}
+
 runtime_gate() {
-    local config="$1"
+    local mode="$1" config="$2"
+    require_clean_worktree
     require_owned_container
     verify_required_mounts
     require_writable_output
@@ -269,7 +288,47 @@ runtime_gate() {
     verify_environment
     verify_native
     load_runtime_config "${config}"
-    echo "RUNTIME_GATE PASS container=${container} config=${config}"
+    validate_run_config "${mode}" "${config}"
+    echo "RUNTIME_GATE PASS container=${container} mode=${mode} config=${config}"
+}
+
+write_run_metadata() {
+    local path="$1" run_id="$2" mode="$3" config="$4" source_commit="$5"
+    local image_ref="$6" image_id="$7" image_build_revision="$8"
+    python3 - "${path}" "${experiment_id}" "${run_id}" "${mode}" "${config}" \
+        "${source_commit}" "${image_ref}" "${image_id}" "${image_build_revision}" <<'PY'
+import datetime
+import json
+import sys
+
+(
+    path,
+    experiment_id,
+    run_id,
+    mode,
+    config,
+    source_commit,
+    image_ref,
+    image_id,
+    image_build_revision,
+) = sys.argv[1:]
+metadata = {
+    "experiment_id": experiment_id,
+    "run_id": run_id,
+    "mode": mode,
+    "config": config,
+    "seed": 42,
+    "source_commit": source_commit,
+    "source_tree_clean": True,
+    "image_ref": image_ref,
+    "image_id": image_id,
+    "image_build_revision": image_build_revision,
+    "created_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+}
+with open(path, "x", encoding="utf-8") as handle:
+    json.dump(metadata, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
 }
 
 next_run_id() {
@@ -286,20 +345,28 @@ next_run_id() {
 }
 
 launch() {
-    local mode="$1" config="$2" checkpoint_container="${3:-}" run_id run_host run_container commit image_ref command
+    local mode="$1" config="$2" checkpoint_container="${3:-}" run_id run_host run_container
+    local commit image_ref image_id image_build_revision command
     check_host
     start_owned_container
     require_gpu_capacity
     require_idle_container
-    runtime_gate "${config}"
+    runtime_gate "${mode}" "${config}"
     run_id="$(next_run_id "${mode}")"
     run_host="${output_root}/${experiment_id}/${run_id}"
     run_container="/workspace/gdrnpp/output/experiments/${experiment_id}/${run_id}"
     mkdir -p "${run_host}"
-    commit="$(git -C "${repo_root}" rev-parse --short=12 HEAD)"
+    commit="$(git -C "${repo_root}" rev-parse HEAD)"
     image_ref="$("${docker_bin}" inspect "${container}" --format '{{.Config.Image}}')"
-    printf 'RUN_INFO experiment=%s run=%s mode=%s config=%s seed=42 commit=%s image=%s\n' \
-        "${experiment_id}" "${run_id}" "${mode}" "${config}" "${commit}" "${image_ref}" \
+    image_id="$("${docker_bin}" inspect "${container}" --format '{{.Image}}')"
+    image_build_revision="$(image_revision "${image_ref}")" || \
+        fail "cannot read image build revision: ${image_ref}"
+    write_run_metadata \
+        "${run_host}/run_metadata.json" "${run_id}" "${mode}" "${config}" \
+        "${commit}" "${image_ref}" "${image_id}" "${image_build_revision}"
+    printf 'RUN_INFO experiment=%s run=%s mode=%s config=%s seed=42 source_commit=%s image=%s image_id=%s image_build_revision=%s\n' \
+        "${experiment_id}" "${run_id}" "${mode}" "${config}" "${commit}" \
+        "${image_ref}" "${image_id}" "${image_build_revision}" \
         > "${run_host}/console.log"
     if [[ "${mode}" == "eval" ]]; then
         command="$(build_eval_command "${config}" "${checkpoint_container}" "${run_container}")"
@@ -344,6 +411,7 @@ main() {
     create)
         [[ $# -eq 1 ]] || usage
         image_ref="$1"
+        require_clean_worktree
         check_host
         container_exists && fail "container name already exists: ${container}"
         "${docker_bin}" image inspect "${image_ref}" >/dev/null 2>&1 || fail "image not found: ${image_ref}"

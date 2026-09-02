@@ -16,6 +16,7 @@ ACTIVE_EXPERIMENT_DIRS = (
     "exp013/d_fulltrain",
     "exp013/e_official_head_random",
     "exp013/f_glm_pose_l",
+    "exp017/support_aware_rotation_residual",
 )
 ACTIVE_EXPERIMENT_FILES = ("train.py", "smoke.py", "audit48.py", "eval.py")
 
@@ -80,3 +81,16 @@ def test_head_depth_is_opt_in_for_exp013f_only():
         cfg = _load(RESEARCH_CONFIG_ROOT / relative_dir / "train.py")
         expected = relative_dir == "exp013/f_glm_pose_l"
         assert cfg.INPUT.get("HEAD_DEPTH", False) is expected
+
+
+def test_frozen_geometry_configs_disable_training_renderer_but_keep_bop_renderer():
+    for relative_dir in ACTIVE_EXPERIMENT_DIRS:
+        cfg = _load(RESEARCH_CONFIG_ROOT / relative_dir / "train.py")
+        pose = cfg.MODEL.POSE_NET
+        if pose.GEO_HEAD.FREEZE:
+            assert pose.GEO_HEAD.TRAIN_SUPERVISION is False
+            assert pose.XYZ_RENDERER is None
+        else:
+            assert pose.GEO_HEAD.TRAIN_SUPERVISION is True
+            assert pose.XYZ_RENDERER in ("cpp", "egl")
+        assert cfg.VAL.RENDERER_TYPE in ("cpp", "egl")

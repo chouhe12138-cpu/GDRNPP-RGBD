@@ -85,14 +85,43 @@ class CppTrainingRenderer:
         self._renderer = None
 
 
+_DISABLED_RENDERERS = {"", "0", "false", "none", "disabled"}
+
+
+def training_geometry_renderer_type(cfg):
+    """Return ``cpp``/``egl`` or ``None`` for the training-only renderer."""
+    raw = cfg.MODEL.POSE_NET.get("XYZ_RENDERER", None)
+    if raw is None or raw is False:
+        return None
+    renderer_type = str(raw).strip().lower()
+    if renderer_type in _DISABLED_RENDERERS:
+        return None
+    if renderer_type not in {"cpp", "egl"}:
+        raise ValueError(f"Unknown online XYZ renderer: {raw!r}")
+    return renderer_type
+
+
 def geometry_supervision_enabled(cfg):
-    """Return whether training needs rendered GT geometry targets."""
+    """Validate and return whether training needs rendered GT geometry targets."""
     g_head_cfg = cfg.MODEL.POSE_NET.GEO_HEAD
     enabled = bool(g_head_cfg.get("TRAIN_SUPERVISION", True))
+    frozen = bool(g_head_cfg.FREEZE)
+    renderer_type = training_geometry_renderer_type(cfg)
+    if enabled and frozen:
+        raise ValueError(
+            "Frozen GEO_HEAD must set TRAIN_SUPERVISION=False; rendered geometry "
+            "cannot update a frozen geometry head."
+        )
     if (not enabled) and (not bool(g_head_cfg.FREEZE)):
         raise ValueError(
             "GEO_HEAD.TRAIN_SUPERVISION=False requires GEO_HEAD.FREEZE=True; "
             "enable geometry supervision before unfreezing the geometry head."
+        )
+    if enabled and renderer_type is None:
+        raise ValueError("Geometry supervision requires XYZ_RENDERER='cpp' or 'egl'")
+    if (not enabled) and renderer_type is not None:
+        raise ValueError(
+            "Frozen geometry without supervision must disable the training XYZ_RENDERER"
         )
     return enabled
 
@@ -368,7 +397,10 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
 
     obj_ids = [data_ref.obj2id[_obj] for _obj in obj_names]
     model_paths = [osp.join(model_dir, "obj_{:06d}.ply".format(obj_id)) for obj_id in obj_ids]
-    renderer_type = str(getattr(cfg.MODEL.POSE_NET, "XYZ_RENDERER", "egl")).lower()
+    renderer_type = training_geometry_renderer_type(cfg)
+
+    if renderer_type is None:
+        raise ValueError("Training geometry renderer is disabled")
 
     if renderer_type == "cpp":
         if not cfg.MODEL.POSE_NET.XYZ_BP:
@@ -379,9 +411,6 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
             height=cfg.MODEL.POSE_NET.OUTPUT_RES,
             width=cfg.MODEL.POSE_NET.OUTPUT_RES,
         )
-    if renderer_type != "egl":
-        raise ValueError(f"Unknown online XYZ renderer: {renderer_type}")
-
     # EGL is optional when the explicitly selected C++ BOP renderer is used.
     # Importing it lazily lets local smoke tests use an existing bop_renderer
     # build without requiring the unrelated PyOpenGL extension.

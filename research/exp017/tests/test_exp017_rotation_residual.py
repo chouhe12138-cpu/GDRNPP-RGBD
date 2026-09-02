@@ -85,6 +85,9 @@ def test_config_registration_protocol_and_parameter_budget():
     assert cfg.SOLVER.OPTIMIZER_CFG == a_cfg.SOLVER.OPTIMIZER_CFG
     assert cfg.SOLVER.WARMUP_ITERS == 200
     assert cfg.SOLVER.CHECKPOINT_PERIOD == 5 and cfg.TEST.EVAL_PERIOD == 5
+    assert pose.GEO_HEAD.TRAIN_SUPERVISION is False
+    assert pose.XYZ_RENDERER is None
+    assert cfg.VAL.RENDERER_TYPE == "cpp"
     assert pose.BACKBONE == a_pose.BACKBONE
     assert pose.GEO_HEAD == a_pose.GEO_HEAD
     assert not pose.PNP_NET.FREEZE

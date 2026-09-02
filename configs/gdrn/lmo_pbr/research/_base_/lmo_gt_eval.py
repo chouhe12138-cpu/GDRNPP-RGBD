@@ -18,6 +18,9 @@ TEST = dict(
     USE_PNP=False,
 )
 
+# BOP evaluation rendering is independent from the training-only XYZ renderer.
+VAL = dict(RENDERER_TYPE="cpp")
+
 RUN_ARTIFACTS = dict(
     STRUCTURED_LAYOUT=True,
     COMPACT_LOG=True,

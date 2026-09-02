@@ -9,14 +9,12 @@ import json
 from pathlib import Path
 
 import torch
-from detectron2.data import MetadataCatalog
 from detectron2.utils.events import EventStorage
 from mmcv import Config
 
-import ref
 from core.gdrn_modeling.datasets.data_loader import build_gdrn_train_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
-from core.gdrn_modeling.engine.engine_utils import batch_data, get_renderer
+from core.gdrn_modeling.engine.engine_utils import batch_data
 from core.gdrn_modeling.models.GDRN_double_mask import build_model_optimizer
 from core.gdrn_modeling.models.heads.exp017_rotation_residual_pnp_net import (
     SupportAwareRotationResidualPnPNet,
@@ -163,14 +161,7 @@ def run_smoke(
     frozen_versions = _versions(frozen_named)
 
     loader = build_gdrn_train_loader(cfg, cfg.DATASETS.TRAIN)
-    metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
-    data_ref = ref.__dict__[metadata.ref_key]
-    renderer = get_renderer(
-        cfg,
-        data_ref,
-        obj_names=metadata.objs,
-        gpu_id=device.index or 0,
-    )
+    renderer = None
     try:
         raw_data = next(iter(loader))
         batch = batch_data(
