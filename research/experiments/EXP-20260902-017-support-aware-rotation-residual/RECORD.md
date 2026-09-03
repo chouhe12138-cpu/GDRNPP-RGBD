@@ -137,4 +137,5 @@ AR_teS `0.797693`。EXP017 E40 必须同时满足：
 ## 当前结论与边界
 
 实现与本地门禁通过；canonical formal 已运行并完成 E5/E10 checkpoint/evaluation，E40
-尚未到达。中间结果不用于正式结论。EXP017-B 只完成本地候选准备，未获任何运行授权。
+尚未到达。中间结果不用于正式结论。EXP017-B 已作为独立 matched 消融通过 smoke 并获
+formal 授权，不改变或停止本 EXP017 run。

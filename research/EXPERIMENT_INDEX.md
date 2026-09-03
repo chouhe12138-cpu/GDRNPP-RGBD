@@ -24,4 +24,4 @@
 | EXP013E Official Random | COMPLETE | 部分支持 M2/M3 并重 | [RECORD](experiments/EXP-20260829-015-e-official-head-random/RECORD.md) |
 | EXP013F GLM-Pose-L | COMPLETE / FAIL | 2/4 gate，边缘失败 | [RECORD](experiments/EXP-20260829-016-f-glm-pose-l-screening/RECORD.md) |
 | EXP017 Rotation Residual | FORMAL RUNNING / E10 EVALUATED | E40 唯一决策点 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |
-| EXP017-B Detached Adapter Geometry | IMPLEMENTED / LOCAL GATES PASS | GO 仅表示值得做严格消融，未授权运行 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |
+| EXP017-B Detached Adapter Geometry | SERVER SMOKE PASS / FORMAL AUTHORIZED | E40 唯一决策点 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |

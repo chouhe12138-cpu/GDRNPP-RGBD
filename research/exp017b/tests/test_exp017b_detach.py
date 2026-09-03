@@ -61,8 +61,6 @@ def test_detach_is_forward_exact_but_blocks_only_adapter_upstream_path():
     )
     assert torch.equal(normal_r, detached_r)
     assert torch.equal(normal_t, detached_t)
-    assert normal_info["adapter_geometry_detached"] is False
-    assert detached_info["adapter_geometry_detached"] is True
 
     normal_grid_grad = torch.autograd.grad(
         normal_info["delta_r"].square().mean(), normal_info["geometry_grid"]

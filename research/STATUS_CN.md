@@ -15,8 +15,8 @@
 - EXP017 canonical formal 正在运行，E10 已评估：BOP `0.642787`、ADD `0.491349`、
   reS `0.419608`、teS `0.770473`，E40 仍是唯一决策点。代码/autograd 复核确认 adapter
   rotation 梯度会额外进入 translation 共用的 geometry encoder；E10 8 样本只读诊断中
-  该增量梯度范数非零且不可忽略。已按严格单变量准备 EXP017-B detach 候选并通过本地
-  tests/preflight，但未获 smoke 或训练授权，不影响当前 EXP017 formal。
+  该增量梯度范数非零且不可忽略。EXP017-B detach 候选已通过本地 tests/preflight 和
+  lab1 smoke，用户已授权 matched formal；它使用独立 release，不影响当前 EXP017。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 
@@ -33,6 +33,5 @@
 
 ## 下一步
 
-等待 EXP017 E40，不因 E5/E10 中间趋势停止或改动当前 formal。EXP017-B 当前只作为
-graph-isolation 候选保留；若之后另行授权，最小下一步是本地真实小批次 smoke，不直接
-启动 screening/formal。不自动恢复 D，也不因单次边缘差距自动增加 seed。
+等待 EXP017 与 EXP017-B 的 E40，不因中间趋势停止或改动运行中的 formal。两者保持独立
+experiment/run/source；不自动恢复 D，也不因单次边缘差距自动增加 seed。

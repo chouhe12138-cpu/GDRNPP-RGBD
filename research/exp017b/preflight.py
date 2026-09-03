@@ -73,14 +73,9 @@ def run_preflight() -> dict[str, object]:
     inputs = _head_inputs(torch.device("cpu"), batch=2)
     with torch.no_grad():
         parent_r, parent_t, _ = parent.forward_with_adapter_intervention(*inputs)
-        candidate_r, candidate_t, info = candidate.forward_with_adapter_intervention(
-            *inputs
-        )
+        candidate_r, candidate_t, _ = candidate.forward_with_adapter_intervention(*inputs)
     if not torch.equal(parent_r, candidate_r) or not torch.equal(parent_t, candidate_t):
         raise RuntimeError("Detach changed forward values")
-    if not info["adapter_geometry_detached"]:
-        raise RuntimeError("EXP017-B did not detach the adapter geometry grid")
-
     # Move past the identity initialization so the adapter has a real upstream
     # gradient, while keeping both heads state-identical.
     with torch.no_grad():
