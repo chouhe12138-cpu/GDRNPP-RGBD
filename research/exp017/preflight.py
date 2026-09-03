@@ -212,8 +212,15 @@ def head_contract_checks(
     weights, valid = info["weights"], info["valid"]
     if torch.count_nonzero(weights[~valid]) != 0:
         raise RuntimeError("Invalid EXP017 token received non-zero pooling weight")
+    # A float32 reduction over 64 normalized weights can land a few ulps from
+    # one depending on prior kernel execution; keep this a numerical, not
+    # bitwise, normalization gate.
+    normalization_atol = 4 * torch.finfo(weights.dtype).eps
     if not torch.allclose(
-        weights.sum(dim=1), torch.ones(weights.shape[0], device=device), atol=1e-7, rtol=0
+        weights.sum(dim=1),
+        torch.ones(weights.shape[0], device=device),
+        atol=normalization_atol,
+        rtol=0,
     ):
         raise RuntimeError("EXP017 pooling weights do not sum to one")
 

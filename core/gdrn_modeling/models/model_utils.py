@@ -253,6 +253,7 @@ def get_pnp_net(cfg):
         "RTDecoupledGeometryPnPNet",
         "GLMPoseLNet",
         "SupportAwareRotationResidualPnPNet",
+        "DetachedSupportAwareRotationResidualPnPNet",
     ]:
         if loss_cfg.XYZ_LOSS_TYPE not in ["MSE", "L1", "L2", "SmoothL1"]:
             raise ValueError(f"{pnp_head_type} requires three-channel regression XYZ")

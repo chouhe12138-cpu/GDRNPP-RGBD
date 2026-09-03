@@ -39,6 +39,7 @@ from .heads.exp013_geometry_pnp_net import (
 )
 from .heads.glm_pose_net import GLMPoseLNet
 from .heads.exp017_rotation_residual_pnp_net import (
+    DetachedSupportAwareRotationResidualPnPNet,
     SupportAwareRotationResidualPnPNet,
 )
 from .heads.official_head_random_init import OfficialConvPnPNetRandomInit
@@ -106,6 +107,9 @@ HEADS = {
     "RTDecoupledGeometryPnPNet": RTDecoupledGeometryPnPNet,
     "GLMPoseLNet": GLMPoseLNet,
     "SupportAwareRotationResidualPnPNet": SupportAwareRotationResidualPnPNet,
+    "DetachedSupportAwareRotationResidualPnPNet": (
+        DetachedSupportAwareRotationResidualPnPNet
+    ),
     "OfficialConvPnPNetRandomInit": OfficialConvPnPNetRandomInit,
     "ConvPnPNetNoRegion": ConvPnPNetNoRegion,
     "ConvPnPNetCls": ConvPnPNetCls,

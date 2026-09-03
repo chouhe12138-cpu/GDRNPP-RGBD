@@ -17,6 +17,7 @@ ACTIVE_EXPERIMENT_DIRS = (
     "exp013/e_official_head_random",
     "exp013/f_glm_pose_l",
     "exp017/support_aware_rotation_residual",
+    "exp017/b_detached_adapter_geometry",
 )
 ACTIVE_EXPERIMENT_FILES = ("train.py", "smoke.py", "audit48.py", "eval.py")
 

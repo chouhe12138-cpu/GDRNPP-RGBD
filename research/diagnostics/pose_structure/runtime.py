@@ -16,7 +16,11 @@ from mmcv import Config
 import ref
 from core.gdrn_modeling.datasets.data_loader import build_gdrn_train_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
-from core.gdrn_modeling.engine.engine_utils import batch_data, get_renderer
+from core.gdrn_modeling.engine.engine_utils import (
+    batch_data,
+    geometry_supervision_enabled,
+    get_renderer,
+)
 from core.utils.my_checkpoint import MyCheckpointer
 
 from .common import DiagnosticBatch
@@ -96,7 +100,7 @@ def build_runtime(
 
     loader = build_gdrn_train_loader(cfg, cfg.DATASETS.TRAIN)
     renderer = None
-    if cfg.MODEL.POSE_NET.XYZ_ONLINE:
+    if cfg.MODEL.POSE_NET.XYZ_ONLINE and geometry_supervision_enabled(cfg):
         meta = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
         data_ref = ref.__dict__[meta.ref_key]
         gpu_id = torch.device(device).index or 0

@@ -2,7 +2,7 @@
 
 ## 协议与状态
 
-- 状态：`IMPLEMENTED / LOCAL_PREFLIGHT_PASS / LOCAL_REAL_SMOKE_PASS / FORMAL_NOT_RUN`
+- 状态：`FORMAL_RUNNING / E10_EVALUATED / E40_PENDING`
 - 问题：完整保留 EXP013A 时，只给 raw rotation 增加 Region-free、position-aware、
   support-masked spatial residual，能否提高 rotation 而不损害 translation/ADD？
 - 唯一变量：EXP013A 8×8 geometry grid 上的 rotation-only adapter。
@@ -10,8 +10,7 @@
 - 配置：
   `configs/gdrn/lmo_pbr/research/exp017/support_aware_rotation_residual/train.py`
 - 基础源码：`5d284946defad56d11c28b40d7a903ae632aa5a5`；EXP017 实现 commit：
-  `6815761`。formal source commit 尚未选择，必须以最终服务器 release 的 detached
-  commit 为准写回记录。
+  `6815761`。canonical formal source：`6b4d412ed2518086efafe2c24190dea60b2baf25`。
 - formal 协议与 A matched：seed 42、LM-PBR train、LM-O BOP19 GT-box、batch 48、
   40 epoch、Ranger lr `8e-4`、weight decay `0.01`、warmup 200、冻结 backbone/geometry，
   E40 唯一决策点；不从 A E40 warm-start pose head。
@@ -123,9 +122,19 @@ AR_teS `0.797693`。EXP017 E40 必须同时满足：
 五项全过才为 `PASS`。若仅 rotation 通过，记为
 `ROTATION_SUPPORTED / SCREEN_FAIL`。边缘差距不自动增加 seed。
 
+## Canonical formal 中间结果
+
+- run：`RUN-20260902-154756-formal-s42-a01`；source `6b4d412ed251`；seed 42。
+- E5：BOP AR `0.639732`、ADD(-S) `0.501730`、AR_reS `0.351557`、
+  AR_teS `0.781084`。
+- E10：BOP AR `0.642787`、ADD(-S) `0.491349`、AR_reS `0.419608`、
+  AR_teS `0.770473`。
+- E5→E10 rotation 明显改善而 translation/ADD 下降；这里只记中间趋势，不改变 E40
+  唯一正式决策点，也不停止当前 formal。
+- 对共享 geometry 优化耦合的代码与 E10 autograd 复核见
+  `research/exp017/EXP017B_DECISION.md`。
+
 ## 当前结论与边界
 
-实现、单测、CPU preflight 和本地真实小批次 smoke 已证明代码链路满足请求的结构和
-隔离约束，可以进入“请求 formal 训练授权”阶段；这不等于 formal 已获授权或方法有效。
-本地实现已提交，可以制作服务器 release；尚未获得 formal 训练授权，不启动 40 epoch
-训练。
+实现与本地门禁通过；canonical formal 已运行并完成 E5/E10 checkpoint/evaluation，E40
+尚未到达。中间结果不用于正式结论。EXP017-B 只完成本地候选准备，未获任何运行授权。

@@ -208,6 +208,10 @@ class SupportAwareRotationResidualPnPNet(XYZResidualBypassPnPNet):
     def adapter_parameter_count(self) -> int:
         return sum(parameter.numel() for parameter in self.adapter_parameters())
 
+    def _adapter_geometry_grid(self, geometry_grid: torch.Tensor) -> torch.Tensor:
+        """Select the adapter input without changing EXP017's default graph."""
+        return geometry_grid
+
     def forward_with_adapter_intervention(
         self,
         coor_feat: torch.Tensor,
@@ -219,6 +223,8 @@ class SupportAwareRotationResidualPnPNet(XYZResidualBypassPnPNet):
         position_mode: str = "normal",
         token_shuffle: bool = False,
         seed: int = 20260902,
+        adapter_enabled: bool = True,
+        detach_adapter_geometry: bool | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, dict[str, torch.Tensor | str | bool]]:
         metric, masked_region, support = self._validate_and_mask_inputs(
             coor_feat, region, extents, mask_attention
@@ -231,15 +237,28 @@ class SupportAwareRotationResidualPnPNet(XYZResidualBypassPnPNet):
         )
         raw_r_a = self.pose_rotation(latent_a)
         raw_t_a = self.pose_translation(latent_a)
-        delta_r, info = self.rotation_adapter(
-            geometry_grid,
-            support,
-            pooling=pooling,
-            position_mode=position_mode,
-            token_shuffle=token_shuffle,
-            seed=seed,
-            return_info=True,
-        )
+        adapter_grid = self._adapter_geometry_grid(geometry_grid)
+        if detach_adapter_geometry is True:
+            adapter_grid = geometry_grid.detach()
+        elif detach_adapter_geometry is False:
+            adapter_grid = geometry_grid
+        if adapter_enabled:
+            delta_r, info = self.rotation_adapter(
+                adapter_grid,
+                support,
+                pooling=pooling,
+                position_mode=position_mode,
+                token_shuffle=token_shuffle,
+                seed=seed,
+                return_info=True,
+            )
+        else:
+            delta_r = torch.zeros_like(raw_r_a)
+            info = {
+                "pooling": pooling,
+                "position_mode": position_mode,
+                "token_shuffle": bool(token_shuffle),
+            }
         raw_r = raw_r_a + self.alpha_r.to(raw_r_a.dtype) * delta_r
         info.update(
             {
@@ -248,6 +267,8 @@ class SupportAwareRotationResidualPnPNet(XYZResidualBypassPnPNet):
                 "delta_r": delta_r,
                 "geometry_grid": geometry_grid,
                 "support": support,
+                "adapter_enabled": bool(adapter_enabled),
+                "adapter_geometry_detached": adapter_grid is not geometry_grid,
             }
         )
         return raw_r, raw_t_a, info
@@ -266,3 +287,12 @@ class SupportAwareRotationResidualPnPNet(XYZResidualBypassPnPNet):
             mask_attention=mask_attention,
         )
         return raw_r, raw_t
+
+
+class DetachedSupportAwareRotationResidualPnPNet(
+    SupportAwareRotationResidualPnPNet
+):
+    """EXP017-B: block only the adapter-to-A geometry-encoder gradient."""
+
+    def _adapter_geometry_grid(self, geometry_grid: torch.Tensor) -> torch.Tensor:
+        return geometry_grid.detach()
