@@ -23,5 +23,6 @@
 | EXP014-D Full Train | PAUSED | a01 无效，无活动重训授权 | [RECORD](experiments/EXP-20260827-014-d-fulltrain-imagenet/RECORD.md) |
 | EXP013E Official Random | COMPLETE | 部分支持 M2/M3 并重 | [RECORD](experiments/EXP-20260829-015-e-official-head-random/RECORD.md) |
 | EXP013F GLM-Pose-L | COMPLETE / FAIL | 2/4 gate，边缘失败 | [RECORD](experiments/EXP-20260829-016-f-glm-pose-l-screening/RECORD.md) |
-| EXP017 Rotation Residual | FORMAL RUNNING / E10 EVALUATED | E40 唯一决策点 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |
-| EXP017-B Detached Adapter Geometry | SERVER SMOKE PASS / FORMAL AUTHORIZED | E40 唯一决策点 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |
+| EXP017 Rotation Residual | COMPLETE / FAIL | E40 3/5 gate，rotation/BOP 未过 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |
+| EXP017-B Detached Adapter Geometry | COMPLETE / NO_OVERALL_GAIN | E40 rotation/BOP 略升，ADD 下降 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |
+| EXP018 Geometry-Consistency Residual | IMPLEMENTED / CPU_PREFLIGHT_PASS | A + 一次 post-decode correction，等待用户 smoke | [RECORD](experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md) |

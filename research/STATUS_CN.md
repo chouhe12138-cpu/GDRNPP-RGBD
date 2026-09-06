@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-03。
+最后核对：2026-09-06。
 
 ## 当前结论
 
@@ -12,11 +12,12 @@
   “结构可读出与预训练继承并重”提供部分支持。
 - EXP013F GLM-Pose-L 完成：BOP `0.684129`、reS `0.515802`，四项门槛通过
   2 项，结论为边缘 `SCREEN_FAIL`。
-- EXP017 canonical formal 正在运行，E10 已评估：BOP `0.642787`、ADD `0.491349`、
-  reS `0.419608`、teS `0.770473`，E40 仍是唯一决策点。代码/autograd 复核确认 adapter
-  rotation 梯度会额外进入 translation 共用的 geometry encoder；E10 8 样本只读诊断中
-  该增量梯度范数非零且不可忽略。EXP017-B detach 候选已通过本地 tests/preflight 和
-  lab1 smoke，用户已授权 matched formal；它使用独立 release，不影响当前 EXP017。
+- EXP017 canonical formal 已完成 E40：BOP `0.681709`、ADD `0.512111`、
+  reS `0.494348`、teS `0.800461`。预注册五项门槛通过三项，rotation/BOP 未过，
+  结论 `SCREEN_FAIL`。
+- EXP017-B 已完成 E40：BOP `0.683686`、ADD `0.498270`、reS `0.503114`、
+  teS `0.800692`。相对 EXP017 的 rotation/BOP 略升，但 ADD 下降 `0.013841`，
+  结论 `NO_OVERALL_GAIN`。原 B 记录未独立列出数值 gate，参照母实验门槛仅达 1/5。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 
@@ -28,10 +29,16 @@
 - lightweight framework 已由 EXP013F 在 lab0/lab1 双机 smoke 验证，EXP005
   matched control smoke 也完成；先前 launcher/cache/native 问题均为基础设施迁移
   失败，不属于科学结果。
-- 当前 EXP017 canonical formal 由用户在服务器运行；不得停止或修改。任何新增 run 必须
-  先由用户明确选择实验和配置，再使用 `docker/l40/experiment.sh`。
+- EXP017/EXP017-B 已完成，保留实现和正式记录。按用户要求删除了本轮新增的本地
+  E40 adapter 开关诊断脚本和产物；该诊断不混入正式训练结果。
+- 任何新增服务器 run 必须先由用户明确选择实验和配置，再使用
+  `docker/l40/experiment.sh`；本次没有服务器操作。
 
 ## 下一步
 
-等待 EXP017 与 EXP017-B 的 E40，不因中间趋势停止或改动运行中的 formal。两者保持独立
-experiment/run/source；不自动恢复 D，也不因单次边缘差距自动增加 seed。
+EXP017 与 EXP017-B 已以 E40 收口。用户已指定 EXP018：EXP013A initial pose 后增加一次
+Geometry-Consistency Residual correction；实现与 CPU preflight 已通过，当前等待用户
+手动真实数据 smoke。详见 [EXP018 RECORD](experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md)
+与 [实现/命令](exp018/README.md)。用户已授权本地提交并推送 GitHub；集成里程碑标签为
+`exp018-integration-cpu-pass`，不代表真实 smoke 或正式性能 gate 通过。没有服务器操作；
+smoke 收口和正式 gate 确认后才进入发布/训练流程。不恢复 D，不自动增加 seed。

@@ -1,6 +1,6 @@
 # EXP017-B 决策
 
-## 结论：GO
+## 启动前结论：GO（历史决策）
 
 EXP017 存在真实的共享优化耦合：同一个 `geometry_grid` 一方面经 EXP013A 的
 `geometry_projection` 进入 rotation/translation 共用 latent，另一方面直接进入新增
@@ -21,5 +21,6 @@ delta_r = rotation_adapter(geometry_grid.detach(), support)
 EXP013A 自身 geometry latent 仍正常训练；translation、loss、optimizer、数据、周期、
 pooling、position、参数量与 renderer 协议均不变。B 使用独立 experiment/output ID。
 
-本地 tests/preflight 与服务器 smoke 均已通过。后续只运行已授权的 matched formal，E40
-是唯一正式决策点；中间 checkpoint 只作趋势记录。
+本地 tests/preflight 与服务器 smoke 通过后，已按授权运行 matched formal，E40
+是唯一正式决策点；中间 checkpoint 只作趋势记录。实验现已完成，最终指标与结论见
+[EXP017-B RECORD](../experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md)。

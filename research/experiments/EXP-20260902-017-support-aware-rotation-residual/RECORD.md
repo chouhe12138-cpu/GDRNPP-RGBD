@@ -2,7 +2,7 @@
 
 ## 协议与状态
 
-- 状态：`FORMAL_RUNNING / E10_EVALUATED / E40_PENDING`
+- 状态：`COMPLETE / SCREEN_FAIL_3_OF_5_GATES`；2026-09-06 核对正式结果。
 - 问题：完整保留 EXP013A 时，只给 raw rotation 增加 Region-free、position-aware、
   support-masked spatial residual，能否提高 rotation 而不损害 translation/ADD？
 - 唯一变量：EXP013A 8×8 geometry grid 上的 rotation-only adapter。
@@ -122,20 +122,53 @@ AR_teS `0.797693`。EXP017 E40 必须同时满足：
 五项全过才为 `PASS`。若仅 rotation 通过，记为
 `ROTATION_SUPPORTED / SCREEN_FAIL`。边缘差距不自动增加 seed。
 
-## Canonical formal 中间结果
+## Canonical formal 完整结果
 
 - run：`RUN-20260902-154756-formal-s42-a01`；source `6b4d412ed251`；seed 42。
-- E5：BOP AR `0.639732`、ADD(-S) `0.501730`、AR_reS `0.351557`、
-  AR_teS `0.781084`。
-- E10：BOP AR `0.642787`、ADD(-S) `0.491349`、AR_reS `0.419608`、
-  AR_teS `0.770473`。
-- E5→E10 rotation 明显改善而 translation/ADD 下降；这里只记中间趋势，不改变 E40
-  唯一正式决策点，也不停止当前 formal。
+- checkpoint：`model_epoch_040.pth`，epoch 40 / iteration 255919；日志确认保存、
+  全部训练完成及 `FINAL_EVAL_REUSED periodic_epoch=40`。
+- 外置证据：`E:\6D姿态估计\EXP-014\` 的 console.log、八个 scores_bop19_*epoch.json
+  与 E40 checkpoint。目录名不是实验 ID；其中旧 F 诊断文件不属于本次 formal。
+- ADD 来自日志 `EVAL_SUMMARY.add_s_0.1d`，采用 1,445 targets 的 micro 口径；
+  BOP/reS/teS 来自对应 epoch JSON，BOP 已与日志交叉核对。不用 AR_ad 替代 ADD。
 - 对共享 geometry 优化耦合的代码与 E10 autograd 复核见
   `research/exp017/EXP017B_DECISION.md`。
 
+| Epoch | BOP AR | ADD(-S) target-micro | AR_reS | AR_teS |
+|---:|---:|---:|---:|---:|
+| 5 | 0.639732 | 0.501730 | 0.351557 | 0.781084 |
+| 10 | 0.642787 | 0.491349 | 0.419608 | 0.770473 |
+| 15 | 0.659130 | 0.488581 | 0.450750 | 0.780854 |
+| 20 | 0.649087 | 0.469204 | 0.433449 | 0.763091 |
+| 25 | 0.658579 | 0.486505 | 0.457209 | 0.778777 |
+| 30 | 0.669520 | 0.514879 | 0.457439 | 0.795617 |
+| 35 | 0.671518 | 0.492042 | 0.491580 | 0.787774 |
+| 40 | 0.681709 | 0.512111 | 0.494348 | 0.800461 |
+
+E40 是 BOP/reS/teS 最高点，E30 是 ADD 最高点；仅描述轨迹，不替换 E40 决策点。
+保留最终/gate 点与 ADD 最佳点的逐物体 ADD：
+
+| Epoch | ape | can | cat | driller | duck | eggbox | glue | holepuncher |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 30 | 0.514286 | 0.829146 | 0.502924 | 0.830000 | 0.194444 | 0.272222 | 0.750000 | 0.240000 |
+| 40 | 0.474286 | 0.809045 | 0.526316 | 0.805000 | 0.077778 | 0.350000 | 0.757143 | 0.310000 |
+
+### E40 gate 判定
+
+| 指标 | E40 | 门槛 | 判定 |
+|---|---:|---:|---|
+| AR_reS | 0.494348 | ≥0.513039 | FAIL |
+| BOP AR | 0.681709 | ≥0.686956 | FAIL |
+| ADD(-S) target-micro | 0.512111 | ≥0.505727 | PASS |
+| AR_teS | 0.800461 | ≥0.794693 | PASS |
+| 相对 A 逐物体 ADD 非负 | 5/8 | ≥5/8 | PASS |
+
+相对 A，cat、driller、duck、glue、holepuncher 的 ADD 改善，ape、can、eggbox 下降。
+五项通过三项；rotation 门槛未过，不能标为 ROTATION_SUPPORTED。
+
 ## 当前结论与边界
 
-实现与本地门禁通过；canonical formal 已运行并完成 E5/E10 checkpoint/evaluation，E40
-尚未到达。中间结果不用于正式结论。EXP017-B 已作为独立 matched 消融通过 smoke 并获
-formal 授权，不改变或停止本 EXP017 run。
+canonical formal 已完成，结论为 SCREEN_FAIL；没有获得预期的 rotation/BOP 收益。
+EXP017-B 已完成独立 matched formal，见其 RECORD；不追加 seed 或自动启动新训练。
+按用户要求，2026-09-05 新增的本地 E40 adapter 开关诊断脚本及产物于 2026-09-06
+删除；本记录只采用服务器正式训练/评估结果，不将已删除诊断的本地指标混入正式结论。

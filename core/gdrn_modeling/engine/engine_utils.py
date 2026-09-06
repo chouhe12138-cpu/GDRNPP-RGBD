@@ -137,6 +137,8 @@ def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):
     # Keep the online mapper contract while skipping rendered GT geometry.
     # batch training data
     batch = {}
+    if cfg.MODEL.POSE_NET.get("POSE_CORRECTOR", {}).get("ENABLED", False):
+        batch["roi_image_hw"] = torch.stack([d["roi_image_hw"] for d in data]).to(device)
     batch["roi_img"] = torch.stack([d["roi_img"] for d in data], dim=0).to(device, non_blocking=True)
     if cfg.INPUT.WITH_DEPTH:
         batch["roi_depth"] = torch.stack([d["roi_depth"] for d in data], dim=0).to(device, non_blocking=True)
@@ -363,7 +365,16 @@ def batch_data_test(cfg, data, device="cuda"):
         if key in data[0]:
             batch[key] = list(itertools.chain(*[d[key] for d in data]))
 
+    if cfg.MODEL.POSE_NET.get("POSE_CORRECTOR", {}).get("ENABLED", False):
+        batch["roi_image_hw"] = torch.stack((batch["im_H"], batch["im_W"]), dim=-1)
     return batch
+
+
+def pose_corrector_kwargs(cfg, batch):
+    """Do not pass new arguments to unrelated upstream model signatures."""
+    if not cfg.MODEL.POSE_NET.get("POSE_CORRECTOR", {}).get("ENABLED", False):
+        return {}
+    return {"roi_image_hw": batch["roi_image_hw"]}
 
 def batch_data_inference_roi(cfg, data, device='cuda'):
     net_cfg = cfg.MODEL.POSE_NET

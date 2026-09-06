@@ -46,6 +46,7 @@ from .heads.official_head_random_init import OfficialConvPnPNetRandomInit
 from .heads.conv_pnp_net_no_region import ConvPnPNetNoRegion
 from .heads.conv_pnp_net_cls import ConvPnPNetCls
 from .heads.point_pnp_net import SimplePointPnPNet
+from .heads.gcr_pose_corrector import GeometryConsistencyCorrector
 
 from .fusenets.conv_fuse_net import ConvFuseNet
 
@@ -119,3 +120,6 @@ HEADS = {
 FUSENETS = {
     "ConvFuseNet": ConvFuseNet,
 }
+
+# Post-decode modules are not raw PnP heads; keep their registry separate.
+POSE_CORRECTORS = {"GeometryConsistencyCorrector": GeometryConsistencyCorrector}

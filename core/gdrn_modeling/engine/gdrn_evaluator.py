@@ -29,7 +29,7 @@ from lib.utils.mask_utils import binary_mask_to_rle
 from lib.utils.utils import dprint
 from lib.vis_utils.image import grid_show, vis_image_bboxes_cv2, vis_image_mask_cv2
 
-from .engine_utils import batch_data, get_out_coor, get_out_mask, batch_data_inference_roi
+from .engine_utils import batch_data, get_out_coor, get_out_mask, batch_data_inference_roi, pose_corrector_kwargs
 from .test_utils import eval_cached_results, save_and_eval_results, to_list
 
 
@@ -745,6 +745,7 @@ def gdrn_inference_on_dataset(cfg, model, data_loader, evaluator, amp_test=False
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
                     depth_stats=batch.get("roi_depth_stats", None),
+                    **pose_corrector_kwargs(cfg, batch),
                 )
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
@@ -907,6 +908,7 @@ def gdrn_save_result_of_dataset(cfg, model, data_loader, output_dir, dataset_nam
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
                     depth_stats=batch.get("roi_depth_stats", None),
+                    **pose_corrector_kwargs(cfg, batch),
                 )
             if torch.cuda.is_available():
                 torch.cuda.synchronize()

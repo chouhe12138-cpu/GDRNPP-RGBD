@@ -404,6 +404,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):
         image, transforms = T.apply_augmentations(self.augmentation, image)
         im_H, im_W = image_shape = image.shape[:2]  # h, w
 
+        if net_cfg.get("POSE_CORRECTOR", {}).get("ENABLED", False):
+            # Post-augmentation full image size, in the same frame as scaled K
+            # and endpoint=False ROI2D. This adds metadata, not an augmentation.
+            dataset_dict["roi_image_hw"] = torch.tensor([im_H, im_W], dtype=torch.float32)
+
         # NOTE: scale camera intrinsic if necessary ================================
         scale_x = im_W / im_W_ori
         scale_y = im_H / im_H_ori  # NOTE: generally scale_x should be equal to scale_y

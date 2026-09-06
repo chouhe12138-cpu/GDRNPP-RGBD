@@ -47,7 +47,7 @@ from core.utils.utils import get_emb_show
 from core.utils.data_utils import denormalize_image
 from core.gdrn_modeling.datasets.data_loader import build_gdrn_train_loader, build_gdrn_test_loader
 
-from .engine_utils import batch_data, get_out_coor, get_out_mask
+from .engine_utils import batch_data, get_out_coor, get_out_mask, pose_corrector_kwargs
 from .gdrn_evaluator import gdrn_inference_on_dataset, GDRN_Evaluator, gdrn_save_result_of_dataset
 from .gdrn_custom_evaluator import GDRN_EvaluatorCustom
 from .artifact_layout import (
@@ -448,6 +448,7 @@ class GDRN_Lite(LightningLite):
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
                     depth_stats=batch.get("roi_depth_stats", None),
+                    **pose_corrector_kwargs(cfg, batch),
                     do_loss=True,
                 )
                 losses = sum(loss_dict.values())

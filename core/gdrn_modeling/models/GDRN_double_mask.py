@@ -26,7 +26,8 @@ from .model_utils import (
 from .pose_from_pred import pose_from_pred
 from .pose_from_pred_centroid_z import pose_from_pred_centroid_z
 from .pose_from_pred_centroid_z_abs import pose_from_pred_centroid_z_abs
-from .net_factory import BACKBONES
+from .net_factory import BACKBONES, POSE_CORRECTORS
+from .heads.gcr_pose_corrector import corrected_centroid_z
 from .heads.quality_coverage_attention import QualityCoverageAttention
 from core.utils.my_checkpoint import load_timm_pretrained
 
@@ -56,6 +57,7 @@ class GDRN_DoubleMask(nn.Module):
         neck=None,
         pnp_net=None,
         quality_coverage_net=None,
+        pose_corrector=None,
     ):
         super().__init__()
         assert cfg.MODEL.POSE_NET.NAME == "GDRN_double_mask", cfg.MODEL.POSE_NET.NAME
@@ -65,6 +67,7 @@ class GDRN_DoubleMask(nn.Module):
         self.geo_head_net = geo_head_net
         self.pnp_net = pnp_net
         self.quality_coverage_net = quality_coverage_net
+        self.pose_corrector = pose_corrector
 
         self.cfg = cfg
         self.xyz_out_dim, self.mask_out_dim, self.region_out_dim = get_xyz_doublemask_region_out_dim(cfg)
@@ -112,6 +115,8 @@ class GDRN_DoubleMask(nn.Module):
         resize_ratios=None,
         depth_stats=None,
         do_loss=False,
+        roi_image_hw=None,
+        return_pose_debug=False,
     ):
         cfg = self.cfg
         net_cfg = cfg.MODEL.POSE_NET
@@ -243,8 +248,30 @@ class GDRN_DoubleMask(nn.Module):
         else:
             raise ValueError(f"Unknown trans type: {pnp_net_cfg.TRANS_TYPE}")
 
+        pose_debug = None
+        loss_pred_t = pred_t_
+        if self.pose_corrector is not None:
+            # Test decode intentionally uses upstream's numpy allo->ego path;
+            # move its CPU R back to the feature device, without changing decode.
+            pred_ego_rot, pred_trans, pose_debug = self.pose_corrector(
+                torch.cat((coor_x, coor_y, coor_z), dim=1),
+                roi_coord_2d,
+                get_mask_prob(vis_mask, mask_loss_type=net_cfg.LOSS_CFG.MASK_LOSS_TYPE),
+                pred_ego_rot, pred_trans, roi_cams, roi_image_hw, roi_extents,
+            )
+            with torch.autocast(device_type=x.device.type, enabled=False):
+                loss_pred_t = corrected_centroid_z(
+                    pred_t_.float(), pose_debug["delta_t"], pred_trans,
+                    roi_cams.float(), roi_centers.float(), roi_whs.float(), resize_ratios.float(),
+                )
+            if return_pose_debug:
+                pose_debug.update(init_raw_rotation=pred_rot_, init_raw_translation=pred_t_,
+                                  final_centroid_z=loss_pred_t)
+
         if not do_loss:  # test
             out_dict = {"rot": pred_ego_rot, "trans": pred_trans}
+            if return_pose_debug and pose_debug is not None:
+                out_dict["pose_debug"] = pose_debug
             if cfg.TEST.USE_PNP or cfg.TEST.SAVE_RESULTS_ONLY or cfg.TEST.USE_DEPTH_REFINE:
                 # TODO: move the pnp/ransac inside forward
                 out_dict.update(
@@ -259,10 +286,13 @@ class GDRN_DoubleMask(nn.Module):
                 )
         else:
             out_dict = {}
+            if return_pose_debug and pose_debug is not None:
+                out_dict["pose_debug"] = pose_debug
             assert (gt_trans is not None) and (gt_trans_ratio is not None)
             if geo_supervision:
                 assert (gt_xyz is not None) and (gt_region is not None)
-            mean_re, mean_te = compute_mean_re_te(pred_trans, pred_rot_m, gt_trans, gt_ego_rot)
+            metric_rot = pred_ego_rot if self.pose_corrector is not None else pred_rot_m
+            mean_re, mean_te = compute_mean_re_te(pred_trans, metric_rot, gt_trans, gt_ego_rot)
             vis_dict = {
                 "vis/error_R": mean_re,
                 "vis/error_t": mean_te * 100,  # cm
@@ -302,8 +332,8 @@ class GDRN_DoubleMask(nn.Module):
                 gt_trans=gt_trans,
                 out_rot=pred_ego_rot,
                 gt_rot=gt_ego_rot,
-                out_centroid=pred_t_[:, :2],  # TODO: get these from trans head
-                out_trans_z=pred_t_[:, 2],
+                out_centroid=loss_pred_t[:, :2],
+                out_trans_z=loss_pred_t[:, 2],
                 gt_trans_ratio=gt_trans_ratio,
                 gt_points=gt_points,
                 sym_infos=sym_infos,
@@ -637,6 +667,28 @@ def build_model_optimizer(cfg, is_test=False):
             )
 
     # build model
+    pose_corrector = None
+    corrector_cfg = net_cfg.get("POSE_CORRECTOR", {})
+    if corrector_cfg.get("ENABLED", False):
+        # EXP018-v1 is strictly A + one post-decode correction. Reject silent
+        # incompatible combinations rather than guessing coordinate semantics.
+        pnp = net_cfg.PNP_NET
+        if (pnp.INIT_CFG.type != "XYZResidualBypassPnPNet"
+                or pnp.TRANS_TYPE != "centroid_z" or pnp.Z_TYPE != "REL"
+                or pnp.ROT_TYPE != "allo_rot6d" or pnp.COORD_2D_TYPE != "abs"
+                or net_cfg.LOSS_CFG.XYZ_LOSS_TYPE != "L1"
+                or not pnp.WITH_2D_COORD or pnp.FREEZE
+                or not net_cfg.BACKBONE.FREEZE or not net_cfg.GEO_HEAD.FREEZE
+                or cfg.INPUT.WITH_DEPTH or cfg.INPUT.get("HEAD_DEPTH", False)
+                or cfg.TEST.USE_PNP or cfg.TEST.USE_DEPTH_REFINE
+                or quality_coverage_net is not None):
+            raise ValueError("EXP018 requires the frozen-upstream EXP013A RGB centroid_z/REL protocol")
+        init_cfg = copy.deepcopy(corrector_cfg.INIT_CFG)
+        corrector_type = init_cfg.pop("type")
+        pose_corrector = POSE_CORRECTORS[corrector_type](**init_cfg)
+        params_lr_list.append({"params": pose_corrector.parameters(),
+                               "lr": float(cfg.SOLVER.BASE_LR) * pnp.LR_MULT})
+
     model = GDRN_DoubleMask(
         cfg,
         backbone,
@@ -644,6 +696,7 @@ def build_model_optimizer(cfg, is_test=False):
         geo_head_net=geo_head,
         pnp_net=pnp_net,
         quality_coverage_net=quality_coverage_net,
+        pose_corrector=pose_corrector,
     )
     if net_cfg.USE_MTL:
         params_lr_list.append(

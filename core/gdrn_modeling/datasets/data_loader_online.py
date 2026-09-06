@@ -395,6 +395,11 @@ class GDRN_Online_DatasetFromList(Base_DatasetFromList):
         image, transforms = T.apply_augmentations(self.augmentation, image)
         im_H, im_W = image_shape = image.shape[:2]  # h, w
 
+        if net_cfg.get("POSE_CORRECTOR", {}).get("ENABLED", False):
+            # XYZ_ONLINE remains True for frozen-producer screening: this is
+            # the formal train mapper even though GT rendering is disabled.
+            dataset_dict["roi_image_hw"] = torch.tensor([im_H, im_W], dtype=torch.float32)
+
         # NOTE: scale camera intrinsic if necessary ================================
         # TODO: resize depth and mask if necessary ================================
         scale_x = im_W / im_W_ori
