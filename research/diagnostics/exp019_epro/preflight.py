@@ -75,6 +75,8 @@ def main():
         "official_model": type(context.model).__name__,
         "dataset": context.dataset,
         "pose_corrector_absent": getattr(context.model, "pose_corrector", None) is None,
+        "dense_test_outputs_enabled": bool(context.cfg.TEST.SAVE_RESULTS_ONLY),
+        "evaluator_pnp_disabled": not bool(context.cfg.TEST.USE_PNP),
         "training_or_real_inference_executed": False,
         "epropnp_root": str(Path(args.epropnp_root).resolve()),
     }

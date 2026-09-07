@@ -77,6 +77,10 @@ def _configure(cfg_path: Path, checkpoint: Path, device: str) -> Config:
     cfg.DATASETS.DET_FILES_TEST = ()
     cfg.TEST.TEST_BBOX_TYPE = "gt"
     cfg.TEST.USE_PNP = False
+    # Current GDRN test forward returns dense producer tensors only for an
+    # evaluator/serialization consumer.  This flag exposes them without
+    # enabling evaluator-side PnP or changing the computed network pose.
+    cfg.TEST.SAVE_RESULTS_ONLY = True
     cfg.TEST.AMP_TEST = False
     cfg.DATALOADER.NUM_WORKERS = 0
     cfg.DATALOADER.PERSISTENT_WORKERS = False
@@ -98,6 +102,8 @@ def _configure(cfg_path: Path, checkpoint: Path, device: str) -> Config:
         raise RuntimeError("EXP019 requires official absolute ROI2D Patch-PnP input")
     if not pnp_cfg.REGION_ATTENTION:
         raise RuntimeError("EXP019 must preserve official Region attention")
+    if cfg.TEST.USE_PNP or not cfg.TEST.SAVE_RESULTS_ONLY:
+        raise RuntimeError("EXP019 must expose dense tensors without evaluator-side PnP")
     return cfg
 
 

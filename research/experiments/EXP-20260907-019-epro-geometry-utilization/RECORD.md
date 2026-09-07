@@ -36,7 +36,7 @@ convention；不自动训练或调参。
 Conda `pytorch22`、CPU、无真实样本：
 
 - 交接包全部 SHA-256 通过；从 Git `d702030` 恢复 exact support/intervention/RANSAC 语义。
-- 新增单测 5 项通过；连同 pose_structure pure utils 与 EXP018 回归共 `30 passed`。
+- 初始新增单测 5 项通过；连同 pose_structure pure utils 与 EXP018 回归共 `30 passed`。
 - synthetic EPro solve 通过：rotation error `0°`，translation error
   `8.929934e-8 m`。
 - official checkpoint hash、配置、LM-O registrar、GT-box loader 与模型构建通过；模型为
@@ -45,3 +45,20 @@ Conda `pytorch22`、CPU、无真实样本：
 
 尚未读取真实诊断样本、执行 32-target smoke、完整推理或 BOP evaluation。上述工程证据
 不构成科学结果。
+
+## Dense-output 接口修复
+
+用户第一次手动 smoke 在首个 forward 后、任何 target 完成前失败：当前 test forward
+默认只返回 `rot/trans`，旧 EXP004 代码假设 `coor_x/y/z/mask/region` 总在输出中，触发
+`KeyError: 'coor_x'`。run_id 未从截图中取得；该失败不进入科学结论。
+
+修复限定在 EXP019 config adapter：设置 `TEST.SAVE_RESULTS_ONLY=True` 以使用当前模型
+已有的 dense-output 接口，同时保持 `TEST.USE_PNP=False`，不改变网络姿态、不触发
+evaluator-side PnP。新增回归断言后 EXP019 `6 passed`。
+修复后的 EXP019、pose_structure pure utils 与 EXP018 相关回归合计 `31 passed`；
+`git diff --check` 通过。
+
+Agent 仅执行一个真实 LM-O target 的 CPU wiring check（临时路径
+`/tmp/exp019-fix-xJSXWJ/run`，不是 smoke/formal）：5 个 alpha 均完成，Patch/RANSAC/EPro
+failure 均为 0，support 308 点，GT-XYZ 最大重投影误差 `0.00545669 px`；alpha=0
+Patch 重入最大 R 差 `1.78813934e-7`、t 差 0。该检查只证明报错链路已修复。

@@ -13,6 +13,7 @@ from research.diagnostics.exp019_epro.correspondence import (
 from research.diagnostics.exp019_epro.gates import evaluate_gates, spearman
 from research.diagnostics.exp019_epro.evaluate import reproduction_report
 from research.diagnostics.exp019_epro.ransac_solver import solve_ransac_pnp
+from research.diagnostics.exp019_epro.repo_adapter import _configure
 from research.diagnostics.exp019_epro.types import DiagnosticSample
 
 
@@ -115,3 +116,15 @@ def test_historical_reproduction_report():
         },
     }
     assert reproduction_report(cfg, summary)["status"] == "PASS"
+
+
+def test_current_test_forward_exposes_dense_outputs_without_pnp():
+    from pathlib import Path
+
+    cfg = _configure(
+        Path("configs/gdrn/lmo_pbr/research/_base_/lmo_gt_eval.py"),
+        Path("pretrained_models/lmo_pbr/model_final_wo_optim.pth"),
+        "cpu",
+    )
+    assert cfg.TEST.SAVE_RESULTS_ONLY
+    assert not cfg.TEST.USE_PNP
