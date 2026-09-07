@@ -46,9 +46,10 @@ test -f .local/third_party/EPro-PnP-v2-main/EPro-PnP-6DoF_v2/lib/ops/pnp/epropnp
 然后在 `pytorch22` 环境依次执行 tests、preflight、32-target balanced smoke。
 smoke 每个 LM-O 物体最多选择四个 target，只验证 wiring，不生成正式结论。
 
-完整 1,445-target raw inference 必须使用 clean committed source。完成后单独运行
-`evaluate`，它导出 15 个 BOP CSV，调用当前 `eval_pose_results_more.py`，生成
-`summary.json`、`reproduction_report.json` 和 `gate_report.json`。
+完整 1,445-target 诊断必须使用 clean committed source。`full` 在 raw inference
+完成后自动导出 15 个 BOP CSV、调用当前 `eval_pose_results_more.py`，并生成
+`summary.json`、`reproduction_report.json` 和 `gate_report.json`。如果 BOP 阶段
+中断，可用 `evaluate RUN_DIR` 对已完成的 raw run 单独重试。
 
 Gate 前必须先通过历史复现：Patch/RANSAC alpha=0 与 RANSAC alpha=1 的 ADD/BOP
 绝对差不超过 0.001。正式 EPro gate 为 alpha=1 ADD/BOP 均至少 0.95，ADD/BOP 的
@@ -58,4 +59,3 @@ Spearman 均至少 0.90，且相对 matched RANSAC 的恢复比例均至少 0.50
 
 PASS 只支持显式 solver 能稳定消费逐步改善的 correspondence geometry，不支持
 learned reliability、solver-oriented training、EPro-GDRN 优越性或部署收益。
-

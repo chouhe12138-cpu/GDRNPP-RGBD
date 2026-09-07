@@ -49,8 +49,10 @@ case "${mode}" in
       --checkpoint "${official_ckpt}" \
       --device cuda:0 \
       --output "${run_dir}"
-    echo "FULL_RAW_RESULT=${run_dir}"
-    echo "NEXT=bash scripts/run_exp019_epro.sh evaluate ${run_dir}"
+    python -m research.diagnostics.exp019_epro.evaluate "${run_dir}"
+    echo "FULL_RESULT=${run_dir}"
+    echo "SUMMARY=${run_dir}/summary.json"
+    echo "GATES=${run_dir}/gate_report.json"
     ;;
   evaluate)
     run_dir="${2:?usage: bash scripts/run_exp019_epro.sh evaluate RUN_DIR}"
