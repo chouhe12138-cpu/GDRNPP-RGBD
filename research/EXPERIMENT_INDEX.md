@@ -26,3 +26,4 @@
 | EXP017 Rotation Residual | COMPLETE / FAIL | E40 3/5 gate，rotation/BOP 未过 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |
 | EXP017-B Detached Adapter Geometry | COMPLETE / NO_OVERALL_GAIN | E40 rotation/BOP 略升，ADD 下降 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |
 | EXP018 Geometry-Consistency Residual | IMPLEMENTED / CPU_PREFLIGHT_PASS | A + 一次 post-decode correction，等待用户 smoke | [RECORD](experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md) |
+| EXP019 EPro Geometry Utilization | IMPLEMENTED / ENGINEERING_PREFLIGHT_PASS | 历史 EXP004 fixed-support matched 诊断，等待用户 smoke | [RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md) |

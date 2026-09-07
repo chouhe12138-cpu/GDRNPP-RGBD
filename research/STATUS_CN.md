@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-06。
+最后核对：2026-09-07。
 
 ## 当前结论
 
@@ -20,10 +20,13 @@
   结论 `NO_OVERALL_GAIN`。原 B 记录未独立列出数值 gate，参照母实验门槛仅达 1/5。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
+- EXP019 已按历史 EXP004 fixed shared support 接入 EPro-PnP-v2；单测、合成
+  EPro solve 与 official 模型构建通过，尚未运行真实样本或 BOP evaluation。
 
 ## 当前代码边界
 
-- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017 和当前结构诊断。
+- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017、EXP018、EXP019
+  和当前结构诊断。
 - EXP001–011 的科学结论保留在 RECORD；旧专用执行代码和 managed experiment
   审计框架已退出当前工作树，可通过 Git 历史恢复。
 - lightweight framework 已由 EXP013F 在 lab0/lab1 双机 smoke 验证，EXP005
@@ -42,3 +45,9 @@ Geometry-Consistency Residual correction；实现与 CPU preflight 已通过，�
 与 [实现/命令](exp018/README.md)。用户已授权本地提交并推送 GitHub；集成里程碑标签为
 `exp018-integration-cpu-pass`，不代表真实 smoke 或正式性能 gate 通过。没有服务器操作；
 smoke 收口和正式 gate 确认后才进入发布/训练流程。不恢复 D，不自动增加 seed。
+
+用户随后指定 EXP019：在历史 EXP004 的 fixed support 与 XYZ alpha sweep 上增加
+uniform-weight EPro-PnP consumer。实现和无真实样本 engineering preflight 已通过，
+当前等待用户手动 32-target smoke；不训练、不混入 EXP018，full 前必须提交为 clean source。
+详见 [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
+与 [执行说明](exp019/README.md)。

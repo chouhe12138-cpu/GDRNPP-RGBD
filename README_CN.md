@@ -1,8 +1,8 @@
 # GDRNPP-RGBD 中文入口
 
 本仓库以 GDRNPP/ConvNeXt-Base 为基线，研究遮挡场景中 dense correspondence
-到直接姿态头的信息利用。当前代码主线是 EXP012、EXP013 与 EXP017；早期诊断和失败方案
-只保留实验记录，不再保留专用执行框架。
+到直接姿态头的信息利用。当前代码主线是 EXP012、EXP013、EXP018 与 EXP019；早期诊断
+和失败方案只保留实验记录，不再保留专用执行框架。
 
 ## 阅读顺序
 
@@ -22,6 +22,7 @@
 | `research/next_pose_head/` | EXP012 实现与 preflight |
 | `research/exp013/`, `research/exp014/`, `research/exp017/` | 当前 pose-head 分枝与 preflight |
 | `research/diagnostics/pose_structure/` | 当前低成本结构诊断 |
+| `research/diagnostics/exp019_epro/` | EXP019 冻结 geometry-utilization 诊断 |
 | `docker/l40/` | L40 镜像和单一安全启动器 |
 | `output/`, `.local/` | Git 忽略的本机产物与路径资源 |
 
