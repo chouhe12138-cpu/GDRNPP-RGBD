@@ -35,7 +35,7 @@ from core.utils.my_checkpoint import MyCheckpointer
 from lib.utils.mask_utils import cocosegm2mask
 
 from .config import EXPECTED_LMO_TARGETS, EXPECTED_OFFICIAL_WEIGHT_SHA256
-from .correspondence import project_points
+from .correspondence import historical_gt_reprojection_errors
 from .types import DiagnosticSample, PoseResult
 
 
@@ -295,14 +295,16 @@ def iter_samples(context: Context) -> Iterator[DiagnosticSample]:
                     )
                     support = pred_visible & gt_visible
                     gt_xyz_norm = (gt_xyz_m / extent.reshape(1, 1, 3) + 0.5).transpose(2, 0, 1)
-                    reproj = project_points(gt_xyz_m[support], R_gt, t_gt, K)
-                    reproj_error = (
-                        np.linalg.norm(reproj - image_points[support], axis=1)
-                        if np.count_nonzero(support)
-                        else np.empty(0)
+                    reproj_error = historical_gt_reprojection_errors(
+                        gt_xyz_m,
+                        image_points,
+                        gt_visible,
+                        R_gt,
+                        t_gt,
+                        K,
                     )
                     max_reprojection = float(reproj_error.max()) if len(reproj_error) else float("nan")
-                    if len(reproj_error) and max_reprojection > 0.75:
+                    if len(reproj_error) and max_reprojection >= 0.5:
                         raise RuntimeError(
                             f"{scene_im_id}/{instance_id}: GT XYZ reprojection {max_reprojection:.4f}px"
                         )

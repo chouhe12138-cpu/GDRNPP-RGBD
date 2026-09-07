@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 
 from .types import DiagnosticSample
@@ -88,3 +89,28 @@ def project_points(x3d_m, R, t, K):
     camera += np.asarray(t, dtype=np.float64).reshape(1, 3)
     uvw = camera @ np.asarray(K, dtype=np.float64).reshape(3, 3).T
     return uvw[:, :2] / uvw[:, 2:3]
+
+
+def historical_gt_reprojection_errors(x3d_m, image_points, support, R, t, K):
+    """Match EXP004's GT-XYZ sanity check, including Rodrigues normalization.
+
+    Some LM-O ``cam_R_m2c`` matrices are measurably non-orthogonal.  EXP004
+    passed them through OpenCV's matrix-to-Rodrigues conversion before
+    projection, while retaining the raw matrix for depth-to-object conversion.
+    Reproducing both details is required for its recorded <0.5 px check.
+    """
+
+    valid = np.asarray(support, dtype=bool)
+    points = np.asarray(x3d_m, dtype=np.float64)[valid]
+    expected = np.asarray(image_points, dtype=np.float64)[valid]
+    if not len(points):
+        return np.empty(0, dtype=np.float64)
+    rotation_vector = cv2.Rodrigues(np.asarray(R, dtype=np.float64).reshape(3, 3))[0]
+    projected = cv2.projectPoints(
+        points,
+        rotation_vector,
+        np.asarray(t, dtype=np.float64).reshape(3, 1),
+        np.asarray(K, dtype=np.float64).reshape(3, 3),
+        np.zeros((8, 1), dtype=np.float64),
+    )[0].reshape(-1, 2)
+    return np.linalg.norm(projected - expected, axis=1)

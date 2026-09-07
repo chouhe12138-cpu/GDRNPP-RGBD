@@ -62,3 +62,17 @@ Agent 仅执行一个真实 LM-O target 的 CPU wiring check（临时路径
 `/tmp/exp019-fix-xJSXWJ/run`，不是 smoke/formal）：5 个 alpha 均完成，Patch/RANSAC/EPro
 failure 均为 0，support 308 点，GT-XYZ 最大重投影误差 `0.00545669 px`；alpha=0
 Patch 重入最大 R 差 `1.78813934e-7`、t 差 0。该检查只证明报错链路已修复。
+
+## GT-XYZ 检查口径修复
+
+用户第二次手动 smoke 在 `2/942/0` 读取阶段失败，当前实现报告 GT-XYZ 最大重投影
+误差 `0.7689 px`，尚未完成 32 targets，故仍不进入科学结论。根因不是求解器或数据
+越界：该 LM-O 原始旋转标注的 determinant 为 `1.0136865`、正交误差约 `0.00987`；
+EXP019 的直接矩阵投影遗漏了历史 EXP004 使用的 OpenCV Rodrigues 转换。
+
+修复恢复 EXP004 的完整检查口径：GT XYZ 仍按原始 `R` 生成，检查在全部 GT-visible
+有效深度点上用 `cv2.Rodrigues` 与 `cv2.projectPoints`，阈值恢复为历史预注册的
+`<0.5 px`。对原始 `2/942/0` 的 9,761 个可见有效深度像素进行只读复核，历史口径
+最大误差为 `0.385464 px`，而错误的直接矩阵口径为 `0.773077 px`。新增该非正交
+LM-O 标注的回归测试。修复后 EXP019、pose_structure 与 EXP018 相关回归合计
+`37 passed`；EPro 合成求解及官方模型构建 preflight 通过。未执行新的 smoke 或正式实验。

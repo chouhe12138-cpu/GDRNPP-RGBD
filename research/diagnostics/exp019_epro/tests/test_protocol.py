@@ -6,6 +6,7 @@ import numpy as np
 from research.diagnostics.exp019_epro.config import ExperimentConfig
 from research.diagnostics.exp019_epro.correspondence import (
     build_correspondences,
+    historical_gt_reprojection_errors,
     interpolate_xyz,
     roi2d_norm_to_pixels,
     xyz_norm_to_metric,
@@ -62,6 +63,35 @@ def test_coordinate_contract_and_shared_set():
     assert corr.n == 16
     assert corr.x3d_m.shape == (16, 3)
     assert corr.x2d_px.shape == (16, 2)
+
+
+def test_historical_gt_reprojection_normalizes_nonorthogonal_lmo_rotation():
+    # Raw LM-O scene 2/image 942/object 5 rotation (determinant 1.0137).
+    rotation = np.array(
+        [
+            [-0.73724288, -0.65025438, 0.20564938],
+            [-0.56502450, 0.41166663, -0.72155121],
+            [0.38288973, -0.64536140, -0.66798783],
+        ],
+        dtype=np.float64,
+    )
+    translation = np.array([-0.17434816, -0.18885588, 0.73448116])
+    camera = np.array([[[0.01, -0.02, 0.8], [0.03, 0.01, 0.82]]])
+    K = np.array([[572.4, 0, 325.3], [0, 573.6, 242.0], [0, 0, 1]], dtype=np.float64)
+    image_h = camera @ K.T
+    image_points = image_h[..., :2] / image_h[..., 2:]
+    # Preserve the historical raw-R inverse approximation used to build GT XYZ.
+    xyz = (camera - translation.reshape(1, 1, 3)) @ rotation
+    errors = historical_gt_reprojection_errors(
+        xyz, image_points, np.ones((1, 2), dtype=bool), rotation, translation, K
+    )
+    rotation_vector = cv2.Rodrigues(rotation)[0]
+    expected = cv2.projectPoints(xyz.reshape(-1, 3), rotation_vector, translation, K, None)[
+        0
+    ].reshape(-1, 2)
+    np.testing.assert_allclose(
+        errors, np.linalg.norm(expected - image_points.reshape(-1, 2), axis=1)
+    )
 
 
 def test_historical_ransac_parameters_recover_clean_pose():
