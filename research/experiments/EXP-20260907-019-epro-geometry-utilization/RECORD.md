@@ -200,3 +200,18 @@ reS/teS：Patch α0→1 `0.5306→0.5276 / 0.8023→0.8044`；RANSAC `0.5444→0
 原 evaluator decision 保持 `PROTOCOL_REPRODUCTION_FAILED_STOP`，Gate A/B 的 true
 输出同时保留。原记录按预注册协议作出的“不进入正式科学结论、不触发训练”处理不变；
 程序输出与研究判断分层，不表示本次已经完成新的研究裁决或获得新实验授权。
+
+## 2026-09-08 用户 Review 决策（并列记录，不覆盖原始输出）
+
+用户 review 判定 EXP019 为**机制通过**（Decision，用户）：α-sweep 证明 EPro-PnP 能
+稳定消费逐步改善的 XYZ（α 0→1，EPro ADD `0.5433→0.9924`、BOP `0.7009→0.9924`），
+同一数据中官方 Patch-PnP 对同样改善不响应（ADD `0.5066→0.4997`、BOP
+`0.6904→0.6837`）；历史复现 6 点偏差折算为 2–6 个 target（0.14%–0.83% 相对），低于
+该指标的二项噪声（SE 约 1.8%–2.6% 相对），视为正常运行差异，不否定机制。
+
+- 原 evaluator decision `PROTOCOL_REPRODUCTION_FAILED_STOP` 与其 gate 输出保持原样，
+  作为 Observed 保留；本节是与原始输出并列的研究判断，不改写历史 gate。
+- 用户同时决定：后续 gate 不再使用 0.001 这类绝对数值阈值，改为按指标尺度设定的
+  相对浮动（如 ±3%–±5%）；接近饱和的指标仍用绝对阈值。
+- 机制推理、文献证据与口径建议见
+  [solver-in-the-loop review](../../notes/20260908-solver-in-the-loop-review.md)。

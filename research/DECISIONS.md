@@ -26,3 +26,13 @@
   EXPERIMENT/ACCEPTANCE JSON；当前 E/F 代码直接保留，不从历史分支重新合并。
 - launcher、cache、native hydration 等上线失败只属于基础设施验证，不写成模型或
   科学实验失败；smoke 通过同样只证明执行链可用，不替代正式指标。
+- 2026-09-08 用户 review：EXP019 判定为**机制通过**（EPro-PnP 能稳定消费逐步改善的
+  XYZ；历史复现漂移属正常运行差异）。原 evaluator decision 保留为历史输出，不覆盖；
+  后续 gate 不再使用 0.001 这类绝对数值阈值，改为按指标尺度设定的相对浮动
+  （如 ±3%–±5%），重点判断机制、趋势与性能变化是否稳定成立；接近饱和的指标仍用
+  绝对阈值。口径与依据见 [review](notes/20260908-solver-in-the-loop-review.md)。
+- 2026-09-08 用户确定新研究主线：用可微 EPro-PnP 作为显式几何后端，把最终姿态监督
+  反传约束 Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），
+  使对应关系学习以“能被显式求解器正确、稳定地使用”为目标。EPro-PnP 不作为主要
+  创新点；必须与 EPRO-GDR（arXiv 2409.11819）区分，新意落在机制归因、对应关系级
+  指标与跨域。具体实验待用户安排。

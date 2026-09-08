@@ -24,6 +24,7 @@
 | `research/exp013/`, `research/exp014/`, `research/exp017/`, `research/exp017b/`, `research/exp018/` | 实验专用验证、测试与说明；可用入口见仓库地图 |
 | `research/diagnostics/pose_structure/` | 当前低成本结构诊断 |
 | `research/diagnostics/exp019_epro/` | EXP019 冻结 geometry-utilization 诊断 |
+| `research/notes/` | 文献与设计 review 记录；不产生实验指标，事实以 RECORD 为准 |
 | `docker/l40/` | L40 镜像和单一安全启动器 |
 | `output/`, `.local/` | Git 忽略的本机产物与路径资源 |
 

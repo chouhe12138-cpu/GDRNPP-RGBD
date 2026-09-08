@@ -21,9 +21,12 @@
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 - EXP019 full run `RUN-20260907-182144-full-s20260730` 已完成 1,445 targets；
-  原始 Gate A/B 均通过，历史复现 6 点中 5 点越界（容差 0.001）。原 evaluator
-  decision 为 `PROTOCOL_REPRODUCTION_FAILED_STOP`；运行完成、各项检查和研究判断
-  分开记录。本次未重新裁决，维持原“不进入正式结论、不触发训练”的处理。
+  原始 Gate A/B 均通过，历史复现 6 点中 5 点越界（原容差 0.001）。原 evaluator
+  decision `PROTOCOL_REPRODUCTION_FAILED_STOP` 保留为历史输出。2026-09-08 用户
+  review 判定**机制通过**：EPro-PnP 稳定消费逐步改善的 XYZ；漂移折算 2–6 个
+  target（0.14%–0.83% 相对），属正常运行差异。后续 gate 改用相对阈值
+  （±3%–±5%），见 [DECISIONS](DECISIONS.md) 与
+  [review](notes/20260908-solver-in-the-loop-review.md)。
 
 ## 当前代码边界
 
@@ -51,7 +54,15 @@ smoke 收口和正式 gate 确认后才进入发布/训练流程。不恢复 D�
 用户随后指定 EXP019：在历史 EXP004 的 fixed support 与 XYZ alpha sweep 上增加
 uniform-weight EPro-PnP consumer。full run `RUN-20260907-182144-full-s20260730`
 （commit `69e0e8a`）已完成全量诊断，不再是待执行任务。原始检查与 decision 如上，
-后续研究 review 尚未完成；本次整理不增加实验或训练安排。已根据 metadata 更正
-`0.7689 px` 报错属于完成 1,203 targets 的 failed full run，并补录两次完成的
-32-target smoke。详见 [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
+2026-09-08 用户 review 已判定机制通过。详见
+[EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
 与 [执行说明](exp019/README.md)。
+
+用户 2026-09-08 确定新研究主线：用可微 EPro-PnP 作为显式几何后端，把最终姿态监督
+反传约束 Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），
+使对应关系学习以“对求解器有用”为目标；EPro-PnP 不是主要创新点。当前尚未安排具体
+实验与服务器操作。工程前置项是把 EPro-PnP 与 GDRNPP 放到同进程以支持梯度反传
+（EXP019 当前因顶层 `lib` 包名冲突运行在独立 spawn 子进程）。文献对照、重合度分析与
+gate 口径见 [solver-in-the-loop review](notes/20260908-solver-in-the-loop-review.md)；
+EPRO-GDR（arXiv 2409.11819）已在方法骨架上占位，本项目新意须落在机制归因、
+对应关系级指标与跨域。
