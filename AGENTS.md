@@ -14,7 +14,7 @@
 ## 代码与环境
 
 - `core/`、`lib/`、`det/` 是上游和稳定核心，不因整理目录而大范围改写。
-- 当前研究代码集中在 EXP012、EXP013/014 和 `research/diagnostics/pose_structure/`；
+- 代码归属与入口见 [仓库地图](research/REPOSITORY_MAP.md)，当前进展见 STATUS；
   实验差异优先由 `configs/gdrn/lmo_pbr/research/` 表达。
 - 本地 Python、测试和实验命令先激活 Conda `pytorch22`；服务器深度学习任务只在
   项目 Docker 容器内运行，不修改宿主机 Python、CUDA 或全局包。
@@ -24,8 +24,8 @@
 ## 轻量实验记录
 
 - 一个科学问题使用唯一 `experiment_id`，一次执行使用唯一 `run_id`。
-- 每个实验目录只维护一份 `RECORD.md`；中央状态只维护在
-  `research/EXPERIMENT_INDEX.md`。
+- 每个实验目录只维护一份叙述性 `RECORD.md`；实验导航维护在
+  `research/EXPERIMENT_INDEX.md`，当前工作摘要维护在 `research/STATUS_CN.md`。
 - 正式记录保留：研究问题与唯一变量、experiment/run ID、协议与指标口径、配置
   路径、seed、源码 commit、checkpoint 文件名与 epoch、全部预定正式评估点的
   聚合指标、预注册 gate、结论或失败原因。
@@ -38,6 +38,30 @@
 - 运行目录必须唯一，禁止覆盖。失败运行在 RECORD 中保留原因；大型失败产物可在
   结论收口后清理。
 - train、eval、diagnostic 使用明确的配置和 checkpoint，不把 smoke 当正式结果。
+
+## 科研证据与 gate
+
+- 原始数据和客观事实优先。记录建议区分 Observed（原始指标、计数、错误与程序
+  输出）、Derived（可复算的差值、比例、相关系数）、Interpretation（解释与假设）、
+  Decision（研究决策）。派生量注明输入证据、公式及口径；解释说明证据边界。
+- 历史结论用于定位证据，不代替原始指标或干预结果继续链式推断。只有历史摘要、
+  原始产物缺失时明确说明，不把旧解释当作新的观察事实。
+- 机制实验优先检查响应关系、趋势、effect size、matched control 和跨条件稳定性；
+  单次运行不自动证明跨 run/seed 稳定。细小绝对数值偏差是否影响机制判断，应结合
+  数据完整性和可比性分析，不能仅凭越过容差就认定机制失败，也不能自动视为无害。
+- gate 建议区分：Integrity（数据、坐标、配置及评估链路完整性）、Mechanism
+  （科学问题对应的响应与效应）、Reproduction（历史复现或等价程度）、Advisory
+  （资源、效率或次要目标）。预先说明各检查的作用和失败影响；不因结果不利而把
+  原主判据降为 Advisory，也不在事后改写历史 gate。
+- 原 evaluator/gate 输出及其 decision 保留为 Observed，不自动等同于最终研究判断。
+  后续 review 可单独记录日期、依据、解释与决策，不覆盖原始输出或当时的判定；
+  原检查结果与 review 并列呈现，避免单一总标签遮蔽完整证据。
+- 紧凑原始指标、metadata 和 gate JSON 可按 run_id 随实验 RECORD 保存原样副本，
+  并注明来源；大型原始产物继续外置并记录位置。这不要求通用 evidence framework
+  或常规哈希链，也不改变数据、权重、完整日志和 secrets 不进入 Git 的边界。
+- 保持用户指令的原始强度和适用范围。“暂不加入 / 简单记录 / 默认不做”通常是
+  当前范围或默认策略，不自动强化成长期硬禁止；简单记录应减少重复，不删必要证据。
+  推荐做法与可选扩展不新增硬约束，已有明确 Git、服务器和数据安全规则保持不变。
 
 ## Git 与服务器
 

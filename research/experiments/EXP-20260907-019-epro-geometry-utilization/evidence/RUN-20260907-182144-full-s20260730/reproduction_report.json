@@ -1,0 +1,28 @@
+{
+  "status": "FAIL",
+  "absolute_tolerance": 0.001,
+  "observed": {
+    "patch_alpha0_add": 0.5065743944636678,
+    "patch_alpha0_bop": 0.690396770472895,
+    "ransac_alpha0_add": 0.5397923875432526,
+    "ransac_alpha0_bop": 0.6909480968858132,
+    "ransac_alpha1_add": 0.9923875432525952,
+    "ransac_alpha1_bop": 0.9923875432525952
+  },
+  "historical": {
+    "patch_alpha0_add": 0.50242,
+    "patch_alpha0_bop": 0.69021,
+    "ransac_alpha0_add": 0.53841,
+    "ransac_alpha0_bop": 0.69255,
+    "ransac_alpha1_add": 0.99377,
+    "ransac_alpha1_bop": 0.99377
+  },
+  "deltas": {
+    "patch_alpha0_add": 0.004154394463667832,
+    "patch_alpha0_bop": 0.00018677047289505921,
+    "ransac_alpha0_add": 0.0013823875432525945,
+    "ransac_alpha0_bop": -0.0016019031141868423,
+    "ransac_alpha1_add": -0.001382456747404892,
+    "ransac_alpha1_bop": -0.001382456747404892
+  }
+}

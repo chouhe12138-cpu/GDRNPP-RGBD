@@ -1,0 +1,25 @@
+{
+  "gate_A_gt_xyz_wiring": true,
+  "gate_B_geometry_responsiveness": true,
+  "gt_xyz": {
+    "add": 0.9923875432525952,
+    "bop": 0.9923875432525952
+  },
+  "spearman": {
+    "add": 0.9999999999999999,
+    "bop": 0.9999999999999999
+  },
+  "delta_epro": {
+    "add": 0.4491349480968858,
+    "bop": 0.2914740484429066
+  },
+  "delta_ransac": {
+    "add": 0.4525951557093425,
+    "bop": 0.301439446366782
+  },
+  "recovery_ratio": {
+    "add": 0.9923547400611622,
+    "bop": 0.9669406308829608
+  },
+  "decision": "PROTOCOL_REPRODUCTION_FAILED_STOP"
+}

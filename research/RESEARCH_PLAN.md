@@ -21,10 +21,12 @@
 
 ## 后续决策顺序
 
-1. EXP017/EXP017-B 已收口；EXP018 等待真实数据 smoke。EXP019 先以冻结诊断复核
-   显式 EPro solver 对逐步改善 geometry 的利用，不将输入干预失效直接等同于结构缺陷。
-2. EXP019 依次执行 engineering preflight、32-target smoke、历史 alpha=0/1 复现和
-   1,445-target full；该诊断不训练模型。
+1. EXP017/EXP017-B 已收口；EXP018 等待真实数据 smoke。
+2. EXP019 已完成 engineering preflight、32-target smoke 与 1,445-target full，
+   未训练模型。原始 Gate A/B 通过，历史复现六点中五点越界；原 evaluator decision
+   为 `PROTOCOL_REPRODUCTION_FAILED_STOP`，后续研究 review 尚未完成。完整事实见
+   [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)。
+   本次只更新事实进度，不重新裁决或新增、确认研究方向，也不安排新实验。
 3. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。
 4. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。

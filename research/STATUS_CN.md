@@ -21,8 +21,9 @@
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
 - EXP019 full run `RUN-20260907-182144-full-s20260730` 已完成 1,445 targets；
-  Gate A/B 通过，但历史复现 6 点中 5 点越界（容差 0.001），按协议整体裁决
-  `PROTOCOL_REPRODUCTION_FAILED_STOP`，不进入正式结论、不触发训练。
+  原始 Gate A/B 均通过，历史复现 6 点中 5 点越界（容差 0.001）。原 evaluator
+  decision 为 `PROTOCOL_REPRODUCTION_FAILED_STOP`；运行完成、各项检查和研究判断
+  分开记录。本次未重新裁决，维持原“不进入正式结论、不触发训练”的处理。
 
 ## 当前代码边界
 
@@ -43,13 +44,14 @@
 EXP017 与 EXP017-B 已以 E40 收口。用户已指定 EXP018：EXP013A initial pose 后增加一次
 Geometry-Consistency Residual correction；实现与 CPU preflight 已通过，当前等待用户
 手动真实数据 smoke。详见 [EXP018 RECORD](experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md)
-与 [实现/命令](exp018/README.md)。用户已授权本地提交并推送 GitHub；集成里程碑标签为
+与 [实现/命令](exp018/README.md)。该集成当时已获本地提交并推送 GitHub 授权；里程碑标签为
 `exp018-integration-cpu-pass`，不代表真实 smoke 或正式性能 gate 通过。没有服务器操作；
 smoke 收口和正式 gate 确认后才进入发布/训练流程。不恢复 D，不自动增加 seed。
 
 用户随后指定 EXP019：在历史 EXP004 的 fixed support 与 XYZ alpha sweep 上增加
 uniform-weight EPro-PnP consumer。full run `RUN-20260907-182144-full-s20260730`
-（commit `69e0e8a`）已完成 1,445 targets；Gate A/B 通过但历史复现 6 点中 5 点越界
-（容差 0.001），整体按协议裁决 `PROTOCOL_REPRODUCTION_FAILED_STOP`，不进入正式
-科学结论、不触发训练。详见 [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
+（commit `69e0e8a`）已完成全量诊断，不再是待执行任务。原始检查与 decision 如上，
+后续研究 review 尚未完成；本次整理不增加实验或训练安排。已根据 metadata 更正
+`0.7689 px` 报错属于完成 1,203 targets 的 failed full run，并补录两次完成的
+32-target smoke。详见 [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
 与 [执行说明](exp019/README.md)。

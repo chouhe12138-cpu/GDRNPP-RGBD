@@ -26,4 +26,4 @@
 | EXP017 Rotation Residual | COMPLETE / FAIL | E40 3/5 gate，rotation/BOP 未过 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |
 | EXP017-B Detached Adapter Geometry | COMPLETE / NO_OVERALL_GAIN | E40 rotation/BOP 略升，ADD 下降 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |
 | EXP018 Geometry-Consistency Residual | IMPLEMENTED / CPU_PREFLIGHT_PASS | A + 一次 post-decode correction，等待用户 smoke | [RECORD](experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md) |
-| EXP019 EPro Geometry Utilization | RUN_COMPLETE / PROTOCOL_REPRODUCTION_FAILED_STOP | full run 完成，历史复现 5/6 越界，未入正式结论 | [RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md) |
+| EXP019 EPro Geometry Utilization | RUN_COMPLETE | 1,445 targets；原 Gate A/B 通过，历史复现 5/6 越界；原 evaluator decision 为 PROTOCOL_REPRODUCTION_FAILED_STOP；未重新裁决、未入正式结论 | [RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md) |
