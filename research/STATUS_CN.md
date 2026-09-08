@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-07。
+最后核对：2026-09-08。
 
 ## 当前结论
 
@@ -20,8 +20,9 @@
   结论 `NO_OVERALL_GAIN`。原 B 记录未独立列出数值 gate，参照母实验门槛仅达 1/5。
 - EXP014-D 的 formal a01 因渲染器覆盖事故和 OOM 作废。EGL 修复保留，实验
   当前 `PAUSED`，没有重训授权。
-- EXP019 已按历史 EXP004 fixed shared support 接入 EPro-PnP-v2；单测、合成
-  EPro solve 与 official 模型构建通过，尚未运行真实样本或 BOP evaluation。
+- EXP019 full run `RUN-20260907-182144-full-s20260730` 已完成 1,445 targets；
+  Gate A/B 通过，但历史复现 6 点中 5 点越界（容差 0.001），按协议整体裁决
+  `PROTOCOL_REPRODUCTION_FAILED_STOP`，不进入正式结论、不触发训练。
 
 ## 当前代码边界
 
@@ -47,7 +48,8 @@ Geometry-Consistency Residual correction；实现与 CPU preflight 已通过，�
 smoke 收口和正式 gate 确认后才进入发布/训练流程。不恢复 D，不自动增加 seed。
 
 用户随后指定 EXP019：在历史 EXP004 的 fixed support 与 XYZ alpha sweep 上增加
-uniform-weight EPro-PnP consumer。实现和无真实样本 engineering preflight 已通过，
-当前等待用户手动 32-target smoke；不训练、不混入 EXP018，full 前必须提交为 clean source。
-详见 [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
+uniform-weight EPro-PnP consumer。full run `RUN-20260907-182144-full-s20260730`
+（commit `69e0e8a`）已完成 1,445 targets；Gate A/B 通过但历史复现 6 点中 5 点越界
+（容差 0.001），整体按协议裁决 `PROTOCOL_REPRODUCTION_FAILED_STOP`，不进入正式
+科学结论、不触发训练。详见 [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)
 与 [执行说明](exp019/README.md)。
