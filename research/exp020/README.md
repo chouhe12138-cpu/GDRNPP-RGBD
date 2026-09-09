@@ -88,9 +88,9 @@ loss 模块产出的 `mean_reproj_px`（来自 EventStorage），不再命名/�
 - `smoke_control.py` / `smoke_reproj.py` / `eval.py`。
 
 optimizer/LR 依据仓库最近的“从 official checkpoint fine-tune”协议（EXP013A/E 与
-PnP-only control：Ranger 8e-4、wd 0.01、warmup 200）。`REPROJ_LW=1.0` 是第一轮固定
-非零值；正式训练前可选做一次真实 batch 的 gradient-magnitude 标定，但 A/B 之间除
-`REPROJ_LW` 外必须完全一致。
+PnP-only control：Ranger 8e-4、wd 0.01、warmup 200）。真实 batch 的
+gradient-magnitude 标定已完成，未发现数量级失衡，因此 `REPROJ_LW=1.0` 保持为
+第一轮固定非零值；A/B 之间除 `REPROJ_LW` 外必须完全一致。
 
 ## 下游评价：matched classical PnP/RANSAC（review-fix 新增）
 
@@ -129,8 +129,8 @@ EPro worker 与 alpha sweep。新 evaluator：
 - Pass REPROJ：清梯度后只 backward **raw** reprojection loss
   （`loss_xyz_reproj / REPROJ_LW`），记录 `g_reproj_raw`。
 - 输出 `ratio_raw = g_reproj_raw / g_xyz` 与可选分组（shared trunk / xyz output
-  layer）norm。目的只是判断 `REPROJ_LW=1.0` 是否明显过强/过弱，不做 λ sweep；
-  实际结果出来前不自行修改 formal `REPROJ_LW`。
+  layer）norm。目的只是判断 `REPROJ_LW=1.0` 是否明显过强/过弱，不做 λ sweep。
+  实际 `ratio_raw=0.0746`，formal `REPROJ_LW` 保持 `1.0`。
 
 ## 本地执行
 
@@ -156,7 +156,7 @@ BOP_RENDERER_PATH="$PWD/.local/bop_renderer/build" \
 
 ## 状态
 
-`IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`。review-fix（2026-09-09）已完成：
+`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_FORMAL_RUN`。review-fix（2026-09-09）已完成：
 EXP020 专用 matched PnP evaluator、A/B 跨 checkpoint fixed support、reprojection
 diagnostics 修正、USE_MTL guard、gradient-scale calibration 均已实现并通过本地
 测试/smoke；**没有 formal A/B 训练**，不宣称任何性能提升。正式 A/B 训练需要用户选择

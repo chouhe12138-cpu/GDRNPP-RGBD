@@ -35,4 +35,10 @@
   反传约束 Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），
   使对应关系学习以“能被显式求解器正确、稳定地使用”为目标。EPro-PnP 不作为主要
   创新点；必须与 EPRO-GDR（arXiv 2409.11819）区分，新意落在机制归因、对应关系级
-  指标与跨域。具体实验待用户安排。
+  指标与跨域。该路线在 2026-09-09 后标为 Historical / Deferred，由下一条决策取代。
+- 2026-09-09 当前主线改为 EXP020 correspondence supervision + ordinary matched
+  PnP/RANSAC：用 GT-pose per-pixel reprojection loss 改进 correspondence producer，
+  不启动 EPro；A/B 唯一变量为 `REPROJ_LW`，formal 前固定为 0/1。
+- 2026-09-09 EXP018 以 `COMPLETE / MARGINAL_GAIN / CLOSED` 收口：E40 相对 EXP013A
+  四项均略升，但 BOP `+0.002346` 未达到设计阶段建议的 `+0.003`，且只有单 seed；
+  保留历史实现与结果，不追加实验或结构扩展，资源转入 EXP020。

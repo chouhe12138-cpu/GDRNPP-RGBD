@@ -3,6 +3,9 @@
 EXP013A 不变，增加一次 camera-frame pose-conditioned XYZ–ROI2D neural correction。
 正式状态与证据见 [RECORD](../experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md)。
 
+本路线已于 2026-09-09 以 `COMPLETE / MARGINAL_GAIN / CLOSED` 收口。下文保留实现
+契约和历史运行入口用于复核，不再表示待执行任务；不追加 smoke、formal 或结构扩展。
+
 ## 修改文件范围
 
 - 新增 `core/gdrn_modeling/models/heads/gcr_pose_corrector.py`；
@@ -58,7 +61,8 @@ predicted XYZ + ROI2D + visible confidence + K + actual image_hw + extent + R0/t
 
 新增参数 13,831，低于 0.1M；没有 sampling、跨点 convolution、Transformer、
 Region feature 输入、EXP017 adapter、PnP/RANSAC/LM、depth stats、renderer 或循环迭代。
-完整 64×64 对应保留，逐点激活开销不等同于参数开销；GPU 时间/显存尚待 smoke。
+完整 64×64 对应保留，逐点激活开销不等同于参数开销；正式运行最大显存记录约
+5,250 MiB。
 
 rotation 每分量为 `tanh(raw)*15°`，因此向量范数上限为 `sqrt(3)*15°`，
 不是严格总旋转角 15°；translation 每分量为 `tanh(raw)*0.15*mean(extent)` 米。
@@ -109,11 +113,12 @@ pixel `reprojection_residual`、clipped `residual_norm`、`support/token_weights
 已有只捕获 `pnp_net` 后直接 decode 的 α-sweep 会遗漏 correction，不能原样视为 EXP018 final。
 之后的机制干预应调用完整 model 或独立 corrector 的公开接口，明确是否固定 initial pose。
 
-## 手动 smoke
+## 历史手动 smoke 入口
 
-先做本地受限 smoke（一个真实 PBR batch、2 步 optimizer、一个 LM-O 图像前向），
+该入口曾用于本地受限 smoke（一个真实 PBR batch、2 步 optimizer、一个 LM-O 图像前向），
 检查 R/t correction 梯度、第二步内部梯度、上游冻结、checkpoint round-trip 和实际 test mapper。
-它不输出正式指标，也不替代服务器一 epoch smoke。失败 run 不复用输出目录。
+结果为 PASS；它不输出正式指标，也不替代 formal 结果。以下命令仅为历史复核入口，
+当前不安排重跑。
 
 在本地 WSL 执行，先确认显存可用：
 
@@ -131,10 +136,9 @@ echo "RESULT: ${run_dir}/result.json"
 )
 ```
 
-产物只有 `result.json` 和 `pose_debug.pt`，均为 ignored local outputs；报错时保存 FAIL 原因。
-不要用 `PYTHONOPTIMIZE` / `python -O` 禁用检查。smoke 确认后，再经用户授权提交/bundle、
-新只读 release 和 `docker/l40/experiment.sh` 进入服务器流程；本次不提供虚构 commit/release，
-也不提前启动 formal。服务器 `smoke.py` 保持原单 epoch 协议，`train.py` 才是 40 epoch。
+产物只有 `result.json` 和 `pose_debug.pt`，均为 ignored local outputs；不要用
+`PYTHONOPTIMIZE` / `python -O` 禁用检查。当时的正式训练随后已完成；run_id、全部
+预定评估点与结论见 RECORD。
 
 ## 风险与证据边界
 

@@ -9,11 +9,6 @@ branch="$(git -C "${repo_root}" symbolic-ref --quiet --short HEAD)" || {
     echo "FAIL: bundle source must be an attached branch" >&2
     exit 1
 }
-[[ "${branch}" == "main" ]] || {
-    echo "FAIL: bundle source branch must be main, got ${branch}" >&2
-    exit 1
-}
-
 status="$(git -C "${repo_root}" status --porcelain --untracked-files=all)"
 [[ -z "${status}" ]] || {
     echo "FAIL: Git working tree must be clean before bundle creation" >&2
@@ -30,7 +25,7 @@ bundle="${output_dir}/GDRNPP-RGBD-${short_sha}.bundle"
 }
 
 mkdir -p "${output_dir}"
-git -C "${repo_root}" bundle create "${bundle}" main
+git -C "${repo_root}" bundle create "${bundle}" "${branch}"
 
 verify_repo="$(mktemp -d "/tmp/gdrnpp-bundle-verify-${short_sha}.XXXXXX")"
 git -c init.defaultBranch=main -C "${verify_repo}" init --bare --quiet

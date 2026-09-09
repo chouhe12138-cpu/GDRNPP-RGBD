@@ -11,7 +11,7 @@ normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection 
 backbone/PNP_NET 冻结、GEO_HEAD trainable、pose-level losses 显式清零以隔离
 producer；无新增模型参数，官方 checkpoint strict 兼容。
 
-当前状态：`IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`。第一阶段实现
+当前状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_FORMAL_RUN`。第一阶段实现
 （commit `64e9098`）与 2026-09-09 审查修复（matched evaluator、A/B 跨 checkpoint
 fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均已完成并
 本地验证；**没有 formal A/B 训练，不宣称任何性能提升**。等待用户选择服务器实验并
@@ -39,7 +39,8 @@ fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均�
 - Gradient-scale calibration 实际运行（真实 online-geometry batch，GPU）：
   `g_xyz=4.9539`、`g_reproj_raw=0.3695`、`ratio_raw≈0.075`。REPROJ_LW 梯度比 XYZ
   三项总梯度小约 13×，同数量级；**formal `REPROJ_LW=1.0` 未修改**。
-- 测试：EXP020 40 passed；仓库回归子集 127 passed；CPU preflight A/B PASS。
+- 测试：EXP020 36 passed、仓库回归子集 127 passed（2026-09-09 本次整理均已
+  复核）；CPU preflight A/B PASS。
 
 ## Historical / Deferred：2026-09-08 EPro-PnP solver-in-the-loop 主线
 
@@ -65,6 +66,10 @@ supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
   reS `0.494348`、teS `0.800461`，结论 `SCREEN_FAIL`。
 - EXP017-B 已完成 E40：BOP `0.683686`、ADD `0.498270`、reS `0.503114`、
   teS `0.800692`，结论 `NO_OVERALL_GAIN`。
+- EXP018 formal 已完成 E40：BOP `0.686302`、ADD `0.516263`、reS `0.517647`、
+  teS `0.800461`；相对 EXP013A 四项均提高，但 BOP 仅 `+0.002346`，未达到设计
+  阶段建议的 `+0.003`。单 seed 小幅收益不足以支持继续投入，状态
+  `COMPLETE / MARGINAL_GAIN / CLOSED`。
 - EXP019 full run（1,445 targets）：原 Gate A/B 通过，历史复现 5/6 越界（原绝对
   容差 0.001）；原 evaluator decision `PROTOCOL_REPRODUCTION_FAILED_STOP` 保留为
   历史输出；2026-09-08 用户 review 判定机制通过。后续 gate 用相对阈值
@@ -72,7 +77,7 @@ supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
 
 ## 当前代码边界
 
-- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017、EXP018、EXP019
+- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017、已收口 EXP018、EXP019
   和 EXP020（实现 + review-fix）。
 - EXP020 review-fix 只改 shared 层的 loss stats/guard 与 exp020 目录；EXP019
   历史 evaluator/结果未改动。

@@ -6,10 +6,10 @@
 直接姿态头有效利用。当前论文链保持 RGB 主干与 geometry head 的可比性，不把
 早期 oracle、PBR calibration 或 smoke 指标当作正式性能结果。
 
-2026-09-08 起主线进一步聚焦：用可微 EPro-PnP 作为显式几何后端，把最终姿态监督
-反传约束 Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），
-使对应关系学习以“能被显式求解器正确、稳定地使用”为目标；EPro-PnP 不作为主要
-创新点。对照分析与文献证据见 [review](notes/20260908-solver-in-the-loop-review.md)。
+2026-09-09 起主线聚焦 EXP020：保持 continuous normalized XYZ，用 GT-pose
+per-pixel correspondence reprojection loss 直接约束 Geometry/Correspondence Head，
+再由 matched classical PnP/RANSAC 判断 producer 是否更真实、更可用。2026-09-08
+提出的 EPro-PnP solver-in-the-loop 路线保留为历史候选，当前不启动。
 
 ## 已建立的证据
 
@@ -23,25 +23,27 @@
   深度统计只获得局部改善。
 - EXP017 E40 未通过 rotation/BOP 门槛；EXP017-B 的 detach 消融仅有小幅
   rotation/BOP 提升，ADD 下降，未形成整体优势。最终结果见各自 RECORD。
+- EXP018 E40 相对 EXP013A 四项聚合指标均略升，但 BOP `+0.002346` 未达到设计阶段
+  建议的 `+0.003`；单 seed、小 effect size 不足以支持扩展，已收口。
 - EXP019 证明 matched RANSAC/EPro-PnP 能稳定消费逐步改善的 XYZ（α 0→1 单调
   改善），而官方 Patch-PnP 对同样改善不响应；用户 2026-09-08 判定该机制通过，
   并把训练信号（而非求解器本身）确定为新主线要解决的问题。
 
 ## 后续决策顺序
 
-1. EXP017/EXP017-B 已收口；EXP018 等待真实数据 smoke。
+1. EXP017/EXP017-B/EXP018 已收口，不安排追加训练或诊断。
 2. EXP019 已完成 engineering preflight、32-target smoke 与 1,445-target full，
    未训练模型。原始 Gate A/B 通过，历史复现六点中五点越界；原 evaluator decision
    为 `PROTOCOL_REPRODUCTION_FAILED_STOP`（保留为历史输出）。2026-09-08 用户
-   review 判定机制通过，并确定新主线：用可微 EPro-PnP 反传姿态监督约束
-   correspondence head；须与 EPRO-GDR 区分，新意落在机制归因、对应关系级指标与
-   跨域。完整事实见
+   review 判定机制通过。完整事实见
    [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)，
    分析与口径见 [review](notes/20260908-solver-in-the-loop-review.md)。
-   具体实验与训练仍待用户安排。
-3. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
+3. EXP020 已完成实现、review-fix、36 项实验测试、真实数据 smoke、fixed-support
+   evaluator identity/non-official smoke 与梯度尺度标定；下一步为服务器 formal A/B，
+   再做 matched PnP/RANSAC 正式评价。
+4. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。
-4. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。
+5. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。
 
 ## 结果口径
 

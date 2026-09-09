@@ -61,8 +61,8 @@ core/lib 公共工具，core 的 demo 依赖 det；GT-box 研究未经过检测�
   唯一目录规则。本次未修复代码。EXP019 evaluator 则要求新建 bop_results 目录，
   不能假设已有部分评估产物时直接重试必定成功，也不应为重试删除原始证据。
 - `docker/l40/experiment.sh` 是当前服务器 check/create/run/eval/status/logs 入口；
-  操作前遵守 [服务器安全规则](SERVER_SAFETY_CN.md)。`create_bundle.sh` 当前硬编码
-  main，与当前研究分支发布需求不一致；这是一项未修复限制，不能描述为已支持。
+  操作前遵守 [服务器安全规则](SERVER_SAFETY_CN.md)。`create_bundle.sh` 从当前已附着
+  分支生成 bundle，并强制 clean tree、唯一目标与独立 bare repo 验证。
 - `scripts/install_deps.sh`、`compile_all.sh` 是上游环境安装/编译脚本，包含包修改和
   构建清理；当前 Docker 流程不能按宿主机安装说明直接照搬。
 - `tools/process_bop_results_time.py` 会备份后原地改写 CSV；其他转换工具也会写出
