@@ -447,6 +447,7 @@ class GDRN_Lite(LightningLite):
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
+                    roi_zoom_cams=batch.get("roi_zoom_K", None),
                     depth_stats=batch.get("roi_depth_stats", None),
                     **pose_corrector_kwargs(cfg, batch),
                     do_loss=True,

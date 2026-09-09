@@ -10,6 +10,7 @@ from detectron2.utils.events import get_event_storage
 from mmcv.runner import load_checkpoint
 
 from ..losses.coor_cross_entropy import CrossEntropyHeatmapLoss
+from ..losses.correspondence_reprojection_loss import correspondence_reprojection_loss
 from ..losses.l2_loss import L2Loss
 from ..losses.mask_losses import weighted_ex_loss_probs, soft_dice_loss
 from ..losses.pm_loss import PyPMLoss
@@ -117,6 +118,7 @@ class GDRN_DoubleMask(nn.Module):
         do_loss=False,
         roi_image_hw=None,
         return_pose_debug=False,
+        roi_zoom_cams=None,
     ):
         cfg = self.cfg
         net_cfg = cfg.MODEL.POSE_NET
@@ -128,6 +130,24 @@ class GDRN_DoubleMask(nn.Module):
                 "GEO_HEAD.TRAIN_SUPERVISION=False requires GEO_HEAD.FREEZE=True; "
                 "enable geometry supervision before unfreezing the geometry head."
             )
+
+        # EXP020: fail fast before any heavy forward work when the reprojection
+        # loss is requested but its required inputs are not available.
+        loss_cfg = net_cfg.LOSS_CFG
+        reproj_lw = float(loss_cfg.get("REPROJ_LW", 0.0))
+        if do_loss and reproj_lw > 0:
+            if roi_zoom_cams is None:
+                raise ValueError(
+                    "REPROJ_LW>0 requires the online crop-resized camera matrix "
+                    "(roi_zoom_cams) for the correspondence reprojection loss"
+                )
+            if loss_cfg.XYZ_LOSS_TYPE != "L1":
+                raise ValueError(
+                    "REPROJ_LW>0 requires continuous XYZ supervision "
+                    "(XYZ_LOSS_TYPE='L1'); got "
+                    f"{loss_cfg.XYZ_LOSS_TYPE!r}. The first EXP020 version does "
+                    "not support CE/bin XYZ with the reprojection loss."
+                )
 
         device = x.device
         bs = x.shape[0]
@@ -313,6 +333,7 @@ class GDRN_DoubleMask(nn.Module):
                 "vis/tz_rel_gt": gt_trans_ratio[0, 2].detach().item(),
             }
 
+            vis_extra = {}
             loss_dict = self.gdrn_loss(
                 cfg=self.cfg,
                 out_mask_vis=vis_mask,
@@ -339,7 +360,10 @@ class GDRN_DoubleMask(nn.Module):
                 sym_infos=sym_infos,
                 extents=roi_extents,
                 # roi_classes=roi_classes,
+                roi_zoom_cams=roi_zoom_cams,
+                vis_extra=vis_extra,
             )
+            vis_dict.update(vis_extra)
 
             if net_cfg.USE_MTL:
                 for _name in self.loss_names:
@@ -382,6 +406,8 @@ class GDRN_DoubleMask(nn.Module):
         gt_points=None,
         sym_infos=None,
         extents=None,
+        roi_zoom_cams=None,
+        vis_extra=None,
     ):
         net_cfg = cfg.MODEL.POSE_NET
         g_head_cfg = net_cfg.GEO_HEAD
@@ -396,6 +422,41 @@ class GDRN_DoubleMask(nn.Module):
         if not g_head_cfg.FREEZE:
             xyz_loss_type = loss_cfg.XYZ_LOSS_TYPE
             gt_mask_xyz = gt_masks[loss_cfg.XYZ_LOSS_MASK_GT]
+
+            # correspondence reprojection loss (EXP020) -----------------------
+            # Supervises that the predicted 3D point at each output pixel, when
+            # projected under the GT pose with the crop-resized camera matrix,
+            # lands back on that same output pixel. REPROJ_LW==0 keeps the old
+            # graph/log behaviour; REPROJ_LW>0 fails fast when the required
+            # inputs are missing or XYZ is a CE/bin representation (logits are
+            # not a continuous XYZ that can be reprojected).
+            reproj_lw = float(loss_cfg.get("REPROJ_LW", 0.0))
+            if reproj_lw > 0:
+                if roi_zoom_cams is None:
+                    raise ValueError(
+                        "REPROJ_LW>0 requires roi_zoom_cams (online crop-resized "
+                        "camera matrix) for the reprojection loss"
+                    )
+                if xyz_loss_type != "L1":
+                    raise ValueError(
+                        "REPROJ_LW>0 requires XYZ_LOSS_TYPE='L1'; got "
+                        f"{xyz_loss_type!r}. CE/bin XYZ with the reprojection "
+                        "loss is not supported in EXP020 phase 1."
+                    )
+                if (gt_rot is None) or (gt_trans is None) or (extents is None):
+                    raise ValueError(
+                        "REPROJ_LW>0 requires GT pose (gt_rot/gt_trans) and "
+                        "extents in gdrn_loss"
+                    )
+                reproj_mask_gt = (
+                    loss_cfg.get("REPROJ_LOSS_MASK_GT", None) or loss_cfg.XYZ_LOSS_MASK_GT
+                )
+                gt_mask_reproj = gt_masks.get(reproj_mask_gt)
+                if gt_mask_reproj is None:
+                    raise ValueError(
+                        f"REPROJ_LW>0 mask GT {reproj_mask_gt!r} is not available"
+                    )
+
             if xyz_loss_type == "L1":
                 loss_func = nn.L1Loss(reduction="sum")
                 loss_dict["loss_coor_x"] = loss_func(
@@ -424,6 +485,27 @@ class GDRN_DoubleMask(nn.Module):
             loss_dict["loss_coor_x"] *= loss_cfg.XYZ_LW
             loss_dict["loss_coor_y"] *= loss_cfg.XYZ_LW
             loss_dict["loss_coor_z"] *= loss_cfg.XYZ_LW
+
+            if reproj_lw > 0:
+                pred_xyz_norm = torch.cat([out_x, out_y, out_z], dim=1)
+                loss_xyz_reproj, reproj_stats = correspondence_reprojection_loss(
+                    pred_xyz_norm=pred_xyz_norm,
+                    extents=extents,
+                    gt_rot=gt_rot,
+                    gt_trans=gt_trans,
+                    crop_K=roi_zoom_cams,
+                    valid_mask=gt_mask_reproj,
+                    loss_type=loss_cfg.get("REPROJ_LOSS_TYPE", "smooth_l1"),
+                    smooth_l1_beta_px=loss_cfg.get("REPROJ_SMOOTH_L1_BETA", 1.0),
+                    normalize_by_res=loss_cfg.get("REPROJ_NORMALIZE_BY_RES", True),
+                    z_eps=loss_cfg.get("REPROJ_Z_EPS", 1e-6),
+                )
+                loss_dict["loss_xyz_reproj"] = loss_xyz_reproj * reproj_lw
+                if vis_extra is not None:
+                    vis_extra["vis/reproj_px"] = float(reproj_stats["mean_reproj_px"])
+                    vis_extra["vis/reproj_valid_ratio"] = float(
+                        reproj_stats["valid_ratio"]
+                    )
 
         # mask loss ----------------------------------
         if not g_head_cfg.FREEZE:
