@@ -1,8 +1,18 @@
 # 当前研究状态
 
-最后核对：2026-09-08。
+最后核对：2026-09-09。
 
 ## 当前结论
+
+- EXP020（第一阶段实现完成）加入一个新增变量：GT-pose-based per-pixel
+  correspondence reprojection loss，唯一核心变量是 `REPROJ_LW`（A=0，B=1）。
+  backbone/PNP_NET 冻结、GEO_HEAD trainable，pose-level losses 全部显式关闭以
+  隔离 producer；无任何模型参数新增，官方 checkpoint strict 兼容。
+  `IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`：纯 loss 单测、gdrn_loss
+  接线、A/B config、CPU preflight 与 GPU 真实数据 smoke 均通过；没有 formal 训练，
+  不宣称性能提升。实现 commit `64e9098`，详见 [EXP020 RECORD]
+  (experiments/EXP-20260909-020-geometry-aware-correspondence-loss/RECORD.md) 与
+  [exp020 说明](exp020/README.md)。
 
 - EXP012 已完成 40 epoch，E40 BOP AR `0.678800`、ADD(-S) `0.494118`、
   AR_reS `0.491349`、AR_teS `0.791926`，是 EXP013 的固定比较基准。
@@ -43,6 +53,15 @@
   `docker/l40/experiment.sh`；本次没有服务器操作。
 
 ## 下一步
+
+用户 2026-09-09 指定 EXP020（第一阶段）：在保留当前 continuous XYZ 的前提下加入
+GT-pose correspondence reprojection supervision，研究 correspondence producer 的
+监督（EXP019 已证明 solver 不是主瓶颈）。实现、配置、测试、CPU preflight 与 GPU
+真实数据 smoke 均完成（commit `64e9098`），状态 `IMPLEMENTED / LOCAL_TEST_PASS /
+AWAITING_FORMAL_RUN`；尚未训练，不宣称性能提升。等待用户选择服务器实验并授权
+`docker/l40/experiment.sh` 的 smoke/formal A/B 运行；主下游评价复用 EXP019 的
+matched classical PnP/RANSAC consumer。详见 [EXP020 RECORD]
+(experiments/EXP-20260909-020-geometry-aware-correspondence-loss/RECORD.md)。
 
 EXP017 与 EXP017-B 已以 E40 收口。用户已指定 EXP018：EXP013A initial pose 后增加一次
 Geometry-Consistency Residual correction；实现与 CPU preflight 已通过，当前等待用户

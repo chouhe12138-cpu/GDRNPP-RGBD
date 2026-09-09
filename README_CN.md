@@ -21,7 +21,7 @@
 | `configs/` | 上游配置及当前研究配置 |
 | `research/experiments/` | 每个实验唯一的 `RECORD.md` |
 | `research/next_pose_head/` | EXP012 preflight 与测试；模型实现在 core |
-| `research/exp013/`, `research/exp014/`, `research/exp017/`, `research/exp017b/`, `research/exp018/` | 实验专用验证、测试与说明；可用入口见仓库地图 |
+| `research/exp013/`, `research/exp014/`, `research/exp017/`, `research/exp017b/`, `research/exp018/`, `research/exp019/`, `research/exp020/` | 实验专用验证、测试与说明；可用入口见仓库地图 |
 | `research/diagnostics/pose_structure/` | 当前低成本结构诊断 |
 | `research/diagnostics/exp019_epro/` | EXP019 冻结 geometry-utilization 诊断 |
 | `research/notes/` | 文献与设计 review 记录；不产生实验指标，事实以 RECORD 为准 |
