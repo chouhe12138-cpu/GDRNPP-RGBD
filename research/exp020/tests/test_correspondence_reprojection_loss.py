@@ -169,3 +169,66 @@ def test_unsupported_loss_type_raises():
         correspondence_reprojection_loss(
             pred, extents, rot, trans, K, mask, loss_type="huber"
         )
+
+
+def test_valid_ratio_uses_gt_foreground_denominator():
+    # Only the left half of the map is GT foreground, and every foreground
+    # pixel is GT-consistent (projects back onto its own output pixel), so
+    # valid_ratio must be 1.0 against the foreground denominator -- the old
+    # full-grid mean() would have reported 0.5.
+    pred, extents, rot, trans, K, mask = _exact_case(height=4, width=6)
+    h, w = pred.shape[2], pred.shape[3]
+    gt_fg = torch.zeros((1, h, w))
+    gt_fg[:, :, : w // 2] = 1.0
+    loss, stats = correspondence_reprojection_loss(
+        pred, extents, rot, trans, K, gt_fg, normalize_by_res=False
+    )
+    assert float(loss) < 1e-7
+    assert int(stats["valid_count"]) == h * (w // 2)
+    assert int(stats["gt_foreground_count"]) == h * (w // 2)
+    assert float(stats["valid_ratio"]) == pytest.approx(1.0)
+    assert float(stats["positive_depth_ratio_on_gt_fg"]) == pytest.approx(1.0)
+    assert float(stats["behind_camera_ratio_on_gt_fg"]) == pytest.approx(0.0)
+
+
+def test_positive_and_behind_camera_ratios_split_on_gt_fg():
+    # On the right half of the GT foreground the predicted point lies behind
+    # the camera (z_obj = -3, t_z = +2), so those pixels leave the loss mask
+    # while remaining part of the GT-foreground denominator.
+    pred, extents, rot, trans, K, mask = _exact_case(height=4, width=6)
+    h, w = pred.shape[2], pred.shape[3]
+    pred = pred.clone()
+    pred[:, 2, :, w // 2 :] = -2.5  # xyz_obj_z = -3 -> camera z = -1
+    loss, stats = correspondence_reprojection_loss(
+        pred, extents, rot, trans, K, mask, normalize_by_res=False
+    )
+    assert torch.isfinite(loss)
+    total_fg = h * w
+    assert int(stats["gt_foreground_count"]) == total_fg
+    assert int(stats["valid_count"]) == h * (w // 2)
+    assert float(stats["valid_ratio"]) == pytest.approx((w // 2) / w)
+    assert float(stats["positive_depth_ratio_on_gt_fg"]) == pytest.approx((w // 2) / w)
+    assert float(stats["behind_camera_ratio_on_gt_fg"]) == pytest.approx((w // 2) / w)
+    assert float(stats["valid_ratio"] + stats["behind_camera_ratio_on_gt_fg"]) == pytest.approx(
+        1.0
+    )
+
+
+def test_mean_reproj_px_is_euclidean_pixel_error():
+    # mean_reproj_px must be the true per-pixel Euclidean reprojection error,
+    # independent of the SmoothL1 reduction, resolution normalisation and loss
+    # weight.  A uniform +1 px (u direction) shift must report ~1 px.
+    pred, extents, rot, trans, K, mask = _exact_case(height=4, width=5)
+    pred = pred.clone()
+    pred[:, 0] += 0.02  # x_obj shift: dx_px = fx * dx / z = 100 * 0.02 / 2 = 1 px
+    raw_loss, stats = correspondence_reprojection_loss(
+        pred, extents, rot, trans, K, mask, normalize_by_res=False
+    )
+    _, stats_norm = correspondence_reprojection_loss(
+        pred, extents, rot, trans, K, mask, normalize_by_res=True
+    )
+    assert float(stats["mean_reproj_px"]) == pytest.approx(1.0, abs=1e-4)
+    # Normalisation changes the loss scalar but never the reported pixel error.
+    assert float(stats_norm["mean_reproj_px"]) == pytest.approx(1.0, abs=1e-4)
+    assert float(raw_loss) > 0.0
+    assert float(stats["mean_reproj_px"]) != float(raw_loss)

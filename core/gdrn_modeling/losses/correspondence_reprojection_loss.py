@@ -165,8 +165,14 @@ def correspondence_reprojection_loss(
 
     Returns:
         loss: scalar ``[0, inf)``; an empty valid set yields a connected zero.
-        stats: ``mean_reproj_px`` (output pixels), ``valid_ratio``,
-            ``valid_count`` (all detached).
+        stats (all detached): ``mean_reproj_px`` Euclidean mean over the loss
+        mask's valid pixels, in output pixels; ``valid_count`` loss-valid
+        pixels; ``gt_foreground_count`` foreground pixels of ``valid_mask``;
+        ``valid_ratio`` = ``valid_count / gt_foreground_count``;
+        ``positive_depth_ratio_on_gt_fg`` / ``behind_camera_ratio_on_gt_fg``
+        = the share of GT-foreground pixels whose predicted point is in front
+        of / at or behind the camera (non-positive camera depth under the GT
+        pose, which also captures non-finite predictions).
     """
     b, h, w = _validate_shapes(
         pred_xyz_norm, extents, gt_rot, gt_trans, crop_K, valid_mask
@@ -196,16 +202,31 @@ def correspondence_reprojection_loss(
     )
 
     finite = torch.isfinite(uv_pred).all(dim=-1)
-    valid = (valid_mask > 0.5) & positive_depth & finite
+    gt_fg = valid_mask > 0.5
+    valid = gt_fg & positive_depth & finite
+
+    # Diagnostics are computed before the empty-mask branch so they stay
+    # meaningful even when no pixel is loss-valid (e.g. all GT foreground is
+    # predicted behind the camera).  The loss mask itself is unchanged.
+    with torch.no_grad():
+        gt_fg_count = gt_fg.sum()
+        gt_fg_denom = gt_fg_count.clamp(min=1)
+        stats = {
+            "valid_count": valid.sum(),
+            "gt_foreground_count": gt_fg_count,
+            "valid_ratio": valid.float().sum() / gt_fg_denom.float(),
+            "positive_depth_ratio_on_gt_fg": (
+                (gt_fg & positive_depth).float().sum() / gt_fg_denom.float()
+            ),
+            "behind_camera_ratio_on_gt_fg": (
+                (gt_fg & ~positive_depth).float().sum() / gt_fg_denom.float()
+            ),
+        }
 
     # Keep a connected zero so backward() stays valid for an empty mask.
     if not torch.any(valid):
         zero = pred_xyz_norm.sum() * 0.0
-        stats = {
-            "mean_reproj_px": zero.detach(),
-            "valid_ratio": valid.float().mean().detach(),
-            "valid_count": valid.sum().detach(),
-        }
+        stats["mean_reproj_px"] = zero.detach()
         return zero, stats
 
     pred_valid = uv_pred[valid]
@@ -229,10 +250,6 @@ def correspondence_reprojection_loss(
 
     with torch.no_grad():
         px_error = torch.linalg.vector_norm(pred_valid - target_valid, dim=-1)
-        stats = {
-            "mean_reproj_px": px_error.mean(),
-            "valid_ratio": valid.float().mean(),
-            "valid_count": valid.sum(),
-        }
+        stats["mean_reproj_px"] = px_error.mean()
 
     return loss, stats

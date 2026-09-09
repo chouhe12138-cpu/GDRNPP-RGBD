@@ -210,3 +210,29 @@ def test_reproj_gt_consistent_prediction_is_near_zero_through_gdrn_loss():
     # All geometry targets coincide, so only the reprojection term matters and
     # it must be at the machine-precision floor (background has no gradient).
     assert float(loss_dict["loss_xyz_reproj"]) < 1e-6
+
+
+def test_use_mtl_true_with_reproj_positive_fails_fast():
+    # loss_xyz_reproj has no trainable log_var_xyz_reproj, so uncertainty
+    # multi-task weighting is undefined for it: REPROJ_LW>0 && USE_MTL=True
+    # must raise NotImplementedError before any loss is computed.
+    cfg = _load(REPROJ_CONFIG)
+    cfg.MODEL.POSE_NET.USE_MTL = True
+    t = _make_tensors()
+    with pytest.raises(NotImplementedError, match="USE_MTL"):
+        _loss(cfg, t, roi_zoom_cams=_crop_k(2, 16, 16))
+
+
+def test_use_mtl_true_with_reproj_zero_stays_legacy():
+    # REPROJ_LW=0 keeps the historical path untouched; the MTL guard is not
+    # triggered because no reprojection key is emitted.
+    cfg = _load(CONTROL_CONFIG)
+    cfg.MODEL.POSE_NET.USE_MTL = False
+    t = _make_tensors()
+    loss_dict = _loss(cfg, t, roi_zoom_cams=None)
+    assert "loss_xyz_reproj" not in loss_dict
+    assert set(loss_dict) >= {
+        "loss_coor_x",
+        "loss_coor_y",
+        "loss_coor_z",
+    }

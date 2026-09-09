@@ -15,7 +15,7 @@ from pathlib import Path
 
 import torch
 from detectron2.data import MetadataCatalog
-from detectron2.utils.events import EventStorage
+from detectron2.utils.events import EventStorage, get_event_storage
 from mmcv import Config
 
 import ref
@@ -150,8 +150,33 @@ def run_arm(
             optimizer.zero_grad(set_to_none=True)
             kwargs = make_model_kwargs(batch, do_loss=True)
             kwargs["roi_zoom_cams"] = batch.get("roi_zoom_K", None)
+            reproj_diag = None
             with EventStorage(step):
                 _out, loss_dict = model(model_input_from_batch(cfg, batch), **kwargs)
+                # gdrn_loss pushes the loss module's own diagnostics through
+                # EventStorage; read the latest values (loss value stays in
+                # loss_dict). ``vis/reproj_px`` is the module-computed Euclidean
+                # mean pixel error -- never ``loss_xyz_reproj * 64``.
+                if expected_lw > 0:
+                    latest = get_event_storage().latest()
+                    reproj_diag = {
+                        "reproj_loss": float(
+                            loss_dict["loss_xyz_reproj"].detach().cpu()
+                        ),
+                        "mean_reproj_px": latest.get("vis/reproj_px", (None, 0))[0],
+                        "valid_ratio": latest.get(
+                            "vis/reproj_valid_ratio", (None, 0)
+                        )[0],
+                        "gt_foreground_count": latest.get(
+                            "vis/reproj_gt_fg_count", (None, 0)
+                        )[0],
+                        "positive_depth_ratio_on_gt_fg": latest.get(
+                            "vis/reproj_positive_depth_ratio", (None, 0)
+                        )[0],
+                        "behind_camera_ratio_on_gt_fg": latest.get(
+                            "vis/reproj_behind_camera_ratio", (None, 0)
+                        )[0],
+                    }
             keys = set(loss_dict)
             if expected_lw > 0:
                 if "loss_xyz_reproj" not in keys:
@@ -188,9 +213,7 @@ def run_arm(
                     "step": step,
                     "total_loss": float(total.detach().cpu()),
                     "loss_keys": sorted(keys),
-                    "reproj_px_loss": float(loss_dict["loss_xyz_reproj"].detach().cpu())
-                    if "loss_xyz_reproj" in loss_dict
-                    else None,
+                    "reproj": reproj_diag,
                 }
             )
         return {

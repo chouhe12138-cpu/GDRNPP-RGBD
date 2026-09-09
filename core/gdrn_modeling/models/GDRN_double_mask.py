@@ -136,6 +136,12 @@ class GDRN_DoubleMask(nn.Module):
         loss_cfg = net_cfg.LOSS_CFG
         reproj_lw = float(loss_cfg.get("REPROJ_LW", 0.0))
         if do_loss and reproj_lw > 0:
+            if bool(net_cfg.get("USE_MTL", False)):
+                raise NotImplementedError(
+                    "EXP020 reprojection loss does not support USE_MTL=True: "
+                    "loss_xyz_reproj has no trainable log_var_xyz_reproj, so "
+                    "uncertainty multi-task weighting is not defined for it"
+                )
             if roi_zoom_cams is None:
                 raise ValueError(
                     "REPROJ_LW>0 requires the online crop-resized camera matrix "
@@ -432,6 +438,12 @@ class GDRN_DoubleMask(nn.Module):
             # not a continuous XYZ that can be reprojected).
             reproj_lw = float(loss_cfg.get("REPROJ_LW", 0.0))
             if reproj_lw > 0:
+                if bool(net_cfg.get("USE_MTL", False)):
+                    raise NotImplementedError(
+                        "EXP020 reprojection loss does not support USE_MTL=True: "
+                        "loss_xyz_reproj has no trainable log_var_xyz_reproj, so "
+                        "uncertainty multi-task weighting is not defined for it"
+                    )
                 if roi_zoom_cams is None:
                     raise ValueError(
                         "REPROJ_LW>0 requires roi_zoom_cams (online crop-resized "
@@ -505,6 +517,15 @@ class GDRN_DoubleMask(nn.Module):
                     vis_extra["vis/reproj_px"] = float(reproj_stats["mean_reproj_px"])
                     vis_extra["vis/reproj_valid_ratio"] = float(
                         reproj_stats["valid_ratio"]
+                    )
+                    vis_extra["vis/reproj_gt_fg_count"] = float(
+                        reproj_stats["gt_foreground_count"]
+                    )
+                    vis_extra["vis/reproj_positive_depth_ratio"] = float(
+                        reproj_stats["positive_depth_ratio_on_gt_fg"]
+                    )
+                    vis_extra["vis/reproj_behind_camera_ratio"] = float(
+                        reproj_stats["behind_camera_ratio_on_gt_fg"]
                     )
 
         # mask loss ----------------------------------
