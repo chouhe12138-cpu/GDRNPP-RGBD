@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from core.base_data_loader import resolve_bg_cache_path
 from core.gdrn_modeling.datasets.lmo_bop_test import resolve_dataset_cache_root
+from lib.egl_renderer.glutils.meshutil import resolve_mesh_cache_dir
 
 
 def test_bg_cache_uses_xdg_cache_home_when_set(tmp_path):
@@ -18,3 +19,15 @@ def test_lmo_dataset_cache_keeps_separate_gdrn_contract(tmp_path):
     assert resolve_dataset_cache_root(
         {"GDRN_DATASET_CACHE_DIR": str(tmp_path)}
     ) == str(tmp_path)
+
+
+def test_egl_mesh_cache_uses_xdg_cache_home_for_read_only_checkout(tmp_path):
+    assert resolve_mesh_cache_dir(environ={"XDG_CACHE_HOME": str(tmp_path)}) == str(
+        tmp_path / "gdrnpp_egl_meshes"
+    )
+
+
+def test_egl_mesh_cache_preserves_explicit_path_and_legacy_fallback(tmp_path):
+    explicit = tmp_path / "explicit"
+    assert resolve_mesh_cache_dir(str(explicit), environ={}) == str(explicit)
+    assert resolve_mesh_cache_dir(environ={}) == ".cache"

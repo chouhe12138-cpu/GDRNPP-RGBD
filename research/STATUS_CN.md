@@ -19,6 +19,11 @@ fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均�
 重跑 A/B smoke。BOP evaluation renderer 仍为 CPP，以保持指标口径。**没有有效
 formal A/B 训练，不宣称任何性能提升**。
 
+修正后的首轮 EGL server smoke 已确认 CUDA device 0 上 EGL 1.5 context 能创建，但
+PLY mesh cache 默认写入只读源码根目录 `.cache` 而失败。默认 EGL mesh cache 已接入
+launcher 提供的可写 `XDG_CACHE_HOME`，当前等待新 release 重跑 A/B smoke；该失败
+run 不进入科学结论。
+
 ### 审查修复后的关键事实（2026-09-09，Observed）
 
 - `research/exp020/matched_pnp_eval.py`：EXP020 专用 matched classical

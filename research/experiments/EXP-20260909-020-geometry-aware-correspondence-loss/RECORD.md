@@ -90,6 +90,17 @@ smoke gate。修正将 A/B 共用 `XYZ_RENDERER` 改为 EGL，不改变唯一变
 基础设施缺陷改为用 `docker top` 拒绝容器内除 PID 1 `sleep infinity` 外的任何进程；
 旧 run 输出仍保留，修复不改变模型或 A/B 科学变量。
 
+修正后的首轮 EGL smoke 中，B run
+`RUN-20260909-113749-smoke-s42-a01` 在 EGL context 创建后、加载首个 PLY 时失败：
+`load_mesh_sixd()` 尝试在只读源码挂载根目录创建相对路径 `.cache`，触发
+`OSError: [Errno 30] Read-only file system: '.cache'`。这是运行缓存路径缺陷，不是
+EGL/CUDA 初始化失败；日志已显示 CUDA device 0 上的 EGL 1.5 context 创建成功。
+现将未显式指定的 EGL mesh cache 解析到
+`${XDG_CACHE_HOME}/gdrnpp_egl_meshes`；服务器 launcher 已将 `XDG_CACHE_HOME` 设为
+可写的 `/home/gdrn/.cache` 并挂载项目 cache。显式 `cache_dir` 保持原语义，本地未设
+XDG 时保持 `.cache` 兼容行为。该失败 run 不进入科学结论，修复后需重新执行 A/B
+smoke。
+
 ## 当前状态与待运行项
 
 状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。
