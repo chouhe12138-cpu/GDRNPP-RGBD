@@ -1,5 +1,5 @@
 import importlib
-from functools import partial
+from contextlib import contextmanager
 import os
 import os.path as osp
 import sys
@@ -98,14 +98,20 @@ def resolve_egl_mesh_cache_dir(environ=None):
     return osp.join(osp.abspath(osp.expanduser(xdg_cache_home)), "gdrnpp_egl_meshes")
 
 
-def configure_egl_mesh_cache(renderer, mesh_loader, environ=None):
-    """Inject a cache-aware loader without changing the native EGL package."""
+@contextmanager
+def egl_mesh_cache_working_directory(environ=None):
+    """Resolve all relative EGL loader caches under the writable runtime cache."""
     cache_dir = resolve_egl_mesh_cache_dir(environ)
     if cache_dir is None:
-        return None
+        yield None
+        return
     os.makedirs(cache_dir, exist_ok=True)
-    renderer.model_load_fn = partial(mesh_loader, cache_dir=cache_dir)
-    return cache_dir
+    original_dir = os.getcwd()
+    os.chdir(cache_dir)
+    try:
+        yield cache_dir
+    finally:
+        os.chdir(original_dir)
 
 
 def training_geometry_renderer_type(cfg):
@@ -446,31 +452,28 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
     # Importing it lazily lets local smoke tests use an existing bop_renderer
     # build without requiring the unrelated PyOpenGL extension.
     from lib.egl_renderer.egl_renderer_v3 import EGLRenderer
-    from lib.egl_renderer.glutils.meshutil import load_mesh_sixd
 
     texture_paths = None
     if data_ref.texture_paths is not None:
         texture_paths = [osp.join(model_dir, "obj_{:06d}.png".format(obj_id)) for obj_id in obj_ids]
 
-    ren = EGLRenderer(
-        model_paths=None,
-        texture_paths=texture_paths,
-        vertex_scale=data_ref.vertex_scale,
-        znear=data_ref.zNear,
-        zfar=data_ref.zFar,
-        K=data_ref.camera_matrix,  # may override later
-        height=cfg.MODEL.POSE_NET.OUTPUT_RES,
-        width=cfg.MODEL.POSE_NET.OUTPUT_RES,
-        gpu_id=gpu_id,
-        use_cache=True,
-    )
-    configure_egl_mesh_cache(ren, load_mesh_sixd)
-    ren.load_objects(
-        model_paths,
-        texture_paths,
-        model_colors=None,
-        vertex_scale=data_ref.vertex_scale,
-    )
+    # meshutil has two nested loaders with independent relative `.cache`
+    # defaults. EGL loads all models synchronously here, before dataloader
+    # workers start, so resolving cwd under XDG_CACHE_HOME keeps both caches
+    # writable without changing the image-bound native package.
+    with egl_mesh_cache_working_directory():
+        ren = EGLRenderer(
+            model_paths,
+            texture_paths=texture_paths,
+            vertex_scale=data_ref.vertex_scale,
+            znear=data_ref.zNear,
+            zfar=data_ref.zFar,
+            K=data_ref.camera_matrix,  # may override later
+            height=cfg.MODEL.POSE_NET.OUTPUT_RES,
+            width=cfg.MODEL.POSE_NET.OUTPUT_RES,
+            gpu_id=gpu_id,
+            use_cache=True,
+        )
     return ren
 
 

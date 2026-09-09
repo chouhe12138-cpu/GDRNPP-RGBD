@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from core.base_data_loader import resolve_bg_cache_path
 from core.gdrn_modeling.datasets.lmo_bop_test import resolve_dataset_cache_root
 from core.gdrn_modeling.engine.engine_utils import (
-    configure_egl_mesh_cache,
+    egl_mesh_cache_working_directory,
     resolve_egl_mesh_cache_dir,
 )
 
@@ -30,20 +34,21 @@ def test_egl_mesh_cache_uses_xdg_cache_home_for_read_only_checkout(tmp_path):
     )
 
 
-def test_egl_mesh_cache_injects_loader_and_preserves_legacy_fallback(tmp_path):
-    class Renderer:
-        model_load_fn = None
+def test_egl_mesh_cache_redirects_nested_relative_caches_and_restores_cwd(tmp_path):
+    original_dir = Path.cwd()
+    with egl_mesh_cache_working_directory(
+        environ={"XDG_CACHE_HOME": str(tmp_path)}
+    ) as cache_dir:
+        assert Path.cwd() == tmp_path / "gdrnpp_egl_meshes"
+        assert Path(".cache").resolve() == Path(cache_dir) / ".cache"
+    assert Path.cwd() == original_dir
 
-    def loader(model_path, cache_dir=None):
-        return model_path, cache_dir
 
-    renderer = Renderer()
-    cache_dir = configure_egl_mesh_cache(
-        renderer, loader, environ={"XDG_CACHE_HOME": str(tmp_path)}
-    )
-    assert cache_dir == str(tmp_path / "gdrnpp_egl_meshes")
-    assert renderer.model_load_fn("model.ply") == ("model.ply", cache_dir)
-
-    untouched = Renderer()
-    assert configure_egl_mesh_cache(untouched, loader, environ={}) is None
-    assert untouched.model_load_fn is None
+def test_egl_mesh_cache_restores_cwd_after_loader_error(tmp_path):
+    original_dir = Path.cwd()
+    with pytest.raises(RuntimeError, match="loader failed"):
+        with egl_mesh_cache_working_directory(
+            environ={"XDG_CACHE_HOME": str(tmp_path)}
+        ):
+            raise RuntimeError("loader failed")
+    assert Path.cwd() == original_dir
