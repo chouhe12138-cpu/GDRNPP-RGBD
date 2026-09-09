@@ -10,9 +10,9 @@
 |---|---|---|
 | 上游与稳定代码 | `core/`、`lib/`、`det/` | 模型、数据、训练/评估、几何、renderer/native 和检测器；core 并非纯上游快照 |
 | 已集成研究扩展 | `core/gdrn_modeling/models/heads/` | hierarchical、EXP013、GLM、EXP017/B、GCR、official random 等 head；保留原 registry 和 checkpoint 路径 |
-| EXP020 几何重投影监督 | `core/gdrn_modeling/losses/correspondence_reprojection_loss.py` | EXP020 纯 Tensor loss；经 `GDRN_double_mask.gdrn_loss`/`engine` 透传在线 `roi_zoom_K`；不新增模型参数 |
+| EXP020 几何重投影监督 | `core/gdrn_modeling/losses/correspondence_reprojection_loss.py` | EXP020 纯 Tensor loss；经 `GDRN_double_mask.gdrn_loss`/`engine` 透传在线 `roi_zoom_K`；不新增模型参数。stats 区分 loss 值与真实 `mean_reproj_px`；`valid_ratio` 以 GT foreground 为分母；`REPROJ_LW>0 && USE_MTL=True` fail-fast |
 | 研究集成点 | `core/gdrn_modeling/models/`、`datasets/`、`engine/` | 模型工厂和 GDRN_double_mask 接线；F 深度统计、GCR image_hw/pose/loss 传递；早期 CPM/quality 接线仍存在 |
-| 实验专用验证 | `research/next_pose_head/`、`exp013/`、`exp014/`、`exp017/`、`exp017b/`、`exp018/`、`exp019/`、`exp020/` | preflight、测试和说明；next_pose_head 对应 EXP012；真实 smoke 入口在 EXP017/018；EXP020 含 preflight 与 real_smoke |
+| 实验专用验证 | `research/next_pose_head/`、`exp013/`、`exp014/`、`exp017/`、`exp017b/`、`exp018/`、`exp019/`、`exp020/` | preflight、测试和说明；next_pose_head 对应 EXP012；真实 smoke 入口在 EXP017/018；EXP020 含 preflight、real_smoke、`matched_pnp_eval.py`（主下游，跨 checkpoint fixed support）与 `calibrate_reproj_weight.py`（REPROJ_LW 梯度尺度标定） |
 | 公共研究工程检查 | `research/run_contract.py`、`research/tests/` | 当前 smoke/formal/eval 配置约束、launcher/cache 等回归；训练协议约束不适用于所有诊断 |
 | 可复用结构诊断 | `research/diagnostics/pose_structure/` | D1–D6、指标、模型访问和报告；支持范围受 head/decode 契约限制 |
 | 专用诊断 | `research/diagnostics/exp019_epro/`、`pose_structure/f_glm_diagnostic.py` | EXP019 固定历史协议；F 专用干预。EXP019 使用说明在 `research/exp019/README.md` |

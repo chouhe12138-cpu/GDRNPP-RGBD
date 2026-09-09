@@ -78,8 +78,12 @@ optimizer/LR/schedule/batch/data/renderer/epochs/seed/evaluator 均由
   `python -m research.exp020.preflight --arm A|B --device cpu` → 两臂均 PASS。
 - GPU 真实数据 smoke（cpp renderer 在线几何、真实 LM-PBR stage3 batch、2 步）：
   `python -m research.exp020.real_smoke --arm both --device cuda:0 --steps 2`
-  → PASS。arm A 的 loss keys 无 `loss_xyz_reproj`；arm B 有且
-  `loss_xyz_reproj`≈0.0448（≈2.9 px @ 64px，除以 res 后量级），全程 finite。
+  → PASS。arm A 的 loss keys 无 `loss_xyz_reproj`；arm B 有。诊断注意：
+  `loss_xyz_reproj` 是 SmoothL1 + reduction + /resolution + loss weight 后的
+  **loss 标量，不是 pixel error**，不能用 `loss_xyz_reproj * 64` 换算成像素误差。
+  2026-09-09 review-fix 后 real_smoke 改为记录 loss 模块真实的 `mean_reproj_px`
+  （Euclidean px），重跑 smoke arm B ≈ `0.045` reproj_loss、`≈5.1 px`
+  mean_reproj_px、`valid_ratio=1.0`、`behind_camera_ratio=0.0`，全程 finite。
 
 合计本地证据：EXP020 新增测试 25 passed；仓库回归 82 + 45 passed。
 
@@ -103,6 +107,71 @@ optimizer/LR/schedule/batch/data/renderer/epochs/seed/evaluator 均由
 - 多 seed / 稳定性复现（按仓库 policy 一次边缘结果不自动加 seed）。
 - EXP019 历史证据未改动。
 
-## 状态
+## 2026-09-09 审查修复（review-fix）
 
-`IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`。
+来源：用户提供的 `GDRNPP_EXP020_review_fix_kit.zip`（REVIEW_FINDINGS /
+MATCHED_PNP_EVAL_SPEC / DIAGNOSTICS_FIX_SPEC / GRADIENT_CALIBRATION_SPEC /
+TEST_CHECKLIST）。审查时 HEAD `395c8e37c5e1c63bd50fc07d0e730bde2c85519c`
+（与实现 commit `64e9098` 后一致；当前分支即 exp020）。本段只记录实际发生的本地
+事实；**没有 formal A/B 训练，不宣称性能提升**。
+
+### 已通过的实现（review 结论，未重写）
+
+reprojection loss 数学链、XYZ normalization、roi_zoom_K + output pixel grid
+坐标系、engine wiring、A/B training isolation 均正确且未改；未引入 EPro-PnP、
+未重构 Patch-PnP、未改 EXP019 历史 evaluator/结果。
+
+### Changed files（Observed，review-fix commit `e5ad38bfcdbde2c5e531e2d3fa9a25954abb4547`）
+
+| 路径 | 改动 |
+|---|---|
+| `research/exp020/matched_pnp_eval.py` | 新增 EXP020 专用 matched classical PnP/RANSAC evaluator（reference/A/B/device/output/limit；复用 EXP019 纯 helper；不启动 EPro、不跑 alpha） |
+| `research/exp020/calibrate_reproj_weight.py` | 新增 REPROJ_LW gradient-scale 标定（g_xyz / g_reproj_raw / ratio_raw，真实 online-geometry batch） |
+| `core/gdrn_modeling/losses/correspondence_reprojection_loss.py` | 只改 stats：`valid_ratio` 分母改为 GT foreground；新增 `gt_foreground_count`、`positive_depth_ratio_on_gt_fg`、`behind_camera_ratio_on_gt_fg`；`mean_reproj_px` 保持真实 Euclidean px；loss mask/数值未改 |
+| `core/gdrn_modeling/models/GDRN_double_mask.py` | `REPROJ_LW>0 && USE_MTL=True` fail-fast（forward 与 gdrn_loss，不新增 log_var）；vis_extra 增加 `vis/reproj_gt_fg_count`、`vis/reproj_positive_depth_ratio`、`vis/reproj_behind_camera_ratio` |
+| `research/exp020/real_smoke.py` | `reproj_px_loss` → `reproj_loss`；记录 loss 模块真实的 `mean_reproj_px` 与 depth 比例（EventStorage），不再用 loss×64 当 px |
+| `research/exp020/tests/` | 新增 loss stats（fg 分母、positive/behind、Euclidean px）、USE_MTL guard、matched evaluator 协议测试；`test_matched_pnp_eval.py`（fixed-support 一致性、A==B 等价、非 finite 不重建 support、无 EPro/alpha、CLI 无 epro 参数） |
+| `research/exp020/README.md`、EXP020 RECORD、`research/STATUS_CN.md`、`research/EXPERIMENT_INDEX.md`、`research/REPOSITORY_MAP.md` | 记录 review-fix 事实；STATUS 旧 EPro-PnP 主线标为 Historical/Deferred |
+
+### 跨 checkpoint fixed support（主协议）
+
+`S_fixed = reference_pred_visible ∩ gt_visible ∩ valid_depth` 由 reference
+checkpoint（默认 official）生成一次；support mask、flat indices、subsample
+indices、2D 点、K、RANSAC seed（20260730+target 序号）/threshold（3px）/
+iterations（100）全部冻结。A/B 只替换各自 predicted XYZ（decode 后取固定 indices）。
+native support 仅允许作为显式标明的 secondary analysis（本轮未启用）。
+EXP019 runner 因强校验 official SHA-256 且固定 EPro + alpha sweep，不能直接评价
+EXP020 checkpoint；未修改/未放宽 EXP019 代码。
+
+### 已运行的测试与 smoke（Observed，本地 2026-09-09）
+
+- EXP020 测试合计 **36 passed**（原 25 项 + 新增 11 项：loss stats 新增 3 项
+  fg 分母/positive-behind/Euclidean px 语义、gdrn_loss 新增 2 项 USE_MTL guard、
+  matched evaluator 新增 6 项协议测试）。
+- 仓库回归子集（research/tests + next_pose_head + exp013 + pose_structure +
+  exp017/017b/018 + exp019_epro tests）：**127 passed**。
+- CPU preflight arm A / arm B：均 PASS（official checkpoint 兼容、geo_head 唯一
+  trainable、REPROJ_LW=0 兼容复检）。
+- GPU 真实数据 smoke（`real_smoke --arm both --steps 2`）：PASS。arm B
+  `reproj_loss≈0.045`、真实 `mean_reproj_px≈5.1 px`、`valid_ratio=1.0`、
+  `behind_camera_ratio_on_gt_fg=0.0`。
+- **matched evaluator identity smoke**：reference=A=B=official、`--limit 16`、真实
+  LM-O → 16 targets COMPLETE。A/B 完全相同（`max_abs_R/t/corr/reproj delta = 0.0`），
+  solve success 1.0，mean corr err ≈ 10.44 mm、mean reproj err ≈ 1.99 px、mean
+  support ≈ 691。metadata：`epro_started=False`、`alpha_sweep=False`、GT XYZ max
+  reprojection ≈ 0.072 px（<0.5 sanity）。该 smoke 只验证 evaluator 接线，不代表
+  科学性能。
+- **非 official checkpoint 加载 smoke**：reference=official、A=B=扰动 geo 权重
+  checkpoint（shared out_layer + features conv 加噪声）、`--limit 8` → 8 targets
+  COMPLETE；A/B 一致 delta=0.0。证明 evaluator 不依赖 official SHA-256。
+- **gradient-scale calibration 实际运行**（真实 online-geometry batch，GPU）：
+  `g_xyz = 4.9539`、`g_reproj_raw = 0.3695`、`ratio_raw = 0.0746`（分组：xyz
+  output layer 4.9511 vs 0.3692；shared trunk 0.1662 vs 0.0149）。REPROJ_LW 梯度比
+  XYZ 三项总梯度小约 13×，属同数量级、不构成“小几十到几百倍”的强/弱失衡；
+  **未修改 formal `REPROJ_LW=1.0`**。工具只做尺度标定，不做 λ sweep。
+
+### 状态
+
+`IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`。review-fix 已收口，但
+**没有 formal A/B 训练，不产生任何 epoch checkpoint，不宣称任何性能提升**。
+

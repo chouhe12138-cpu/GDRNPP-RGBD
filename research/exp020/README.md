@@ -42,6 +42,29 @@ valid 只取 GT XYZ 对应 mask 的前景像素且相机深度 `z > z_eps` 且�
 与 `lib.pysixd.misc.calc_xyz_bp_batch` 使用的整数 pixel grid 同一坐标系，因此在线
 back-projection XYZ target 在 GT 一致时满足 `L_reproj ≈ 0`（有单测覆盖）。
 
+### Diagnostics（review-fix 后）
+
+loss 模块返回的 stats 区分 **loss 值**与 **真实 pixel error**，禁止用
+`loss_xyz_reproj * max(H,W)` 当 pixel error：
+
+- `mean_reproj_px`：loss mask 有效像素的 Euclidean 重投影误差均值（真实 px）。
+- `valid_ratio = valid_count / gt_foreground_count`：以 GT 前景为分母。
+- `positive_depth_ratio_on_gt_fg` / `behind_camera_ratio_on_gt_fg`：GT 前景像素中
+  预测点在相机前/非正深度（含非有限预测）的比例；`behind ≈ 1 - positive`。
+- `gt_foreground_count`：GT 前景像素数。
+
+本轮 review-fix **只改 stats，不改 loss valid mask**，避免在 formal 前引入新的科学变量。
+`gdrn_loss` 经 `vis_extra` 继续记录 `vis/reproj_px`、`vis/reproj_valid_ratio`，并新增
+`vis/reproj_gt_fg_count`、`vis/reproj_positive_depth_ratio`、
+`vis/reproj_behind_camera_ratio`。`real_smoke.py` 记录 `reproj_loss`（真实 loss 标量）与
+loss 模块产出的 `mean_reproj_px`（来自 EventStorage），不再命名/换算成 `reproj_px_loss`。
+
+### USE_MTL guard
+
+`loss_xyz_reproj` 没有对应 trainable `log_var_xyz_reproj`。若
+`REPROJ_LW>0 && USE_MTL=True`，`forward` 与 `gdrn_loss` 直接
+`NotImplementedError` fail-fast；不新增 log_var 参数。`REPROJ_LW=0` 历史路径不变。
+
 ## 代码路径
 
 - `core/gdrn_modeling/losses/correspondence_reprojection_loss.py`：纯 Tensor loss。
@@ -69,6 +92,46 @@ PnP-only control：Ranger 8e-4、wd 0.01、warmup 200）。`REPROJ_LW=1.0` 是�
 非零值；正式训练前可选做一次真实 batch 的 gradient-magnitude 标定，但 A/B 之间除
 `REPROJ_LW` 外必须完全一致。
 
+## 下游评价：matched classical PnP/RANSAC（review-fix 新增）
+
+`research/exp020/matched_pnp_eval.py` 是 EXP020 **主下游评价**。它不能用 EXP019
+runner：EXP019 `build_context()` 会强校验 official checkpoint SHA-256，且固定启动
+EPro worker 与 alpha sweep。新 evaluator：
+
+- 复用 EXP019 已验证的纯函数：`roi2d_norm_to_pixels`、`xyz_norm_to_metric`、
+  `historical_gt_reprojection_errors`、`solve_ransac_pnp()`，以及 repo_adapter 的
+  depth→object / prediction-valid-mask 语义；不修改任何 EXP019 代码，不启动 EPro，
+  不做 alpha interpolation，不以 Patch-PnP 为主结果。
+- **跨 checkpoint fixed support（主协议）**：reference checkpoint（默认 official）
+  一次生成 `S_fixed = reference_pred_visible ∩ gt_visible ∩ valid_depth`，冻结
+  support mask、flat indices、subsample indices、2D 点、K、RANSAC seed/threshold/
+  iterations。A/B 只替换各自 predicted XYZ（`(xyz_norm-0.5)*extent` 后取固定
+  indices）。A/B 不得各自重建主 support。native-support 仅允许作为显式标明的
+  secondary analysis（本轮未启用）。
+- 输出 per-target 行（`poses.jsonl`）：`num_fixed_support`、`num_selected`、
+  A/B pose（RANSAC/EPNP，3px、100 iter、0.99、seed 20260730+序号）、A/B fixed-support
+  XYZ metric error（mm，对 GT）、A/B GT-pose reprojection error（px）。汇总见
+  `summary.json`（solve success rate、mean corr/reproj error、A/B arm consistency）。
+- CLI：`--reference-checkpoint`、`--checkpoint-a`、`--checkpoint-b`、
+  `--gdrn-config`、`--device`、`--output`、`--limit`；完整 run（limit=None）可另加
+  `--bop-eval` 导出 BOP-AR/ADD(-S)/reS/teS。
+
+对同一 checkpoint 临时作为 A 与 B 的 smoke（identity 测试）用于验证 evaluator
+接线：A/B 输出应一致或数值误差级一致，不表示科学性能。
+
+## REPROJ_LW 梯度尺度标定（review-fix 新增）
+
+`research/exp020/calibrate_reproj_weight.py` 在同一真实 online-geometry batch、同一
+模型状态（official 权重、geo head 唯一 trainable）上：
+
+- Pass XYZ：只 backward `loss_coor_x + loss_coor_y + loss_coor_z`，记录
+  `g_xyz` = geo_head_net 的 global L2 grad norm。
+- Pass REPROJ：清梯度后只 backward **raw** reprojection loss
+  （`loss_xyz_reproj / REPROJ_LW`），记录 `g_reproj_raw`。
+- 输出 `ratio_raw = g_reproj_raw / g_xyz` 与可选分组（shared trunk / xyz output
+  layer）norm。目的只是判断 `REPROJ_LW=1.0` 是否明显过强/过弱，不做 λ sweep；
+  实际结果出来前不自行修改 formal `REPROJ_LW`。
+
 ## 本地执行
 
 ```bash
@@ -79,11 +142,25 @@ PYTHONPATH="$PWD" python -m research.exp020.preflight --arm A --device cpu
 PYTHONPATH="$PWD" python -m research.exp020.preflight --arm B --device cpu
 BOP_RENDERER_PATH="$PWD/.local/bop_renderer/build" \
   PYTHONPATH="$PWD" python -m research.exp020.real_smoke --arm both --device cuda:0
+# matched evaluator identity smoke（同一 checkpoint 临时作为 reference/A/B）
+PYTHONPATH="$PWD" python -m research.exp020.matched_pnp_eval \
+  --reference-checkpoint pretrained_models/lmo_pbr/model_final_wo_optim.pth \
+  --checkpoint-a pretrained_models/lmo_pbr/model_final_wo_optim.pth \
+  --checkpoint-b pretrained_models/lmo_pbr/model_final_wo_optim.pth \
+  --device cuda:0 --output output/experiments/EXP-20260909-020-geometry-aware-correspondence-loss/matched-pnp-smoke \
+  --limit 16
+# REPROJ_LW gradient-scale calibration
+BOP_RENDERER_PATH="$PWD/.local/bop_renderer/build" \
+  PYTHONPATH="$PWD" python -m research.exp020.calibrate_reproj_weight --device cuda:0
 ```
 
 ## 状态
 
-`IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`。正式 A/B 训练需要用户选择
-服务器实验与配置后走 `docker/l40/experiment.sh`。主要下游评价复用 EXP019 已验证的
-matched classical PnP/RANSAC consumer（不要仅因 `TEST.USE_PNP=True` 就默认协议
-一致）；`eval.py` 只提供仓库标准的 BOP-AR/ADD(-S) 直接姿态 telemetry，不作为主结论。
+`IMPLEMENTED / LOCAL_TEST_PASS / AWAITING_FORMAL_RUN`。review-fix（2026-09-09）已完成：
+EXP020 专用 matched PnP evaluator、A/B 跨 checkpoint fixed support、reprojection
+diagnostics 修正、USE_MTL guard、gradient-scale calibration 均已实现并通过本地
+测试/smoke；**没有 formal A/B 训练**，不宣称任何性能提升。正式 A/B 训练需要用户选择
+服务器实验与配置后走 `docker/l40/experiment.sh`。主要下游评价复用本页 matched
+evaluator（EXP019 已验证的 matched classical PnP/RANSAC consumer），不要仅因
+`TEST.USE_PNP=True` 就默认协议一致；`eval.py` 只提供仓库标准的 BOP-AR/ADD(-S) 直接
+姿态 telemetry，不作为主结论。
