@@ -17,7 +17,8 @@ confidence head、新 pose head 或 Patch-PnP 重构。
   `e5ad38bfcdbde2c5e531e2d3fa9a25954abb4547`。
 - 唯一核心变量：`LOSS_CFG.REPROJ_LW`，A=`0.0`，B=`1.0`。
 - 两臂共用 official checkpoint、seed 42、40 epoch、batch 48、Ranger lr `8e-4`、
-  wd `0.01`、warmup 200、数据与 evaluator。
+  wd `0.01`、warmup 200、数据与 evaluator；训练期在线 GT geometry 使用 EGL，
+  BOP evaluation 独立保持 CPP。
 - backbone/PNP_NET frozen，GEO_HEAD trainable；保留 XYZ/mask/full-mask/region loss；
   `PM/CENTROID/Z/ROT/TRANS/BIND_LW` 全部为 0，隔离 producer。
 - 无新增模型参数，official checkpoint strict compatible。
@@ -72,10 +73,22 @@ AR_reS、AR_teS；仓库标准 direct-pose `eval.py` 只作 telemetry。
 
 这些 smoke 和 calibration 只验证工程链路与尺度，不是性能结果。
 
+## 2026-09-09 renderer protocol correction
+
+首个服务器 release `698a8fe` 将训练期 `XYZ_RENDERER` 错配为 CPP。A/B smoke
+`RUN-20260909-084019-smoke-s42-a01` / `RUN-20260909-084107-smoke-s42-a01` 虽完成
+1 epoch 且 loss finite，但每批在线 GT geometry 都走 CPU-oriented CPP renderer，
+造成明显不必要的运行时间；这些 run 只证明旧配置能执行，不作为修正后 formal 的
+smoke gate。修正将 A/B 共用 `XYZ_RENDERER` 改为 EGL，不改变唯一变量
+`REPROJ_LW`；`VAL.RENDERER_TYPE=cpp` 保持不变，以保留 BOP 指标可比性。旧 release
+若已启动 formal，应视为无效协议 run，不进入科学结论。本地 effective-config 与
+36 项 EXP020 测试通过；本地无可用 CUDA runtime，EGL renderer 的真实执行和速度
+必须由新 release 的服务器 smoke 验证。
+
 ## 当前状态与待运行项
 
-状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_FORMAL_RUN`。
+状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。
 
-尚未运行 formal A/B 训练、matched PnP/RANSAC 正式评价、BOP 聚合或多 seed，因此
-不宣称性能提升。下一步是在用户指定服务器实验后，以确定 commit 生成 bundle，使用
-`docker/l40/experiment.sh` 创建唯一 A/B run；训练完成后按固定 support 主协议评价。
+尚未运行有效 formal A/B 训练、matched PnP/RANSAC 正式评价、BOP 聚合或多 seed，
+因此不宣称性能提升。下一步以修正后的确定 commit 生成 bundle，重跑 EGL A/B smoke；
+通过后才启动唯一 formal A/B，训练完成后按 fixed-support 主协议评价。

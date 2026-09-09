@@ -42,7 +42,7 @@ def _assert_exp020_freeze_and_loss_protocol(cfg: Config) -> None:
     assert cfg.SEED == 42
     assert cfg.SOLVER.TOTAL_EPOCHS == 40 and cfg.SOLVER.IMS_PER_BATCH == 48
     assert cfg.SOLVER.CHECKPOINT_PERIOD == 5 and cfg.TEST.EVAL_PERIOD == 5
-    assert pose.XYZ_RENDERER == "cpp"
+    assert pose.XYZ_RENDERER == "egl"
     assert pose.GEO_HEAD.FREEZE is False
     assert pose.GEO_HEAD.TRAIN_SUPERVISION is True
     assert pose.BACKBONE.FREEZE is True
@@ -82,7 +82,7 @@ def test_formal_and_smoke_and_eval_configs_satisfy_run_contract():
             expected_experiment_id=EXPERIMENT_ID,
         )
         assert result["training_geometry_supervision"] is True
-        assert result["training_renderer"] == "cpp"
+        assert result["training_renderer"] == "egl"
         if mode == "formal":
             assert result["evaluation_renderer"] == "cpp"
 

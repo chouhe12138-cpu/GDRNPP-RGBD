@@ -41,8 +41,8 @@ def validate_config(cfg: Config, expected_reproj_lw: float) -> dict[str, object]
     )
     pose = cfg.MODEL.POSE_NET
     loss = pose.LOSS_CFG
-    if pose.XYZ_RENDERER != "cpp":
-        raise RuntimeError("EXP020 requires the cpp online XYZ renderer")
+    if pose.XYZ_RENDERER != "egl":
+        raise RuntimeError("EXP020 requires the EGL online XYZ renderer")
     if pose.GEO_HEAD.FREEZE or not pose.GEO_HEAD.TRAIN_SUPERVISION:
         raise RuntimeError("EXP020 must train the geometry head with supervision")
     if not pose.BACKBONE.FREEZE or not pose.PNP_NET.FREEZE:

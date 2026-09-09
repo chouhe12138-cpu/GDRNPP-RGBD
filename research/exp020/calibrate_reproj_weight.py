@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """REPROJ_LW gradient-scale calibration for EXP020 (never a lambda sweep).
 
-On one genuine online-geometry batch (cpp XYZ renderer), one model state
+On one genuine online-geometry batch (EGL XYZ renderer), one model state
 (official checkpoint, backbone/PNP_NET frozen, geometry head trainable), the
 script compares the geometry-head gradient scale induced by
 

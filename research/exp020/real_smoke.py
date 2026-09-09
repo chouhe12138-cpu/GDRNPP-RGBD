@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bounded real LM-PBR optimizer smoke for EXP020 (never formal).
 
-Loads a genuine online-geometry batch (cpp XYZ renderer) and runs a few
+Loads a genuine online-geometry batch (EGL XYZ renderer) and runs a few
 forward/backward/optimizer steps for the selected arm(s). It exercises the
 REPROJ_LW=0 legacy path (A) and the REPROJ_LW>0 path (B) with the actual
 batch_data -> GDRN_DoubleMask -> gdrn_loss wiring including roi_zoom_K.

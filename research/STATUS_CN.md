@@ -11,11 +11,13 @@ normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection 
 backbone/PNP_NET 冻结、GEO_HEAD trainable、pose-level losses 显式清零以隔离
 producer；无新增模型参数，官方 checkpoint strict 兼容。
 
-当前状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_FORMAL_RUN`。第一阶段实现
+当前状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。第一阶段实现
 （commit `64e9098`）与 2026-09-09 审查修复（matched evaluator、A/B 跨 checkpoint
 fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均已完成并
-本地验证；**没有 formal A/B 训练，不宣称任何性能提升**。等待用户选择服务器实验并
-授权 `docker/l40/experiment.sh` 的 smoke/formal A/B 运行。
+本地验证。首个服务器 release `698a8fe` 错配 CPP online training renderer，运行
+时间异常；该 release 的 smoke/formal 不作为有效协议，现已改为 EGL 并等待新 release
+重跑 A/B smoke。BOP evaluation renderer 仍为 CPP，以保持指标口径。**没有有效
+formal A/B 训练，不宣称任何性能提升**。
 
 ### 审查修复后的关键事实（2026-09-09，Observed）
 

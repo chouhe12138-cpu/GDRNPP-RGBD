@@ -82,7 +82,8 @@ loss 模块产出的 `mean_reproj_px`（来自 EventStorage），不再命名/�
 `configs/gdrn/lmo_pbr/research/exp020_geometry_aware_corr/`：
 
 - `common.py`：共享 formal 协议（seed 42、40 epoch、batch 48、5-epoch ckpt/eval、
-  Ranger lr 8e-4 / wd 0.01 / warmup 200、cpp online renderer、freeze/loss 布局）。
+  Ranger lr 8e-4 / wd 0.01 / warmup 200、EGL online training renderer、freeze/loss
+  布局）。BOP evaluation renderer 独立保持 CPP，以维持历史指标口径。
 - `control.py`（A）与 `reproj.py`（B）唯一差异是 `LOSS_CFG.REPROJ_LW`
   （`0.0` vs `1.0`）。
 - `smoke_control.py` / `smoke_reproj.py` / `eval.py`。
@@ -156,11 +157,13 @@ BOP_RENDERER_PATH="$PWD/.local/bop_renderer/build" \
 
 ## 状态
 
-`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_FORMAL_RUN`。review-fix（2026-09-09）已完成：
+`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。review-fix（2026-09-09）已完成：
 EXP020 专用 matched PnP evaluator、A/B 跨 checkpoint fixed support、reprojection
 diagnostics 修正、USE_MTL guard、gradient-scale calibration 均已实现并通过本地
-测试/smoke；**没有 formal A/B 训练**，不宣称任何性能提升。正式 A/B 训练需要用户选择
-服务器实验与配置后走 `docker/l40/experiment.sh`。主要下游评价复用本页 matched
+测试/smoke。首个服务器 release `698a8fe` 错用 CPP online training renderer，运行
+速度异常，不能作为正式协议继续；修正为 EGL 后必须以新 release 重跑 matched A/B
+smoke。**没有有效 formal A/B 训练**，不宣称任何性能提升。正式 A/B 训练需要用户
+选择服务器实验与配置后走 `docker/l40/experiment.sh`。主要下游评价复用本页 matched
 evaluator（EXP019 已验证的 matched classical PnP/RANSAC consumer），不要仅因
 `TEST.USE_PNP=True` 就默认协议一致；`eval.py` 只提供仓库标准的 BOP-AR/ADD(-S) 直接
 姿态 telemetry，不作为主结论。

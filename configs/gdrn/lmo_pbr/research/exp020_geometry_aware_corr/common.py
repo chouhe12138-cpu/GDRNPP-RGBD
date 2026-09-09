@@ -20,7 +20,10 @@ DATALOADER = dict(NUM_WORKERS=16)
 MODEL = dict(
     WEIGHTS="pretrained_models/lmo_pbr/model_final_wo_optim.pth",
     POSE_NET=dict(
-        XYZ_RENDERER="cpp",
+        # Online GT geometry is rendered for every training batch. EGL keeps
+        # this path on GPU; the BOP evaluation renderer remains independently
+        # fixed to cpp by the shared evaluation base.
+        XYZ_RENDERER="egl",
         BACKBONE=dict(FREEZE=True, INIT_CFG=dict(pretrained=False)),
         GEO_HEAD=dict(FREEZE=False, TRAIN_SUPERVISION=True),
         PNP_NET=dict(FREEZE=True),
