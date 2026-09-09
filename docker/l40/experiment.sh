@@ -162,8 +162,26 @@ require_gpu_capacity() {
 }
 
 require_idle_container() {
-    if "${docker_bin}" exec "${container}" pgrep -f '[m]ain_gdrn.py' >/dev/null 2>&1; then
-        fail "a GDRN training/evaluation process is already active in ${container}"
+    local active
+    # main_gdrn.py calls setproctitle() after startup, so matching its original
+    # argv can miss a live training process (for example control.TIMESTAMP).
+    # A managed container normally contains only PID 1 `sleep infinity`; reject
+    # every additional process conservatively before launching another run.
+    active="$("${docker_bin}" top "${container}" -eo pid,args | awk '
+        NR == 1 { next }
+        {
+            pid = $1
+            $1 = ""
+            sub(/^[[:space:]]+/, "", $0)
+            if ($0 != "sleep infinity") {
+                print pid "\t" $0
+            }
+        }
+    ')"
+    if [[ -n "${active}" ]]; then
+        printf 'ACTIVE_CONTAINER_PROCESS container=%s:\n%s\n' \
+            "${container}" "${active}" >&2
+        fail "a process is already active in ${container}"
     fi
 }
 

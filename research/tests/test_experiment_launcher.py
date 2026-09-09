@@ -91,15 +91,30 @@ def test_gpu_capacity_rejects_insufficient_free_memory():
     )
 
 
-def test_idle_container_still_rejects_duplicate_gdrn_process():
+def test_idle_container_accepts_only_sleep_infinity():
     result = _source_and_run(
         "container=test-container\n"
         "docker_bin=fake_docker\n"
-        "fake_docker() { return 0; }\n"
+        "fake_docker() {\n"
+        "  printf 'PID COMMAND\\n123 sleep infinity\\n'\n"
+        "}\n"
+        "require_idle_container"
+    )
+    assert result.returncode == 0
+
+
+def test_idle_container_rejects_setproctitle_process():
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        "fake_docker() {\n"
+        "  printf 'PID COMMAND\\n123 sleep infinity\\n456 control.20260909_171616\\n'\n"
+        "}\n"
         "require_idle_container",
         check=False,
     )
     assert result.returncode != 0
+    assert "control.20260909_171616" in result.stderr
     assert "already active in test-container" in result.stderr
 
 

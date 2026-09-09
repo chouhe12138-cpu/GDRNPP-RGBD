@@ -126,8 +126,16 @@ mounted_repo="$(/usr/bin/docker inspect "${container}" \
   --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
 test "${mounted_repo}" = "${expected_old_repo}"
 
-if /usr/bin/docker exec "${container}" pgrep -f '[m]ain_gdrn.py' >/dev/null 2>&1; then
-  echo "REFUSE: main_gdrn.py is active in ${container}" >&2
+active="$(/usr/bin/docker top "${container}" -eo pid,args | awk '
+  NR > 1 {
+    pid = $1
+    $1 = ""
+    sub(/^[[:space:]]+/, "", $0)
+    if ($0 != "sleep infinity") print pid "\t" $0
+  }
+')"
+if [[ -n "${active}" ]]; then
+  printf 'REFUSE: active process in %s:\n%s\n' "${container}" "${active}" >&2
   exit 1
 fi
 
@@ -179,6 +187,9 @@ docker/l40/experiment.sh lab0 logs EXP-.../RUN-...
 formal 必须是 seed 42、LM-PBR、LM-O GT-box、40 epoch、batch 48、每 5 epoch checkpoint
 与 evaluation。每次 run 的根目录写入 `run_metadata.json`，保存完整 source commit、
 image ID、image build revision、config、mode 与 run ID。
+
+idle gate 通过 `docker top` 检查容器内除 PID 1 `sleep infinity` 外的全部进程；不能
+依赖 `main_gdrn.py` 字符串，因为训练启动后会用 `setproctitle` 改名为配置名和时间戳。
 
 给远端终端的命令优先写成可整体复制的多行 subshell：集中定义 `release`、experiment、
 config 等短变量，一行执行一个命令，不使用超长单行或反斜杠续行。简单的单步

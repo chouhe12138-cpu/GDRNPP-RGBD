@@ -85,6 +85,11 @@ smoke gate。修正将 A/B 共用 `XYZ_RENDERER` 改为 EGL，不改变唯一变
 36 项 EXP020 测试通过；本地无可用 CUDA runtime，EGL renderer 的真实执行和速度
 必须由新 release 的服务器 smoke 验证。
 
+同次处置发现 launcher 的旧 idle gate 用 `pgrep -f main_gdrn.py`，会漏掉
+`setproctitle` 后名为 `control.TIMESTAMP` / `reproj.TIMESTAMP` 的存活训练进程。该
+基础设施缺陷改为用 `docker top` 拒绝容器内除 PID 1 `sleep infinity` 外的任何进程；
+旧 run 输出仍保留，修复不改变模型或 A/B 科学变量。
+
 ## 当前状态与待运行项
 
 状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。
