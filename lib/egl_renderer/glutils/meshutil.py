@@ -9,23 +9,11 @@ import os.path as osp
 import pyassimp
 import pprint
 import hashlib
-import os
 import mmcv
 
 cur_dir = osp.dirname(osp.abspath(__file__))
 from lib.utils import logger
 from lib.pysixd import inout
-
-
-def resolve_mesh_cache_dir(cache_dir=None, environ=None):
-    """Resolve EGL mesh caches outside a read-only source checkout."""
-    if cache_dir is not None:
-        return osp.abspath(osp.expanduser(cache_dir))
-    env = os.environ if environ is None else environ
-    xdg_cache_home = env.get("XDG_CACHE_HOME")
-    if xdg_cache_home:
-        return osp.join(osp.abspath(osp.expanduser(xdg_cache_home)), "gdrnpp_egl_meshes")
-    return ".cache"
 
 
 def get_vertices_extent(vertices):
@@ -253,10 +241,9 @@ def load_mesh_pyassimp(
     is_textured=False,
     cad_model_color=None,
     use_cache=True,
-    cache_dir=None,
+    cache_dir=".cache",
     verbose=True,
 ):
-    cache_dir = resolve_mesh_cache_dir(cache_dir)
     hashed_file_name = (
         hashlib.md5(
             (
@@ -380,9 +367,8 @@ def load_mesh_sixd(
     model_info=None,
     cad_model_color=None,
     use_cache=True,
-    cache_dir=None,
+    cache_dir=".cache",
 ):
-    cache_dir = resolve_mesh_cache_dir(cache_dir)
     mmcv.mkdir_or_exist(cache_dir)
     if model_path.endswith(".obj"):
         logger.warn(".obj file, load with pyassimp")

@@ -95,11 +95,11 @@ smoke gate。修正将 A/B 共用 `XYZ_RENDERER` 改为 EGL，不改变唯一变
 `load_mesh_sixd()` 尝试在只读源码挂载根目录创建相对路径 `.cache`，触发
 `OSError: [Errno 30] Read-only file system: '.cache'`。这是运行缓存路径缺陷，不是
 EGL/CUDA 初始化失败；日志已显示 CUDA device 0 上的 EGL 1.5 context 创建成功。
-现将未显式指定的 EGL mesh cache 解析到
+现由训练 renderer 构造端将 EGL mesh loader 的 cache 注入为
 `${XDG_CACHE_HOME}/gdrnpp_egl_meshes`；服务器 launcher 已将 `XDG_CACHE_HOME` 设为
-可写的 `/home/gdrn/.cache` 并挂载项目 cache。显式 `cache_dir` 保持原语义，本地未设
-XDG 时保持 `.cache` 兼容行为。该失败 run 不进入科学结论，修复后需重新执行 A/B
-smoke。
+可写的 `/home/gdrn/.cache` 并挂载项目 cache。本地未设 XDG 时保持 EGL loader 原有
+`.cache` 行为。实现不修改镜像所绑定的 `lib/egl_renderer` 原生输入，因此继续复用
+稳定镜像。该失败 run 不进入科学结论，修复后需重新执行 A/B smoke。
 
 ## 当前状态与待运行项
 

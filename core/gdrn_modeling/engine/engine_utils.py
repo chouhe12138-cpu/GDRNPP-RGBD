@@ -1,4 +1,5 @@
 import importlib
+from functools import partial
 import os
 import os.path as osp
 import sys
@@ -86,6 +87,25 @@ class CppTrainingRenderer:
 
 
 _DISABLED_RENDERERS = {"", "0", "false", "none", "disabled"}
+
+
+def resolve_egl_mesh_cache_dir(environ=None):
+    """Return the writable runtime cache used by the online EGL renderer."""
+    env = os.environ if environ is None else environ
+    xdg_cache_home = env.get("XDG_CACHE_HOME")
+    if not xdg_cache_home:
+        return None
+    return osp.join(osp.abspath(osp.expanduser(xdg_cache_home)), "gdrnpp_egl_meshes")
+
+
+def configure_egl_mesh_cache(renderer, mesh_loader, environ=None):
+    """Inject a cache-aware loader without changing the native EGL package."""
+    cache_dir = resolve_egl_mesh_cache_dir(environ)
+    if cache_dir is None:
+        return None
+    os.makedirs(cache_dir, exist_ok=True)
+    renderer.model_load_fn = partial(mesh_loader, cache_dir=cache_dir)
+    return cache_dir
 
 
 def training_geometry_renderer_type(cfg):
@@ -426,13 +446,14 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
     # Importing it lazily lets local smoke tests use an existing bop_renderer
     # build without requiring the unrelated PyOpenGL extension.
     from lib.egl_renderer.egl_renderer_v3 import EGLRenderer
+    from lib.egl_renderer.glutils.meshutil import load_mesh_sixd
 
     texture_paths = None
     if data_ref.texture_paths is not None:
         texture_paths = [osp.join(model_dir, "obj_{:06d}.png".format(obj_id)) for obj_id in obj_ids]
 
     ren = EGLRenderer(
-        model_paths,
+        model_paths=None,
         texture_paths=texture_paths,
         vertex_scale=data_ref.vertex_scale,
         znear=data_ref.zNear,
@@ -442,6 +463,13 @@ def get_renderer(cfg, data_ref, obj_names, gpu_id=None):
         width=cfg.MODEL.POSE_NET.OUTPUT_RES,
         gpu_id=gpu_id,
         use_cache=True,
+    )
+    configure_egl_mesh_cache(ren, load_mesh_sixd)
+    ren.load_objects(
+        model_paths,
+        texture_paths,
+        model_colors=None,
+        vertex_scale=data_ref.vertex_scale,
     )
     return ren
 
