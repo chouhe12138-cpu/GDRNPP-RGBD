@@ -101,13 +101,90 @@ EGL/CUDA 初始化失败；日志已显示 CUDA device 0 上的 EGL 1.5 context 
 回落到只读 `.cache`。现由训练 renderer 在同步加载全部模型期间临时将 cwd 切换到
 `${XDG_CACHE_HOME}/gdrnpp_egl_meshes`，使两层 loader 的相对 `.cache` 都落入可写挂载，
 并在成功或异常后恢复原 cwd。本地未设 XDG 时保持原行为。实现不修改镜像所绑定的
-`lib/egl_renderer` 原生输入，因此继续复用稳定镜像。这些失败 run 不进入科学结论，
-修复后需重新执行 A/B smoke。
+`lib/egl_renderer` 原生输入，因此继续复用稳定镜像。这些失败 run 不进入科学结论；
+修复后的 A/B smoke 随后通过，并进入下述 formal。
+
+## Formal partial：E5/E10 与训练日志快照（2026-09-10）
+
+修正后的 EGL A/B formal 使用相同 source commit
+`c2a7723d5cf468de97ef8aa6f860c4f474203f30`、seed 42 和镜像
+`gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9`；镜像 ID 为
+`sha256:124d9ba7c7754b4445bfb7a1a177e15073f8139a376ec4e0701ec336be6944da`，
+build revision 为 `c0be1ade7ea94d968256d81051caeb7b6a0db9ba`：
+
+- A：`RUN-20260909-124125-formal-s42-a01`，`control.py`。
+- B：`RUN-20260909-124137-formal-s42-a01`，`reproj.py`。
+- 当前外置证据：`E:\6D姿态估计\EXP020\实验A` 与 `实验B`。每臂包含
+  `console.log`、`scores_bop19_5epoch.json` 和 `scores_bop19_10epoch.json`。
+- A/B 日志均记录生成了 `model_epoch_005.pth`、`model_epoch_010.pth`；对应 E5/E10
+  均已有 direct-pose evaluation。
+- 日志快照覆盖 A 至 iteration 93,499（epoch 15），B 至 iteration 88,999（epoch 14）；
+  两份日志均未包含 run exit code，外置目录中尚无 E15–E40 score JSON。
+
+### Direct-pose 聚合指标（Observed）
+
+| Epoch | 臂 | BOP AR | ADD(-S)0.1d | AR_reS | AR_teS |
+|---:|---|---:|---:|---:|---:|
+| 5 | A | 0.563426 | 0.255363 | 0.433679 | 0.634141 |
+| 5 | B | 0.567089 | 0.278893 | 0.449366 | 0.638754 |
+| 10 | A | 0.518987 | 0.253979 | 0.419839 | 0.571857 |
+| 10 | B | 0.521398 | 0.253979 | 0.412918 | 0.573010 |
+
+输入值来自各 checkpoint 的 `EVAL_SUMMARY` 和对应 BOP score JSON。
+
+### A/B 差值（Derived）
+
+差值均按 `B − A` 计算，相对变化按 `(B-A)/A` 计算。
+
+| Epoch | 指标 | B − A | 相对变化 |
+|---:|---|---:|---:|
+| 5 | BOP AR | +0.003663 | +0.65% |
+| 5 | ADD(-S)0.1d | +0.023529 | +9.21% |
+| 5 | AR_reS | +0.015686 | +3.62% |
+| 5 | AR_teS | +0.004614 | +0.73% |
+| 10 | BOP AR | +0.002411 | +0.46% |
+| 10 | ADD(-S)0.1d | 0.000000 | 0.00% |
+| 10 | AR_reS | -0.006920 | -1.65% |
+| 10 | AR_teS | +0.001153 | +0.20% |
+
+### ADD(-S)0.1d 逐物体结果（Observed / Derived）
+
+| 物体 | A E5 | B E5 | B−A E5 | A E10 | B E10 | B−A E10 |
+|---|---:|---:|---:|---:|---:|---:|
+| ape | 0.125714 | 0.068571 | -0.057143 | 0.000000 | 0.000000 | 0.000000 |
+| can | 0.301508 | 0.346734 | +0.045226 | 0.276382 | 0.266332 | -0.010050 |
+| cat | 0.210526 | 0.216374 | +0.005848 | 0.175439 | 0.169591 | -0.005848 |
+| driller | 0.345000 | 0.355000 | +0.010000 | 0.320000 | 0.300000 | -0.020000 |
+| duck | 0.033333 | 0.027778 | -0.005556 | 0.016667 | 0.016667 | 0.000000 |
+| eggbox | 0.405556 | 0.477778 | +0.072222 | 0.477778 | 0.505556 | +0.027778 |
+| glue | 0.314286 | 0.342857 | +0.028571 | 0.278571 | 0.271429 | -0.007143 |
+| holepuncher | 0.295000 | 0.375000 | +0.080000 | 0.450000 | 0.465000 | +0.015000 |
+
+E5 的逐物体差值计数为 6 个正值、2 个负值；E10 为 2 个正值、4 个负值、2 个零值。
+
+### 训练日志快照（Observed）
+
+`my_writer` 的括号外数值是最近 20 iteration 的 median，括号内数值是从 iteration 0
+起累计的 global average。下表记录两份日志最后一行的括号内数值：
+
+| 臂 | 最后 iteration | epoch | total | region | coor_x | coor_y | coor_z | xyz_reproj | mask | mask_full | max_mem |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| A | 93,499 | 15 | 16.49 | 16.37 | 0.02731 | 0.02554 | 0.01966 | — | 0.02257 | 0.02274 | 8286M |
+| B | 88,999 | 14 | 16.49 | 16.37 | 0.02719 | 0.02544 | 0.01968 | 0.009151 | 0.02251 | 0.02266 | 8295M |
+
+按表中显示值计算，两臂 `loss_region / total_loss = 16.37 / 16.49 = 99.27%`。
+两份日志均未检出 `Traceback`、CUDA OOM 或 `ERROR`。
+
+### Logged region loss 口径（Code-derived）
+
+当前实现对 `out_region * gt_mask` 计算 65-way cross entropy，先对图像求和，再除以
+前景像素数。背景位置的输入 logits 为 0，因此其标量交叉熵为 `log(65)`；乘法链式
+导数中对应 `gt_mask=0`，这些位置对原始 `out_region` 的导数为 0。上述背景标量包含在
+日志的 `loss_region` 与 `total_loss` 中。
 
 ## 当前状态与待运行项
 
-状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。
+状态：`FORMAL_RUNNING / E10_AVAILABLE / PARTIAL_EVIDENCE`。
 
-尚未运行有效 formal A/B 训练、matched PnP/RANSAC 正式评价、BOP 聚合或多 seed，
-因此不宣称性能提升。下一步以修正后的确定 commit 生成 bundle，重跑 EGL A/B smoke；
-通过后才启动唯一 formal A/B，训练完成后按 fixed-support 主协议评价。
+当前已有 E5/E10 direct-pose telemetry；日志快照分别覆盖 A 的 epoch 15 与 B 的
+epoch 14。E15–E40 结果、run exit code 和 matched PnP/RANSAC 评价均未提供。

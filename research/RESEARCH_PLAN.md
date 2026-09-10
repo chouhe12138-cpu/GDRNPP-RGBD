@@ -38,9 +38,10 @@ per-pixel correspondence reprojection loss 直接约束 Geometry/Correspondence 
    review 判定机制通过。完整事实见
    [EXP019 RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md)，
    分析与口径见 [review](notes/20260908-solver-in-the-loop-review.md)。
-3. EXP020 已完成实现、review-fix、36 项实验测试、真实数据 smoke、fixed-support
-   evaluator identity/non-official smoke 与梯度尺度标定；下一步为服务器 formal A/B，
-   再做 matched PnP/RANSAC 正式评价。
+3. EXP020 已完成实现、review-fix、36 项实验测试、EGL server smoke、fixed-support
+   evaluator smoke 与梯度尺度标定；A/B formal 正在运行，已有 E5/E10 direct-pose
+   telemetry，日志快照覆盖 A epoch 15、B epoch 14。E15–E40 与 matched PnP/RANSAC
+   正式评价尚未提供。
 4. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。
 5. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。

@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-09。
+最后核对：2026-09-10。
 
 ## Active mainline（2026-09-09 起）
 
@@ -11,19 +11,27 @@ normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection 
 backbone/PNP_NET 冻结、GEO_HEAD trainable、pose-level losses 显式清零以隔离
 producer；无新增模型参数，官方 checkpoint strict 兼容。
 
-当前状态：`IMPLEMENTED / LOCAL_TEST_PASS / READY_FOR_EGL_SMOKE`。第一阶段实现
+当前状态：`FORMAL_RUNNING / E10_AVAILABLE / PARTIAL_EVIDENCE`。第一阶段实现
 （commit `64e9098`）与 2026-09-09 审查修复（matched evaluator、A/B 跨 checkpoint
 fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均已完成并
 本地验证。首个服务器 release `698a8fe` 错配 CPP online training renderer，运行
-时间异常；该 release 的 smoke/formal 不作为有效协议，现已改为 EGL 并等待新 release
-重跑 A/B smoke。BOP evaluation renderer 仍为 CPP，以保持指标口径。**没有有效
-formal A/B 训练，不宣称任何性能提升**。
+时间异常；该 release 的 run 不作为有效协议。EGL/cache 修复后，source commit
+`c2a7723` 的 A/B formal 已启动；当前外置日志覆盖 A epoch 15、B epoch 14，并有
+E5/E10 evaluation，BOP evaluation renderer 仍为 CPP。外置记录中尚无 E15–E40、
+run exit code 或 matched PnP 评价。
 
 修正后的首轮 EGL server smoke 已确认 CUDA device 0 上 EGL 1.5 context 能创建，但
 PLY mesh cache 默认写入只读源码根目录 `.cache` 而失败。第二次重跑确认外层 cache
 注入有效，但内部 pyassimp loader 未透传路径并再次回落到 `.cache`。训练 renderer
 现于同步模型加载期间把两层相对 cache 一并定向到可写 `XDG_CACHE_HOME`，且不改变
-镜像原生输入；当前等待新 release 重跑 A/B smoke，失败 run 不进入科学结论。
+镜像原生输入；修复后的 smoke 已通过并进入 formal，先前失败 run 不进入科学结论。
+
+Direct-pose telemetry：E5 的 A/B BOP 为 `0.563426/0.567089`、ADD 为
+`0.255363/0.278893`、reS 为 `0.433679/0.449366`、teS 为
+`0.634141/0.638754`；E10 对应为 `0.518987/0.521398`、`0.253979/0.253979`、
+`0.419839/0.412918`、`0.571857/0.573010`。最新日志行的 A/B global-average
+`total_loss` 均为 `16.49`，`loss_region` 均为 `16.37`；B 的
+`loss_xyz_reproj` 为 `0.009151`。完整逐物体结果和日志口径见 EXP020 RECORD。
 
 ### 审查修复后的关键事实（2026-09-09，Observed）
 
@@ -95,8 +103,8 @@ supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
 
 ## 下一步
 
-1. 用户选择 EXP020 formal A/B 服务器实验与配置，走 `docker/l40/experiment.sh`；
-   服务器运行前本地提交并生成 bundle，服务器只 checkout 确定 commit 运行。
+1. 当前已记录 E5/E10；尚待收集 A/B 的 E15/20/25/30/35/40 固定评估点与 run exit
+   code。
 2. Formal 完成后用 `research/exp020/matched_pnp_eval.py` 做主下游评价（matched
    classical PnP/RANSAC，fixed support，A/B 只换 XYZ），必要时 `--bop-eval` 汇总
    BOP-AR/ADD(-S)/reS/teS。
