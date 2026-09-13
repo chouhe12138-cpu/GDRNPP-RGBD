@@ -157,14 +157,15 @@ BOP_RENDERER_PATH="$PWD/.local/bop_renderer/build" \
 
 ## 状态
 
-`FORMAL_RUNNING / E10_AVAILABLE / PARTIAL_EVIDENCE`。review-fix（2026-09-09）已完成：
+`E40_AVAILABLE / MATCHED_PNP_PENDING / EXIT_CODE_UNCONFIRMED`。review-fix（2026-09-09）已完成：
 EXP020 专用 matched PnP evaluator、A/B 跨 checkpoint fixed support、reprojection
 diagnostics 修正、USE_MTL guard、gradient-scale calibration 均已实现并通过本地
 测试/smoke。首个服务器 release `698a8fe` 错用 CPP online training renderer，不能
 作为正式协议；EGL/cache 修复后的 smoke 已通过，source commit `c2a7723` 的 A/B
-formal 正在运行，当前已有 E5/E10 direct-pose telemetry，日志快照覆盖 A epoch 15、
-B epoch 14。聚合指标、逐物体结果和 loss 日志数值见 RECORD；E15–E40、run exit code
-与主 matched PnP 评价尚未提供。主要下游评价复用
+formal 日志均已到达 E40，全部 E5–E40 direct-pose telemetry 已齐，并记录保存
+`model_epoch_040.pth`。聚合指标、逐物体 ADD、紧凑原始证据和 loss 日志数值见 RECORD；
+run exit code 与正式主 matched PnP 评价尚未提供。B E15/E20/E25 score JSON 与对应日志
+不一致，原文件保留，reS/teS 的 epoch 归属待核对（见 RECORD）。主要下游评价复用
 本页 matched evaluator（EXP019 已验证的 matched classical PnP/RANSAC consumer），不要仅因
 `TEST.USE_PNP=True` 就默认协议一致；`eval.py` 只提供仓库标准的 BOP-AR/ADD(-S) 直接
 姿态 telemetry，不作为主结论。

@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-10。
+最后核对：2026-09-13。
 
 ## Active mainline（2026-09-09 起）
 
@@ -11,14 +11,15 @@ normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection 
 backbone/PNP_NET 冻结、GEO_HEAD trainable、pose-level losses 显式清零以隔离
 producer；无新增模型参数，官方 checkpoint strict 兼容。
 
-当前状态：`FORMAL_RUNNING / E10_AVAILABLE / PARTIAL_EVIDENCE`。第一阶段实现
+当前状态：`E40_AVAILABLE / MATCHED_PNP_PENDING / EXIT_CODE_UNCONFIRMED`。第一阶段实现
 （commit `64e9098`）与 2026-09-09 审查修复（matched evaluator、A/B 跨 checkpoint
 fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均已完成并
 本地验证。首个服务器 release `698a8fe` 错配 CPP online training renderer，运行
 时间异常；该 release 的 run 不作为有效协议。EGL/cache 修复后，source commit
-`c2a7723` 的 A/B formal 已启动；当前外置日志覆盖 A epoch 15、B epoch 14，并有
-E5/E10 evaluation，BOP evaluation renderer 仍为 CPP。外置记录中尚无 E15–E40、
-run exit code 或 matched PnP 评价。
+`c2a7723` 的 A/B formal 日志均已到达 E40 最后 iteration 255919，并记录保存
+`model_epoch_040.pth`；E5/10/15/20/25/30/35/40 全部 direct-pose evaluation 已齐，
+BOP evaluation renderer 仍为 CPP。run exit code 与正式 matched PnP 评价尚未提供。
+原始 score JSON 及日志抽取的 EVAL_SUMMARY 已按 run ID 随 EXP020 RECORD 保存紧凑副本。
 
 修正后的首轮 EGL server smoke 已确认 CUDA device 0 上 EGL 1.5 context 能创建，但
 PLY mesh cache 默认写入只读源码根目录 `.cache` 而失败。第二次重跑确认外层 cache
@@ -26,12 +27,14 @@ PLY mesh cache 默认写入只读源码根目录 `.cache` 而失败。第二次�
 现于同步模型加载期间把两层相对 cache 一并定向到可写 `XDG_CACHE_HOME`，且不改变
 镜像原生输入；修复后的 smoke 已通过并进入 formal，先前失败 run 不进入科学结论。
 
-Direct-pose telemetry：E5 的 A/B BOP 为 `0.563426/0.567089`、ADD 为
-`0.255363/0.278893`、reS 为 `0.433679/0.449366`、teS 为
-`0.634141/0.638754`；E10 对应为 `0.518987/0.521398`、`0.253979/0.253979`、
-`0.419839/0.412918`、`0.571857/0.573010`。最新日志行的 A/B global-average
-`total_loss` 均为 `16.49`，`loss_region` 均为 `16.37`；B 的
-`loss_xyz_reproj` 为 `0.009151`。完整逐物体结果和日志口径见 EXP020 RECORD。
+Direct-pose telemetry：E40 A/B BOP `0.460300/0.462563`、ADD(-S)0.1d
+`0.159170/0.152941`、reS `0.326182/0.325952`、teS `0.495502/0.494118`。
+两臂 BOP/ADD 在全部固定点中均于 E5 最大；这只是事后描述，不用于重选模型。
+交叉核对发现 B E15/E20/E25 score JSON 与对应日志 BOP 不一致：保留原文件，
+这三点 reS/teS 的 epoch 归属待核对，不能直接按文件名采用；详情见 RECORD。
+整体随训练下降、B 未形成四项一致收益，但不能据此裁决 correspondence 或 matched
+PnP 主假设。全部固定点评估、最终/最佳点逐物体 ADD 与日志口径见 EXP020 RECORD。
+本次仅同步记录，未重新运行测试、训练或 evaluator。
 
 ### 审查修复后的关键事实（2026-09-09，Observed）
 
@@ -55,8 +58,8 @@ Direct-pose telemetry：E5 的 A/B BOP 为 `0.563426/0.567089`、ADD 为
 - Gradient-scale calibration 实际运行（真实 online-geometry batch，GPU）：
   `g_xyz=4.9539`、`g_reproj_raw=0.3695`、`ratio_raw≈0.075`。REPROJ_LW 梯度比 XYZ
   三项总梯度小约 13×，同数量级；**formal `REPROJ_LW=1.0` 未修改**。
-- 测试：EXP020 36 passed、仓库回归子集 127 passed（2026-09-09 本次整理均已
-  复核）；CPU preflight A/B PASS。
+- 测试：EXP020 36 passed、仓库回归子集 127 passed（2026-09-09 review-fix 与
+  2026-09-10 整理时复核）；CPU preflight A/B PASS。
 
 ## Historical / Deferred：2026-09-08 EPro-PnP solver-in-the-loop 主线
 
@@ -103,9 +106,9 @@ supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
 
 ## 下一步
 
-1. 当前已记录 E5/E10；尚待收集 A/B 的 E15/20/25/30/35/40 固定评估点与 run exit
-   code。
-2. Formal 完成后用 `research/exp020/matched_pnp_eval.py` 做主下游评价（matched
+1. E5–E40 BOP/ADD 已齐；补充 B E15/E20/E25 的明确 epoch 原始 score，核对 reS/teS
+   归属；补充 A/B run exit code 并核对 E40 checkpoint 文件。
+2. 使用明确的 A/B E40 checkpoint，用 `research/exp020/matched_pnp_eval.py` 做主下游评价（matched
    classical PnP/RANSAC，fixed support，A/B 只换 XYZ），必要时 `--bop-eval` 汇总
    BOP-AR/ADD(-S)/reS/teS。
 3. Gate 沿用相对阈值政策（±3%–±5%），先看方向一致性：correspondence error →
