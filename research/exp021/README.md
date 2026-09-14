@@ -59,8 +59,9 @@ python -m research.exp021.preflight --arm C --device cpu
 服务器正式运行前，在同一真实 CUDA/EGL batch 上标定三项 loss 的 CAD-head 梯度，
 再执行 B/C one-step smoke。标定器会除去当前配置权重后测量原始梯度；只在原始
 梯度比超出 `[0.1, 10]` 时建议 2 的幂次权重，并要求加权后各项相对中位数位于
-`[0.25, 4]`。本机 CUDA+CPP batch-1 的建议为 coarse/fine/XYZ = `0.125/1/16`，已写入
-B/C 共享配置；正式训练前仍须用 EGL 重做标定，确认后再 smoke。
+`[0.25, 4]`。本机 CUDA+CPP batch 的建议为 coarse/fine/XYZ = `0.125/1/16`；随后
+lab0/L40 的正式 EGL batch 建议 `0.25/1/16`，因此正式 B/C 共享配置采用服务器建议。
+权重变化后的 release 必须再次通过服务器 EGL 标定和 B/C one-step smoke。
 
 ```bash
 python -m research.exp021.calibrate_loss_weights --device cuda:0 \
@@ -123,7 +124,7 @@ python -m research.exp021.profile_inference \
 - 资源：batch-1、K=4、50 次 warmup/200 次 CUDA timing 下，C 相对 A 的中位延迟
   增幅不超过 25%，峰值 allocated memory 增幅不超过 20%。参数量同时如实记录。
 
-当前 AMP + feature-only 实现已通过本机 CUDA+CPP smoke、梯度标定和 matched
-FP32/AMP batch-48 profile；服务器 EGL 尚需复核。用户报告旧 FP32 B/C formal 正在
-运行，待新 release 通过服务器 gate 后从官方 checkpoint 统一重启。不能据随机初始化
-输出、工程性能或待替换 run 作科学机制判断。
+当前 AMP + feature-only 实现已通过本机 CUDA+CPP 与 lab0/L40 EGL smoke、梯度标定和
+matched FP32/AMP batch-48 profile。首次服务器标定把 coarse 权重从 `0.125` 调整为
+`0.25`，新 release 尚需复核。不能据随机初始化输出、工程性能或待替换 run 作科学
+机制判断。

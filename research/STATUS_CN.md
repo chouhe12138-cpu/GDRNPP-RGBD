@@ -10,8 +10,8 @@ C 臂在 8×8 特征上增加两层图像—CAD Transformer、全局粗区域偏
 注入。V1 固定为 RGB 与冻结阶段，只训练新增 CAD head；不执行 backbone 联合微调。
 对称监督按实例从完整 BOP SE(3) 等价路径中选择一条，三项 loss 共用该分支。
 
-当前状态：`AMP_FEATURE_ONLY_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING /
-FP32_FORMAL_ACTIVE_PENDING_RESTART`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
+当前状态：`SERVER_EGL_CALIBRATION_PASS / COARSE_WEIGHT_UPDATE_REVALIDATION_PENDING /
+FP32_B_REPLACED / FP32_C_ACTIVE_PENDING_RESTART`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
 16 项测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
 参数，官方 checkpoint 只缺 `cad_head.*`，优化步后冻结张量不变。真实 LM-O 单目标
 evaluator 接线 smoke 已完成，能输出 fixed support、K=1/2/4/8、对称/路由/几何与
@@ -30,10 +30,15 @@ C→lab1。用户随后启动的 FP32 B/C formal 当前约为 `1.89/2.96 s/iter`
 release 通过 EGL gate 后终止并从官方 checkpoint 重启，不混合精度续训。新实现将
 训练路径改为可选全局增强后只运行一次 feature decoder，跳过零权重旧输出和 PnP，
 并显式启用 FP16 AMP；几何 target/`cdist` 保持 FP32。本机 CUDA+CPP batch-1 AMP
-smoke 与标定 PASS，GradScaler 保持 65536，权重仍建议 `0.125/1/16`。同代码 matched
+smoke 与标定 PASS，GradScaler 保持 65536。本机建议权重为 `0.125/1/16`；source
+`8a736c8` 的 lab0/L40 EGL 标定建议 `0.25/1/16`，加权梯度相对中位数为
+`1.133/1.000/0.582`，因此已按预定标定规则更新共享配置，等待新 release 复核。同代码 matched
 batch-48 profile 中，B AMP 相对 FP32 的模型前反向缩短约 17.0%、端到端中位数缩短
 13.5%；C 分别缩短约 8.4%/3.0%，峰值显存下降约 8.6%。本机 DataLoader 有秒级长尾，
-完整 research 回归为 184 passed；服务器 EGL profile/smoke、新 AMP formal 和完整
+完整 research 回归为 184 passed。source `8a736c8` 的服务器 B/C EGL AMP smoke 均
+PASS，无跳步且冻结参数不变；batch-48 profile 中 B FP32→AMP 端到端中位数
+`1.457→1.420 s`，C 为 `1.650→1.335 s`，但 DataLoader 仍有 4.8–6.9 秒长尾，B 的
+均值与模型前反向没有稳定加速。更新权重后的服务器复核、新 AMP formal 和完整
 matched PnP/BOP 尚未运行。
 
 协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
@@ -143,9 +148,9 @@ matched PnP 缺口仍保留；不启动 EPro。文献对照与口径见
 
 ## 下一步
 
-1. 用新 release 在 lab0 做 EXP021 AMP EGL 标定、B/C one-step smoke，以及同代码
-   FP32/AMP batch-48 matched profile；若权重建议改变，回到本地提交配置后重做 release。
-2. gate 通过后记录并终止待替换 FP32 B/C run；B→lab0、C→lab1 从官方 checkpoint
+1. 将服务器 EGL 建议的 coarse/fine/XYZ `0.25/1/16` 做成新 release，在 lab0 重跑
+   标定与 B/C AMP one-step smoke；配置建议一致且无跳步后通过工程 gate。
+2. gate 通过后记录并终止仍在运行的 FP32 C；B→lab0、C→lab1 从官方 checkpoint
    启动唯一 AMP formal，不按中间 LM-O 结果选择模型。
 3. 对 B/C 固定 checkpoint 做 K=1/2/4/8 fixed-support matched RANSAC-PnP、完整
    BOP evaluator 与 batch-1 profile，按预注册 mechanism/resource gate 决策。

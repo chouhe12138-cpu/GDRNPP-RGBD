@@ -410,7 +410,7 @@ def test_configs_isolate_b_and_c_and_enable_geometry():
     assert b.MODEL.POSE_NET.BACKBONE.FREEZE
     assert b.MODEL.POSE_NET.GEO_HEAD.FREEZE
     assert b.MODEL.POSE_NET.PNP_NET.FREEZE
-    assert b.MODEL.POSE_NET.CAD_HEAD.INIT_CFG.coarse_loss_weight == 0.125
+    assert b.MODEL.POSE_NET.CAD_HEAD.INIT_CFG.coarse_loss_weight == 0.25
     assert b.MODEL.POSE_NET.CAD_HEAD.INIT_CFG.fine_loss_weight == 1.0
     assert b.MODEL.POSE_NET.CAD_HEAD.INIT_CFG.xyz_loss_weight == 16.0
     b_dict, c_dict = b.to_dict(), c.to_dict()

@@ -1,0 +1,48 @@
+{
+  "B": {
+    "status": "PASS",
+    "arm": "B",
+    "real_data": true,
+    "formal_training": false,
+    "batch_size": 2,
+    "renderer_type": "egl",
+    "formal_renderer_match": true,
+    "precision": "amp-fp16",
+    "amp_enabled": true,
+    "grad_scale_before": 65536.0,
+    "grad_scale_after": 65536.0,
+    "optimizer_step_applied": true,
+    "trainable_parameters": 233347,
+    "active_gradient_tensors": 14,
+    "losses": {
+      "loss_cad_coarse": 0.5126355886459351,
+      "loss_cad_fine": 4.11518669128418,
+      "loss_cad_xyz": 0.08088675141334534
+    },
+    "peak_allocated_bytes": 992137728,
+    "frozen_parameters_unchanged": true
+  },
+  "C": {
+    "status": "PASS",
+    "arm": "C",
+    "real_data": true,
+    "formal_training": false,
+    "batch_size": 2,
+    "renderer_type": "egl",
+    "formal_renderer_match": true,
+    "precision": "amp-fp16",
+    "amp_enabled": true,
+    "grad_scale_before": 65536.0,
+    "grad_scale_after": 65536.0,
+    "optimizer_step_applied": true,
+    "trainable_parameters": 2923587,
+    "active_gradient_tensors": 60,
+    "losses": {
+      "loss_cad_coarse": 0.5376919507980347,
+      "loss_cad_fine": 4.1422224044799805,
+      "loss_cad_xyz": 0.09098324179649353
+    },
+    "peak_allocated_bytes": 1088520192,
+    "frozen_parameters_unchanged": true
+  }
+}

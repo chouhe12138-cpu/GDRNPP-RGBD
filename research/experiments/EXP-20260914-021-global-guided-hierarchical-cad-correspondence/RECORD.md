@@ -1,7 +1,7 @@
 # EXP021 全局引导的层级 CAD 对应预测
 
 - `experiment_id`: `EXP-20260914-021-global-guided-hierarchical-cad-correspondence`
-- 状态：`AMP_FEATURE_ONLY_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING / FP32_FORMAL_ACTIVE_PENDING_RESTART`
+- 状态：`SERVER_EGL_CALIBRATION_PASS / COARSE_WEIGHT_UPDATE_REVALIDATION_PENDING / FP32_B_REPLACED / FP32_C_ACTIVE_PENDING_RESTART`
 - 日期：2026-09-14
 - seed：42（训练）；20260914（CAD 表面采样）；20260730+目标序号（RANSAC）
 - 实现开始时的父 commit：`c2b7c2f`；正式 run 记录实际 release commit
@@ -102,6 +102,24 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
   只用于工程比较，不能替代服务器 EGL gate。
 - AMP + feature-only 修改后的完整 `pytest -q research`：184 passed；B/C CPU
   preflight 均 PASS，trainable 参数数与官方 checkpoint 缺失 key 契约未变。
+- source `8a736c8`、lab0/L40、真实 batch-2 EGL AMP 标定 PASS。原始 gradient norm
+  coarse/fine/XYZ 为 `4.10657/0.90651/0.032990`，服务器建议权重为
+  `0.25/1/16`，对应相对中位数 `1.1325/1.0000/0.5823`。该建议与本机 CPP 的
+  `0.125/1/16` 不同，按预定规则以正式 renderer 结果更新 B/C 共享配置并重做 release。
+- 同 release 的 B/C batch-2 EGL AMP one-step smoke 均 PASS：GradScaler 均为
+  `65536→65536`，optimizer step 已执行，冻结参数逐张量不变；活跃梯度张量分别为
+  `14/60`，峰值 allocated 为 `992,137,728/1,088,520,192` bytes。
+- lab0/L40/EGL、batch 48、16 workers、5 warmup + 20 measured profile 全部 PASS，
+  FP32/AMP 均无非有限梯度或跳步。B FP32→AMP：端到端 median
+  `1.4572→1.4199 s`（`-2.6%`），mean `1.7832→1.8984 s`（`+6.5%`），峰值
+  `1.701→1.717 GB`（`+1.0%`）。C：median `1.6498→1.3350 s`（`-19.1%`），mean
+  `1.9897→1.7137 s`（`-13.9%`），峰值 `3.551→3.241 GB`（`-8.7%`）。四组
+  DataLoader 最大等待为 `4.78–6.93 s`；B 的 mean 和 forward+backward 未显示稳定
+  AMP 加速，因此只把这些结果作为工程资源证据，不把单次长尾差异解释为模型收益。
+- 上述六份紧凑原始 JSON 保存在本 RECORD 同目录的 `evidence/8a736c8-lab0-egl/`。
+  lab0 已切换到新 release 才能产生这些结果，因此旧 FP32 B 已被替换；其最终 iteration
+  尚未随 JSON 提供。lab1 的旧 FP32 C 在本轮 gate 期间继续运行，待更新权重复核通过
+  后再精确终止。
 
 ## Derived / Interpretation / Decision
 
@@ -112,16 +130,22 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
   batch-48 formal/audit 均使用 16 workers，EXP021 先前继承公共基线的 8 属配置遗漏。
 - Interpretation：AMP 主要缩短 tensor-core 友好的前向；CAD 标签、排序、索引和
   FP32 `cdist` 限制 B/C 的端到端收益，C 的本机 DataLoader 长尾进一步稀释总收益。
+- Interpretation：lab0 EGL profile 中 AMP 对 C 的端到端中位数和显存有明确工程收益；
+  B 的 20-step 结果受 DataLoader 长尾影响，且模型 forward+backward 没有稳定缩短，
+  不据此承诺 B formal 的显著加速。AMP 的数值完整性与冻结隔离门禁已经通过。
 - Decision：原空闲 GPU `≤1.2/1.5 s` 启动 gate 及当前实际偏离继续作为 Observed
   保留。2026-09-14 用户接受训练耗时，并决定以同代码 FP32→AMP 相对提速和数值完整性
   做本轮工程 review；新 release 必须先在服务器完成 EGL 标定、B/C smoke 和 matched
   profile。通过后终止待替换 FP32 runs，正式配置固定 AMP + 16 workers，按 B→lab0、
   C→lab1 从官方 checkpoint 重启；不用 smoke 选择 checkpoint，不因 direct-pose
   telemetry 改写 matched-PnP 主 gate。
+- Decision：正式 EGL 单 batch 标定优先于本机 CPP 标定；将 coarse/fine/XYZ 从
+  `0.125/1/16` 更新为 `0.25/1/16`。新配置必须重新提交、生成唯一 bundle，并在
+  lab0 重跑 EGL 标定与 B/C AMP smoke；建议一致后才替换 lab1 和启动 formal。
 
 ## 待生成的正式证据
 
-- loss 梯度标定 JSON、B/C CUDA/EGL smoke 输出与峰值显存。
+- 更新为 `0.25/1/16` 后的 loss 梯度标定 JSON 与 B/C CUDA/EGL smoke。
 - B/C 唯一 run_id、源码 commit、checkpoint 文件名/epoch、全部预定正式评估点。
 - E40 A/B/C matched K sweep、完整 BOP evaluator 输出、gate report、batch-1 profile。
 - 最终与最佳点的聚合和逐物体结果；失败 run 保留原因与有效证据边界。

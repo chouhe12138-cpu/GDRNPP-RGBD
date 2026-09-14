@@ -1,0 +1,38 @@
+{
+  "amp_enabled": true,
+  "batch_size": 2,
+  "config": "/workspace/gdrnpp/configs/gdrn/lmo_pbr/research/exp021_global_hierarchical_cad/b_hierarchical.py",
+  "configured_weights": {
+    "loss_cad_coarse": 0.125,
+    "loss_cad_fine": 1.0,
+    "loss_cad_xyz": 16.0
+  },
+  "device": "cuda:0",
+  "formal_renderer_match": true,
+  "formal_training": false,
+  "grad_scale": 65536.0,
+  "precision": "amp-fp16",
+  "raw_gradient_norms": {
+    "loss_cad_coarse": 4.106565568458892,
+    "loss_cad_fine": 0.906514423111169,
+    "loss_cad_xyz": 0.032989903889059674
+  },
+  "raw_losses": {
+    "loss_cad_coarse": 4.1010847091674805,
+    "loss_cad_fine": 4.11518669128418,
+    "loss_cad_xyz": 0.005055422428995371
+  },
+  "real_data": true,
+  "recommended_weights": {
+    "loss_cad_coarse": 0.25,
+    "loss_cad_fine": 1.0,
+    "loss_cad_xyz": 16.0
+  },
+  "renderer_type": "egl",
+  "status": "PASS",
+  "weighted_gradient_ratios_to_median": {
+    "loss_cad_coarse": 1.1325152319047245,
+    "loss_cad_fine": 1.0,
+    "loss_cad_xyz": 0.5822725472071437
+  }
+}

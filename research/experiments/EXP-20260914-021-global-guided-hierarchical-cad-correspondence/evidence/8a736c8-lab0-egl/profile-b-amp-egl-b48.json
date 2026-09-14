@@ -1,0 +1,53 @@
+{
+  "status": "PASS",
+  "arm": "B",
+  "device": "NVIDIA L40",
+  "batch_size": 48,
+  "renderer_type": "egl",
+  "precision": "amp-fp16",
+  "amp_enabled": true,
+  "final_grad_scale": 65536.0,
+  "nonfinite_or_skipped_steps": 0,
+  "warmup_steps": 5,
+  "measured_steps": 20,
+  "phases": {
+    "data_loader_ms": {
+      "mean_ms": 361.79630623664707,
+      "median_ms": 0.10802503675222397,
+      "min_ms": 0.08022692054510117,
+      "max_ms": 6933.673695195466
+    },
+    "batch_geometry_ms": {
+      "mean_ms": 405.13123844284564,
+      "median_ms": 201.80794061161578,
+      "min_ms": 52.52478690817952,
+      "max_ms": 1205.6636377237737
+    },
+    "forward_ms": {
+      "mean_ms": 630.5140309268609,
+      "median_ms": 613.7398460414261,
+      "min_ms": 521.7131399549544,
+      "max_ms": 772.137985099107
+    },
+    "backward_ms": {
+      "mean_ms": 485.77911094762385,
+      "median_ms": 484.1715283691883,
+      "min_ms": 418.8732341863215,
+      "max_ms": 611.0725700855255
+    },
+    "optimizer_ms": {
+      "mean_ms": 15.22438379470259,
+      "median_ms": 8.887481410056353,
+      "min_ms": 5.681753624230623,
+      "max_ms": 43.434442952275276
+    }
+  },
+  "total": {
+    "mean_ms": 1898.44507034868,
+    "median_ms": 1419.875399209559,
+    "min_ms": 1151.6307704150677,
+    "max_ms": 9026.375403627753,
+    "samples_per_second": 25.283849793549216
+  },
+  "peak_allocated_bytes": 1717354496
+}
