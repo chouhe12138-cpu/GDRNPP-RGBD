@@ -23,6 +23,12 @@ from research.diagnostics.pose_structure.model_access import make_model_kwargs, 
 from research.diagnostics.pose_structure.runtime import set_seed
 from research.exp013.preflight import PROJECT_ROOT, checkpoint_model_state
 from research.exp021.preflight import EXPERIMENT_ID
+from research.exp021.precision import (
+    PRECISION_CHOICES,
+    autocast_context,
+    grad_scaler,
+    resolve_precision,
+)
 from research.run_contract import validate_research_run_config
 
 
@@ -30,10 +36,10 @@ CONFIG = PROJECT_ROOT / "configs/gdrn/lmo_pbr/research/exp021_global_hierarchica
 LOSS_KEYS = ("loss_cad_coarse", "loss_cad_fine", "loss_cad_xyz")
 
 
-def _grad_norm(module: torch.nn.Module) -> float:
+def _grad_norm(module: torch.nn.Module, divisor: float = 1.0) -> float:
     return math.sqrt(
         sum(
-            float(parameter.grad.detach().square().sum())
+            float((parameter.grad.detach().float() / divisor).square().sum())
             for parameter in module.parameters()
             if parameter.grad is not None
         )
@@ -61,6 +67,7 @@ def run(
     device: torch.device,
     batch_size: int,
     renderer_type: str = "egl",
+    precision: str = "config",
 ) -> dict:
     cfg = Config.fromfile(str(config))
     validate_research_run_config(cfg, mode="formal", expected_experiment_id=EXPERIMENT_ID)
@@ -72,8 +79,10 @@ def run(
     cfg.SOLVER.IMS_PER_BATCH = batch_size
     cfg.SOLVER.REFERENCE_BS = batch_size
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
+    effective_precision = resolve_precision(cfg, precision)
     register_datasets_in_cfg(cfg)
-    model, _ = build_model_optimizer(cfg)
+    model, _optimizer = build_model_optimizer(cfg)
+    scaler = grad_scaler(effective_precision)
     incompatible = model.load_state_dict(dict(checkpoint_model_state(weights)), strict=False)
     if incompatible.unexpected_keys or any(not key.startswith("cad_head.") for key in incompatible.missing_keys):
         raise RuntimeError(f"Official checkpoint incompatibility: {incompatible}")
@@ -87,7 +96,7 @@ def run(
         kwargs = make_model_kwargs(batch, do_loss=True)
         kwargs["roi_zoom_cams"] = batch.get("roi_zoom_K")
         kwargs["cad_beam_ks"] = (4,)
-        with EventStorage():
+        with EventStorage(), autocast_context(effective_precision, device):
             _output, losses = model(model_input_from_batch(cfg, batch), **kwargs)
         if set(losses) != set(LOSS_KEYS):
             raise RuntimeError(f"Unexpected calibration losses: {sorted(losses)}")
@@ -100,8 +109,19 @@ def run(
         for index, key in enumerate(LOSS_KEYS):
             model.zero_grad(set_to_none=True)
             raw_loss = losses[key] / configured_weights[key]
-            raw_loss.backward(retain_graph=index < len(LOSS_KEYS) - 1)
-            norms[key] = _grad_norm(model.cad_head)
+            scaler.scale(raw_loss).backward(
+                retain_graph=index < len(LOSS_KEYS) - 1
+            )
+            scale = float(scaler.get_scale())
+            if any(
+                parameter.grad is not None
+                and not bool(torch.isfinite(parameter.grad).all())
+                for parameter in model.cad_head.parameters()
+            ):
+                raise RuntimeError(
+                    f"Non-finite scaled gradients for {key} at scale {scale}"
+                )
+            norms[key] = _grad_norm(model.cad_head, divisor=scale)
         recommendation = recommended_weights(norms)
         weighted = {key: norms[key] * recommendation[key] for key in LOSS_KEYS}
         weighted_median = float(np.median(list(weighted.values())))
@@ -116,6 +136,9 @@ def run(
             "batch_size": batch_size,
             "renderer_type": renderer_type,
             "formal_renderer_match": renderer_type == "egl",
+            "precision": effective_precision,
+            "amp_enabled": effective_precision == "amp-fp16",
+            "grad_scale": float(scaler.get_scale()),
             "configured_weights": configured_weights,
             "raw_losses": {
                 key: float(losses[key].detach()) / configured_weights[key]
@@ -138,13 +161,19 @@ def main() -> int:
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--renderer-type", choices=("egl", "cpp"), default="egl")
+    parser.add_argument("--precision", choices=PRECISION_CHOICES, default="config")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     device = torch.device(args.device)
     if device.type != "cuda" or not torch.cuda.is_available():
         raise RuntimeError("EXP021 calibration requires a real CUDA/EGL batch")
     report = run(
-        args.config, args.weights, device, args.batch_size, args.renderer_type
+        args.config,
+        args.weights,
+        device,
+        args.batch_size,
+        args.renderer_type,
+        args.precision,
     )
     text = json.dumps(report, indent=2, sort_keys=True)
     print(text)

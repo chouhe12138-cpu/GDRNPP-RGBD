@@ -101,6 +101,7 @@ def validate_research_run_config(
         "training_geometry_supervision": bool(training_supervision),
         "training_renderer": cfg.MODEL.POSE_NET.get("XYZ_RENDERER", None),
         "evaluation_renderer": evaluation_renderer,
+        "amp_enabled": bool(cfg.SOLVER.get("AMP", {}).get("ENABLED", False)),
     }
 
 

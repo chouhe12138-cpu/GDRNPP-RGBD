@@ -172,6 +172,70 @@ class GDRN_DoubleMask(nn.Module):
         conv_feat = self.backbone(x)  # [bs, c, 8, 8]
         if self.neck is not None:
             conv_feat = self.neck(conv_feat)
+
+        # EXP021 training only consumes the decoder feature and returns CAD
+        # losses before the legacy dense heads/PnP path.  Run exactly one
+        # feature decoder here: B decodes the frozen backbone feature, while C
+        # first injects global CAD guidance and then decodes the enhanced
+        # feature.  This avoids both unused legacy output convolutions and C's
+        # former redundant pre-enhancement decoder pass.
+        if cad_enabled and do_loss:
+            if not hasattr(self.geo_head_net, "forward_features"):
+                raise TypeError("EXP021 requires a geo head with forward_features()")
+            forbidden = (
+                "XYZ_LW",
+                "MASK_LW",
+                "FULL_MASK_LW",
+                "REGION_LW",
+                "PM_LW",
+                "CENTROID_LW",
+                "Z_LW",
+                "ROT_LW",
+                "TRANS_LW",
+                "BIND_LW",
+                "REPROJ_LW",
+            )
+            nonzero = [
+                name for name in forbidden if float(loss_cfg.get(name, 0.0)) != 0.0
+            ]
+            if nonzero:
+                raise ValueError(
+                    f"EXP021 CAD_HEAD requires legacy losses to be zero: {nonzero}"
+                )
+            if roi_classes is None or roi_extents is None:
+                raise ValueError("EXP021 CAD_HEAD requires roi_classes and roi_extents")
+            if gt_xyz is None or gt_mask_visib is None:
+                raise ValueError(
+                    "EXP021 CAD_HEAD training requires gt_xyz and gt_mask_visib"
+                )
+            backbone_tensor = (
+                conv_feat[0] if isinstance(conv_feat, (tuple, list)) else conv_feat
+            )
+            enhanced_feature, global_bias = self.cad_head.enhance_backbone(
+                backbone_tensor, roi_classes
+            )
+            decoder_feature = self.geo_head_net.forward_features(enhanced_feature)
+            _cad_state, cad_losses, cad_stats = self.cad_head(
+                decoder_feature,
+                roi_classes,
+                global_bias=global_bias,
+                beam_ks=cad_beam_ks,
+                gt_xyz_norm=gt_xyz,
+                gt_mask=gt_mask_visib,
+            )
+            storage = get_event_storage()
+            storage.put_scalars(
+                **{
+                    "vis/cad_symmetry_branch_mean": float(
+                        cad_stats["selected_symmetry_branch_mean"]
+                    ),
+                    "vis/cad_foreground_pixels": float(
+                        cad_stats["cad_foreground_pixels"]
+                    ),
+                }
+            )
+            return {}, cad_losses
+
         if cad_enabled:
             if not hasattr(self.geo_head_net, "forward_features"):
                 raise TypeError("EXP021 requires a geo head with forward_features()")
@@ -241,20 +305,9 @@ class GDRN_DoubleMask(nn.Module):
                 roi_classes,
                 global_bias=global_bias,
                 beam_ks=cad_beam_ks,
-                gt_xyz_norm=gt_xyz if do_loss else None,
-                gt_mask=gt_mask_visib if do_loss else None,
+                gt_xyz_norm=None,
+                gt_mask=None,
             )
-            if do_loss:
-                storage = get_event_storage()
-                storage.put_scalars(
-                    **{
-                        "vis/cad_symmetry_branch_mean": float(
-                            cad_stats["selected_symmetry_branch_mean"]
-                        ),
-                        "vis/cad_foreground_pixels": float(cad_stats["cad_foreground_pixels"]),
-                    }
-                )
-                return {}, cad_losses
 
             default_k = self.cad_head.default_beam_k
             cad_xyz = cad_state["decoded"][default_k]["xyz_norm"]

@@ -6,9 +6,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
+import torch.nn as nn
+from detectron2.utils.events import EventStorage
 from mmcv import Config
+from mmcv.utils import ConfigDict
 
 from core.gdrn_modeling.engine.engine_utils import geometry_supervision_enabled
+from core.gdrn_modeling.models.GDRN_double_mask import GDRN_DoubleMask
 from core.gdrn_modeling.models.heads.global_hierarchical_cad_head import (
     GlobalGuidedHierarchicalCADHead,
     load_hierarchy,
@@ -19,10 +23,99 @@ from core.gdrn_modeling.models.heads.top_down_doublemask_xyz_region_head import 
 from research.exp021.calibrate_loss_weights import recommended_weights
 from research.exp021.matched_pnp_eval import mechanism_gates
 from research.exp021.profile_inference import resource_gate
+from research.exp021.precision import resolve_precision
+from research.run_contract import validate_research_run_config
 
 
 ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = ROOT / "configs/gdrn/lmo_pbr/research/exp021_global_hierarchical_cad"
+TEMPLATE = ROOT / "configs/gdrn/lmo_pbr/research/templates/pose_head/train.py"
+
+
+class _FeatureOnlyGeoHead(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.feature_calls = 0
+        self.output_calls = 0
+        self.last_input = None
+
+    def forward_features(self, value):
+        self.feature_calls += 1
+        self.last_input = value
+        return value * 2.0
+
+    def forward(self, value, return_features=False):
+        self.output_calls += 1
+        raise AssertionError("EXP021 training must not compute legacy dense outputs")
+
+
+class _TrainingPathCADHead(nn.Module):
+    def __init__(self, global_guidance):
+        super().__init__()
+        self.use_global_guidance = global_guidance
+        self.default_beam_k = 4
+        self.scale = nn.Parameter(torch.tensor(0.0 if global_guidance else 1.0))
+
+    def enhance_backbone(self, feature, _classes):
+        if self.use_global_guidance:
+            return feature + self.scale, feature.new_zeros((feature.shape[0], 64))
+        return feature, None
+
+    def forward(
+        self,
+        decoder_feature,
+        _classes,
+        global_bias=None,
+        **_kwargs,
+    ):
+        loss = decoder_feature.mean() + self.scale
+        if global_bias is not None:
+            loss = loss + global_bias.mean()
+        return {}, {"loss_cad_xyz": loss}, {
+            "selected_symmetry_branch_mean": loss.detach() * 0,
+            "cad_foreground_pixels": loss.detach() * 0 + decoder_feature.shape[0],
+        }
+
+
+def _training_path_model(global_guidance):
+    model = GDRN_DoubleMask.__new__(GDRN_DoubleMask)
+    nn.Module.__init__(model)
+    zero_losses = {
+        name: 0.0
+        for name in (
+            "XYZ_LW",
+            "MASK_LW",
+            "FULL_MASK_LW",
+            "REGION_LW",
+            "PM_LW",
+            "CENTROID_LW",
+            "Z_LW",
+            "ROT_LW",
+            "TRANS_LW",
+            "BIND_LW",
+            "REPROJ_LW",
+        )
+    }
+    model.cfg = ConfigDict(
+        MODEL=ConfigDict(
+            POSE_NET=ConfigDict(
+                GEO_HEAD=ConfigDict(FREEZE=True, TRAIN_SUPERVISION=False),
+                PNP_NET=ConfigDict(),
+                LOSS_CFG=ConfigDict(zero_losses),
+                USE_MTL=False,
+                NUM_CLASSES=8,
+                OUTPUT_RES=64,
+            )
+        )
+    )
+    model.backbone = nn.Identity()
+    model.neck = None
+    model.geo_head_net = _FeatureOnlyGeoHead()
+    model.cad_head = _TrainingPathCADHead(global_guidance)
+    model.pnp_net = None
+    model.quality_coverage_net = None
+    model.pose_corrector = None
+    return model
 
 
 def _reference_loss(head, decoded_state, roi_classes, gt_xyz_norm, gt_mask):
@@ -275,6 +368,31 @@ def test_geo_head_feature_api_is_backward_compatible():
     assert with_features[-1].shape == (1, 32, 64, 64)
 
 
+@pytest.mark.parametrize("global_guidance", [False, True])
+def test_cad_training_uses_one_feature_decoder_and_no_legacy_outputs(
+    global_guidance,
+):
+    model = _training_path_model(global_guidance)
+    image = torch.ones(2, 4, 8, 8)
+    with EventStorage():
+        _output, losses = model(
+            image,
+            gt_xyz=torch.ones(2, 3, 8, 8),
+            gt_mask_visib=torch.ones(2, 8, 8),
+            roi_classes=torch.tensor([0, 1]),
+            roi_extents=torch.ones(2, 3),
+            do_loss=True,
+        )
+    assert set(losses) == {"loss_cad_xyz"}
+    assert model.geo_head_net.feature_calls == 1
+    assert model.geo_head_net.output_calls == 0
+    expected = image + (model.cad_head.scale if global_guidance else 0)
+    assert torch.equal(model.geo_head_net.last_input, expected)
+    sum(losses.values()).backward()
+    assert model.cad_head.scale.grad is not None
+    assert torch.isfinite(model.cad_head.scale.grad)
+
+
 def test_configs_isolate_b_and_c_and_enable_geometry():
     b = Config.fromfile(str(CONFIG_ROOT / "b_hierarchical.py"))
     c = Config.fromfile(str(CONFIG_ROOT / "c_global.py"))
@@ -283,6 +401,11 @@ def test_configs_isolate_b_and_c_and_enable_geometry():
     assert geometry_supervision_enabled(b) and geometry_supervision_enabled(c)
     assert b.DATALOADER.NUM_WORKERS == c.DATALOADER.NUM_WORKERS == 16
     assert smoke_b.DATALOADER.NUM_WORKERS == smoke_c.DATALOADER.NUM_WORKERS == 2
+    assert b.SOLVER.AMP.ENABLED and c.SOLVER.AMP.ENABLED
+    assert smoke_b.SOLVER.AMP.ENABLED and smoke_c.SOLVER.AMP.ENABLED
+    assert resolve_precision(b, "config") == "amp-fp16"
+    assert resolve_precision(b, "fp32") == "fp32"
+    assert validate_research_run_config(b, mode="formal")["amp_enabled"] is True
     assert b.INPUT.WITH_DEPTH is False and c.INPUT.WITH_DEPTH is False
     assert b.MODEL.POSE_NET.BACKBONE.FREEZE
     assert b.MODEL.POSE_NET.GEO_HEAD.FREEZE
@@ -298,6 +421,13 @@ def test_configs_isolate_b_and_c_and_enable_geometry():
         b_dict.pop(key)
         c_dict.pop(key)
     assert b_dict == c_dict
+
+
+def test_future_research_template_enables_amp_without_changing_global_default():
+    template = Config.fromfile(str(TEMPLATE))
+    global_base = Config.fromfile(str(ROOT / "configs/_base_/common_base.py"))
+    assert template.SOLVER.AMP.ENABLED is True
+    assert global_base.SOLVER.AMP.ENABLED is False
 
 
 def test_b_and_c_shared_parameters_start_identically(hierarchy_path):

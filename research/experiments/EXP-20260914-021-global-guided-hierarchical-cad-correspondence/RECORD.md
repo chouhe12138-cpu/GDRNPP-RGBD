@@ -1,7 +1,7 @@
 # EXP021 全局引导的层级 CAD 对应预测
 
 - `experiment_id`: `EXP-20260914-021-global-guided-hierarchical-cad-correspondence`
-- 状态：`PERFORMANCE_FIX_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING / FORMAL_NOT_STARTED`
+- 状态：`AMP_FEATURE_ONLY_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING / FP32_FORMAL_ACTIVE_PENDING_RESTART`
 - 日期：2026-09-14
 - seed：42（训练）；20260914（CAD 表面采样）；20260730+目标序号（RANSAC）
 - 实现开始时的父 commit：`c2b7c2f`；正式 run 记录实际 release commit
@@ -83,6 +83,25 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
   仅为 `0.262/0.263 s`，不是主瓶颈。改为 8 workers 后，总耗时均值降至
   `2.214/3.002 s`、中位数 `1.619/2.635 s`，DataLoader 均值降至
   `0.621/0.507 s`，但仍出现 `3.590/4.511 s` 的偶发等待峰值。
+- 用户报告随后启动的 FP32 formal 正在运行：截图中 lab0/B 在 iter 999 的全局平均
+  `1.8918 s/iter`、lab1/C 在 iter 499 为 `2.9619 s/iter`，峰值 allocated 约
+  `5286/5461 MiB`；run ID 与精确 source 尚未提供。用户决定待 AMP release 通过
+  服务器 gate 后终止两臂，并从官方 checkpoint 重新开始，不续训 FP32 checkpoint。
+- AMP + feature-only 本地实现跳过训练时零权重的 legacy output convolutions，B/C
+  均只运行一次 `geo_head.forward_features()`；C 先做全局增强，梯度仍经冻结 decoder
+  回到 global-guidance。推理路径未变。EXP021 16 项测试覆盖一次调用、无 legacy
+  outputs、C 全局梯度和未来配置 AMP 默认。
+- 本机 RTX 4060 + CPP batch-1 AMP smoke B/C PASS：GradScaler `65536→65536`，
+  optimizer 确实更新 CAD 参数，冻结参数不变；loss 与 FP32 结果接近。AMP 标定原始
+  gradient norm 为 `7.8417/1.2717/0.06850`，仍建议 `0.125/1/16`。
+- 同代码、seed、batch 48、16 workers、5 warmup + 20 measured 的本机 CPP matched
+  profile：B FP32→AMP 的 forward+backward 为 `2.230→1.851 s`（`-17.0%`），端到端
+  median `2.709→2.344 s`（`-13.5%`），peak allocated `1.699→1.717 GB`；C 为
+  `2.215→2.029 s`（`-8.4%`）、median `2.647→2.568 s`（`-3.0%`）、peak
+  `3.548→3.241 GB`（`-8.6%`）。DataLoader 各有一次 2.9–5.9 秒长尾，本机总耗时
+  只用于工程比较，不能替代服务器 EGL gate。
+- AMP + feature-only 修改后的完整 `pytest -q research`：184 passed；B/C CPU
+  preflight 均 PASS，trainable 参数数与官方 checkpoint 缺失 key 契约未变。
 
 ## Derived / Interpretation / Decision
 
@@ -91,10 +110,14 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
 - Interpretation：本地证据支持实现契约与梯度隔离，尚不支持任何机制效果结论。
 - Interpretation：服务器 w2/w8 对比表明总耗时首先受 DataLoader 并发影响；近期
   batch-48 formal/audit 均使用 16 workers，EXP021 先前继承公共基线的 8 属配置遗漏。
-- Decision：性能修复必须以新 commit 在服务器重新完成 EGL B/C smoke、batch-48
-  性能诊断与 audit；正式配置显式固定 16 workers，并按 B→lab0、C→lab1 并行执行。
-  空闲 GPU 下总训练步达到 B/C `≤1.2/1.5 s` 后，才开始 formal；不用 smoke 选择
-  checkpoint，不因 direct-pose telemetry 改写 matched-PnP 主 gate。
+- Interpretation：AMP 主要缩短 tensor-core 友好的前向；CAD 标签、排序、索引和
+  FP32 `cdist` 限制 B/C 的端到端收益，C 的本机 DataLoader 长尾进一步稀释总收益。
+- Decision：原空闲 GPU `≤1.2/1.5 s` 启动 gate 及当前实际偏离继续作为 Observed
+  保留。2026-09-14 用户接受训练耗时，并决定以同代码 FP32→AMP 相对提速和数值完整性
+  做本轮工程 review；新 release 必须先在服务器完成 EGL 标定、B/C smoke 和 matched
+  profile。通过后终止待替换 FP32 runs，正式配置固定 AMP + 16 workers，按 B→lab0、
+  C→lab1 从官方 checkpoint 重启；不用 smoke 选择 checkpoint，不因 direct-pose
+  telemetry 改写 matched-PnP 主 gate。
 
 ## 待生成的正式证据
 

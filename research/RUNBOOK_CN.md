@@ -217,6 +217,11 @@ config 等短变量，一行执行一个命令，不使用超长单行或反斜�
 训练 loop 在每个预定 evaluation 点先保存 epoch checkpoint，再运行 BOP evaluation；
 因此 evaluation 异常不会抹掉已经完成的 epoch 状态。
 
+新建正式研究训练配置默认显式设置 `SOLVER.AMP.ENABLED=True`；历史实验配置保持原值。
+启用 AMP 的实验必须让 CUDA smoke/profile 使用与 formal 相同的 autocast 和 GradScaler，
+不能用 FP32 诊断代替 AMP 证据。因算子或数值问题关闭 AMP 时，在对应 RECORD 中记录
+smoke 输出与例外范围。
+
 正式流程为 bundle/只读 release checkout → `create IMAGE_REF` → `run`/`eval`。
 `create` 会核对 image revision 与当前 native/环境输入，并自动补齐 Git ignored
 native artifacts，无需手工复制 `.so`。output、home、XDG runtime cache 与 dataset
@@ -233,3 +238,5 @@ docker/l40/experiment.sh lab0 eval EXP-... configs/.../eval.py \
 `run`/`eval` 自动建立唯一输出目录，后台执行并写 `console.log`、`exit_code`。启动后
 不要修改服务器 checkout 或镜像。完成后把关键指标、checkpoint 文件名/epoch、
 run ID、源码 commit 和结论写入对应 RECORD；不要提交 checkpoint 或完整日志。
+smoke/profile 启动后至少间隔 10–15 分钟再检查；formal 首次在 15–30 分钟确认数值、
+显存和吞吐，之后按约 6 小时或固定 checkpoint 节点检查，避免持续 `tail -f` 和频繁轮询。

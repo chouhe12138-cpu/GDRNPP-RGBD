@@ -17,7 +17,13 @@ B/C 除 `use_global_guidance` 外配置相同。C 的共享模块与 B 按同一
 全局注入的最后一层为零初始化，因此初始 decoder 输入与冻结官方路径一致。
 V1 不解冻 backbone，也不训练原有 XYZ/Mask/Region/Pose loss。正式 batch-48 训练使用
 16 个 DataLoader workers；batch-4 smoke 单独覆盖为 2。B 固定在 lab0/GPU 0，C 固定
-在 lab1/GPU 1，并使用相同源码、镜像、配置、seed、数据和权重并行运行。
+在 lab1/GPU 1，并使用相同源码、镜像、配置、seed、数据和权重并行运行。B/C 正式
+训练显式启用 FP16 AMP；几何 target、nearest-anchor `cdist` 与分支聚合保留 FP32。
+
+EXP021 的训练专用路径在 backbone 后先做可选全局增强，再只调用一次
+`geo_head.forward_features()`。它不计算零权重的旧 mask/XYZ/region 输出，也不进入
+Patch-PnP；C 的梯度仍经冻结 decoder 的运算回到 global-guidance 参数。推理路径保持
+原 dense outputs 和 K-beam 行为。
 
 ## CAD 层级与解码
 
@@ -58,8 +64,10 @@ B/C 共享配置；正式训练前仍须用 EGL 重做标定，确认后再 smok
 
 ```bash
 python -m research.exp021.calibrate_loss_weights --device cuda:0 \
+  --precision config \
   --output output/experiments/EXP021-calibration.json
 python -m research.exp021.real_smoke --arm both --device cuda:0 \
+  --precision config \
   --output output/experiments/EXP021-egl-smoke.json
 ```
 
@@ -73,10 +81,16 @@ renderer、forward、backward、optimizer、总吞吐和峰值 allocated memory�
 
 ```bash
 python -m research.exp021.profile_training --arm B --device cuda:0 \
-  --batch-size 48 --renderer-type cpp --num-workers 16 --warmup 5 --steps 20
+  --batch-size 48 --renderer-type cpp --num-workers 16 --warmup 5 --steps 20 \
+  --precision config
 python -m research.exp021.profile_training --arm C --device cuda:0 \
-  --batch-size 48 --renderer-type cpp --num-workers 16 --warmup 5 --steps 20
+  --batch-size 48 --renderer-type cpp --num-workers 16 --warmup 5 --steps 20 \
+  --precision config
 ```
+
+`--precision fp32` 可在相同代码和 batch 序列上生成 matched control；报告包含实际
+precision、GradScaler scale、非有限/跳过 step 计数及各阶段耗时。profile 会与正式
+入口一样提高文件描述符上限，以支持 16-worker DataLoader。
 
 正式训练使用 `b_hierarchical.py` 和 `c_global.py`，唯一 run 目录由 launcher 设置。
 训练 checkpoint 不含 CAD 几何 buffer，加载时仍必须提供同版本 hierarchy artifact。
@@ -109,6 +123,7 @@ python -m research.exp021.profile_inference \
 - 资源：batch-1、K=4、50 次 warmup/200 次 CUDA timing 下，C 相对 A 的中位延迟
   增幅不超过 25%，峰值 allocated memory 增幅不超过 20%。参数量同时如实记录。
 
-当前完成实现、本地验证和 source `9399608` 的服务器 EGL 标定/smoke/audit；性能修复
-release 的 EGL profile 正在复核，formal 尚未开始。不能据随机初始化输出或性能诊断
-作科学机制判断。
+当前 AMP + feature-only 实现已通过本机 CUDA+CPP smoke、梯度标定和 matched
+FP32/AMP batch-48 profile；服务器 EGL 尚需复核。用户报告旧 FP32 B/C formal 正在
+运行，待新 release 通过服务器 gate 后从官方 checkpoint 统一重启。不能据随机初始化
+输出、工程性能或待替换 run 作科学机制判断。

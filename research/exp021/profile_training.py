@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import resource
 import statistics
 import time
 from pathlib import Path
@@ -22,9 +23,22 @@ from core.gdrn_modeling.models.GDRN_double_mask import build_model_optimizer
 from research.diagnostics.pose_structure.model_access import make_model_kwargs, model_input_from_batch
 from research.diagnostics.pose_structure.runtime import set_seed
 from research.exp013.preflight import PROJECT_ROOT, checkpoint_model_state
+from research.exp021.precision import (
+    PRECISION_CHOICES,
+    autocast_context,
+    grad_scaler,
+    gradients_are_finite,
+    resolve_precision,
+)
 
 
 CONFIG_ROOT = PROJECT_ROOT / "configs/gdrn/lmo_pbr/research/exp021_global_hierarchical_cad"
+FILE_LIMIT = 500_000
+
+
+def _raise_file_limit() -> None:
+    _soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (min(FILE_LIMIT, hard), hard))
 
 
 def _timed(function, *, synchronize: bool = False):
@@ -47,6 +61,7 @@ def _summary(values: list[float]) -> dict[str, float]:
 
 
 def profile(args: argparse.Namespace) -> dict:
+    _raise_file_limit()
     device = torch.device(args.device)
     if device.type != "cuda" or not torch.cuda.is_available():
         raise RuntimeError("EXP021 training profiling requires CUDA")
@@ -59,6 +74,7 @@ def profile(args: argparse.Namespace) -> dict:
     cfg.SOLVER.IMS_PER_BATCH = args.batch_size
     cfg.SOLVER.REFERENCE_BS = args.batch_size
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
+    effective_precision = resolve_precision(cfg, args.precision)
     set_seed(42)
     register_datasets_in_cfg(cfg)
 
@@ -71,6 +87,7 @@ def profile(args: argparse.Namespace) -> dict:
     ):
         raise RuntimeError(f"Official checkpoint incompatibility: {incompatible}")
     model.train()
+    scaler = grad_scaler(effective_precision)
 
     metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
     data_ref = ref.__dict__[metadata.ref_key]
@@ -96,14 +113,22 @@ def profile(args: argparse.Namespace) -> dict:
             optimizer.zero_grad(set_to_none=True)
 
             def forward():
-                with EventStorage():
+                with EventStorage(), autocast_context(effective_precision, device):
                     return model(model_input, **kwargs)[1]
 
             losses, forward_ms = _timed(forward, synchronize=True)
             _, backward_ms = _timed(
-                lambda: sum(losses.values()).backward(), synchronize=True
+                lambda: scaler.scale(sum(losses.values())).backward(), synchronize=True
             )
-            _, optimizer_ms = _timed(optimizer.step, synchronize=True)
+
+            def optimizer_step():
+                scaler.unscale_(optimizer)
+                if not gradients_are_finite(model.parameters()):
+                    raise RuntimeError("EXP021 profile produced non-finite unscaled gradients")
+                scaler.step(optimizer)
+                scaler.update()
+
+            _, optimizer_ms = _timed(optimizer_step, synchronize=True)
             if iteration >= args.warmup:
                 rows.append(
                     {
@@ -127,6 +152,10 @@ def profile(args: argparse.Namespace) -> dict:
         "device": torch.cuda.get_device_name(device),
         "batch_size": args.batch_size,
         "renderer_type": args.renderer_type,
+        "precision": effective_precision,
+        "amp_enabled": effective_precision == "amp-fp16",
+        "final_grad_scale": float(scaler.get_scale()),
+        "nonfinite_or_skipped_steps": 0,
         "warmup_steps": args.warmup,
         "measured_steps": args.steps,
         "phases": phases,
@@ -141,6 +170,7 @@ def main() -> int:
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=48)
     parser.add_argument("--renderer-type", choices=("cpp", "egl"), default="cpp")
+    parser.add_argument("--precision", choices=PRECISION_CHOICES, default="config")
     parser.add_argument("--num-workers", type=int, default=16)
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--steps", type=int, default=20)

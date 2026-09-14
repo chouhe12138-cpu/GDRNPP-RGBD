@@ -13,3 +13,7 @@ MODEL = dict(
         GEO_HEAD=dict(FREEZE=True),
     ),
 )
+
+# New research training defaults to mixed precision.  An experiment that
+# cannot use AMP must document the CUDA evidence for its explicit opt-out.
+SOLVER = dict(AMP=dict(ENABLED=True))

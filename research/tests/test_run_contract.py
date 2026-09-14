@@ -40,6 +40,7 @@ def test_exp017_modes_have_distinct_safe_renderer_contracts():
     assert formal["evaluation_renderer"] == "cpp"
     assert smoke["total_epochs"] == 1 and smoke["evaluation_period"] == 0
     assert evaluation["evaluation_renderer"] == "cpp"
+    assert formal["amp_enabled"] is False
 
 
 def test_formal_contract_rejects_smoke_or_drifted_protocol():

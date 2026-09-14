@@ -58,6 +58,7 @@ MODEL = dict(
 
 SOLVER = dict(
     OPTIMIZER_CFG=dict(_delete_=True, type="Ranger", lr=8e-4, weight_decay=0.01),
+    AMP=dict(ENABLED=True),
     WARMUP_ITERS=200,
     BEST_CHECKPOINT=dict(ENABLED=False),
 )

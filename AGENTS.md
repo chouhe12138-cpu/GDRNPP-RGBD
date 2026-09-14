@@ -18,6 +18,8 @@
   实验差异优先由 `configs/gdrn/lmo_pbr/research/` 表达。
 - 本地 Python、测试和实验命令先激活 Conda `pytorch22`；服务器深度学习任务只在
   项目 Docker 容器内运行，不修改宿主机 Python、CUDA 或全局包。
+- 新建正式研究训练配置默认显式开启 AMP；因算子兼容性或数值稳定性关闭时，先做
+  CUDA smoke，并在对应实验 RECORD 中记录证据和例外范围。历史配置不追溯修改。
 - dataset、checkpoint、完整日志、缓存和 secrets 不进入 Git；`output/` 与
   `.local/` 是机器本地内容。
 

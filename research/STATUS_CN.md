@@ -10,9 +10,9 @@ C 臂在 8×8 特征上增加两层图像—CAD Transformer、全局粗区域偏
 注入。V1 固定为 RGB 与冻结阶段，只训练新增 CAD head；不执行 backbone 联合微调。
 对称监督按实例从完整 BOP SE(3) 等价路径中选择一条，三项 loss 共用该分支。
 
-当前状态：`PERFORMANCE_FIX_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING /
-FORMAL_NOT_STARTED`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021 13 项
-测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
+当前状态：`AMP_FEATURE_ONLY_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING /
+FP32_FORMAL_ACTIVE_PENDING_RESTART`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
+16 项测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
 参数，官方 checkpoint 只缺 `cad_head.*`，优化步后冻结张量不变。真实 LM-O 单目标
 evaluator 接线 smoke 已完成，能输出 fixed support、K=1/2/4/8、对称/路由/几何与
 RANSAC 计时；随机初始化 B 的数值不进入科学结论。本机 CUDA+CPP 真实 batch 标定
@@ -26,7 +26,15 @@ batch-48 前向+反向分别约 1.93/2.23 秒，峰值约 1.58/3.30 GiB，数值
 测试一致。source `f29f9a0` 的 lab1/EGL profile 发现 2 workers 导致 DataLoader
 均值约 2.8–3.6 秒；8 workers 将 B/C 总耗时均值降至约 2.21/3.00 秒，但仍有偶发
 等待峰值。EXP021 formal 已显式对齐近期协议为 16 workers，执行固定为 B→lab0、
-C→lab1；新 release 的双机 EGL profile/smoke、formal 和完整 matched PnP/BOP 尚未运行。
+C→lab1。用户随后启动的 FP32 B/C formal 当前约为 `1.89/2.96 s/iter`，已决定在新
+release 通过 EGL gate 后终止并从官方 checkpoint 重启，不混合精度续训。新实现将
+训练路径改为可选全局增强后只运行一次 feature decoder，跳过零权重旧输出和 PnP，
+并显式启用 FP16 AMP；几何 target/`cdist` 保持 FP32。本机 CUDA+CPP batch-1 AMP
+smoke 与标定 PASS，GradScaler 保持 65536，权重仍建议 `0.125/1/16`。同代码 matched
+batch-48 profile 中，B AMP 相对 FP32 的模型前反向缩短约 17.0%、端到端中位数缩短
+13.5%；C 分别缩短约 8.4%/3.0%，峰值显存下降约 8.6%。本机 DataLoader 有秒级长尾，
+完整 research 回归为 184 passed；服务器 EGL profile/smoke、新 AMP formal 和完整
+matched PnP/BOP 尚未运行。
 
 协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
 [EXP021 RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md)。
@@ -135,10 +143,10 @@ matched PnP 缺口仍保留；不启动 EPro。文献对照与口径见
 
 ## 下一步
 
-1. 在服务器项目容器内生成/核对 EXP021 hierarchy，运行真实 CUDA/EGL loss 梯度
-   标定和 B/C one-step smoke；若权重建议不全为 1，先固定共享配置并重复 smoke。
-2. smoke 通过后启动 EXP021 B/C 唯一 formal run；固定 checkpoint，不按中间 LM-O
-   结果选择模型。
+1. 用新 release 在 lab0 做 EXP021 AMP EGL 标定、B/C one-step smoke，以及同代码
+   FP32/AMP batch-48 matched profile；若权重建议改变，回到本地提交配置后重做 release。
+2. gate 通过后记录并终止待替换 FP32 B/C run；B→lab0、C→lab1 从官方 checkpoint
+   启动唯一 AMP formal，不按中间 LM-O 结果选择模型。
 3. 对 B/C 固定 checkpoint 做 K=1/2/4/8 fixed-support matched RANSAC-PnP、完整
    BOP evaluator 与 batch-1 profile，按预注册 mechanism/resource gate 决策。
 4. EXP020 E5–E40 BOP/ADD 已齐；补充 B E15/E20/E25 的明确 epoch 原始 score，核对 reS/teS

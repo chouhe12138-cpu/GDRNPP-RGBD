@@ -21,6 +21,13 @@ from research.diagnostics.pose_structure.model_access import make_model_kwargs, 
 from research.diagnostics.pose_structure.runtime import set_seed
 from research.exp013.preflight import PROJECT_ROOT, checkpoint_model_state
 from research.exp021.preflight import EXPERIMENT_ID
+from research.exp021.precision import (
+    PRECISION_CHOICES,
+    autocast_context,
+    grad_scaler,
+    gradients_are_finite,
+    resolve_precision,
+)
 from research.run_contract import validate_research_run_config
 
 
@@ -33,6 +40,7 @@ def run_arm(
     device: torch.device,
     batch_size: int,
     renderer_type: str = "egl",
+    precision: str = "config",
 ) -> dict:
     config = CONFIG_ROOT / ("b_hierarchical.py" if arm == "B" else "c_global.py")
     cfg = Config.fromfile(str(config))
@@ -45,12 +53,14 @@ def run_arm(
     cfg.SOLVER.IMS_PER_BATCH = batch_size
     cfg.SOLVER.REFERENCE_BS = batch_size
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
+    effective_precision = resolve_precision(cfg, precision)
     register_datasets_in_cfg(cfg)
     model, optimizer = build_model_optimizer(cfg)
     incompatible = model.load_state_dict(dict(checkpoint_model_state(weights)), strict=False)
     if incompatible.unexpected_keys or any(not key.startswith("cad_head.") for key in incompatible.missing_keys):
         raise RuntimeError(f"Official checkpoint incompatibility: {incompatible}")
     model.train()
+    scaler = grad_scaler(effective_precision)
     frozen_before = {
         name: value.detach().clone()
         for name, value in model.named_parameters()
@@ -66,12 +76,14 @@ def run_arm(
         kwargs["roi_zoom_cams"] = batch.get("roi_zoom_K")
         kwargs["cad_beam_ks"] = (4,)
         torch.cuda.reset_peak_memory_stats(device)
-        with EventStorage():
+        with EventStorage(), autocast_context(effective_precision, device):
             _output, losses = model(model_input_from_batch(cfg, batch), **kwargs)
         if set(losses) != {"loss_cad_coarse", "loss_cad_fine", "loss_cad_xyz"}:
             raise RuntimeError(f"Unexpected losses: {sorted(losses)}")
         total = sum(losses.values())
-        total.backward()
+        scale_before = float(scaler.get_scale())
+        scaler.scale(total).backward()
+        scaler.unscale_(optimizer)
         trainable = {name: value for name, value in model.named_parameters() if value.requires_grad}
         active = [
             name
@@ -80,7 +92,19 @@ def run_arm(
         ]
         if not active or any(not name.startswith("cad_head.") for name in active):
             raise RuntimeError(f"Invalid active gradients: {active}")
-        optimizer.step()
+        if not gradients_are_finite(trainable.values()):
+            raise RuntimeError("EXP021 smoke produced non-finite unscaled gradients")
+        trainable_before = {
+            name: value.detach().clone() for name, value in trainable.items()
+        }
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer_step_applied = any(
+            not torch.equal(trainable_before[name], value.detach())
+            for name, value in trainable.items()
+        )
+        if not optimizer_step_applied:
+            raise RuntimeError("EXP021 smoke optimizer step did not update CAD parameters")
         changed_frozen = [
             name
             for name, value in model.named_parameters()
@@ -98,6 +122,11 @@ def run_arm(
             "batch_size": batch_size,
             "renderer_type": renderer_type,
             "formal_renderer_match": renderer_type == "egl",
+            "precision": effective_precision,
+            "amp_enabled": effective_precision == "amp-fp16",
+            "grad_scale_before": scale_before,
+            "grad_scale_after": float(scaler.get_scale()),
+            "optimizer_step_applied": optimizer_step_applied,
             "trainable_parameters": sum(value.numel() for value in trainable.values()),
             "active_gradient_tensors": len(active),
             "losses": {name: float(value.detach()) for name, value in losses.items()},
@@ -117,6 +146,7 @@ def main() -> int:
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--renderer-type", choices=("egl", "cpp"), default="egl")
+    parser.add_argument("--precision", choices=PRECISION_CHOICES, default="config")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     device = torch.device(args.device)
@@ -125,7 +155,12 @@ def main() -> int:
     arms = ("B", "C") if args.arm == "both" else (args.arm,)
     report = {
         arm: run_arm(
-            arm, args.weights, device, args.batch_size, args.renderer_type
+            arm,
+            args.weights,
+            device,
+            args.batch_size,
+            args.renderer_type,
+            args.precision,
         )
         for arm in arms
     }

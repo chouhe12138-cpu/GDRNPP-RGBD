@@ -392,11 +392,16 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
         b, n, _ = query.shape
         symmetry_slots = self.symmetry_transforms.shape[1]
 
-        with torch.no_grad():
+        # Geometry targets and nearest-anchor labels are precision-sensitive
+        # supervision, not learned tensor-core work.  Keep them in FP32 when
+        # the surrounding formal training step uses FP16 autocast.
+        with torch.no_grad(), torch.autocast(
+            device_type=query.device.type, enabled=False
+        ):
             gt_metric = (
-                gt_xyz_norm.permute(0, 2, 3, 1).reshape(b, n, 3) - 0.5
-            ) * extents[:, None]
-            transforms = self._select(self.symmetry_transforms, roi_classes)
+                gt_xyz_norm.float().permute(0, 2, 3, 1).reshape(b, n, 3) - 0.5
+            ) * extents.float()[:, None]
+            transforms = self._select(self.symmetry_transforms, roi_classes).float()
             rotations = transforms[:, :, :3, :3]
             translations = transforms[:, :, :3, 3]
             symmetry_targets = torch.einsum(
@@ -422,7 +427,9 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
             q = query[batch_index, pixel_index]
             branch_index = batch_index * symmetry_slots + symmetry_index
 
-            with torch.no_grad():
+            with torch.no_grad(), torch.autocast(
+                device_type=query.device.type, enabled=False
+            ):
                 coarse_labels = []
                 for start in range(0, target.shape[0], 32768):
                     stop = min(start + 32768, target.shape[0])
@@ -461,7 +468,9 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
                 group_target = target[offset:stop]
                 group_query = q[offset:stop]
                 anchors = self.fine_anchors[object_class, parent]
-                with torch.no_grad():
+                with torch.no_grad(), torch.autocast(
+                    device_type=query.device.type, enabled=False
+                ):
                     fine_label = torch.cdist(group_target, anchors).argmin(-1)
                 token_bank = fine_tokens[descriptor_index, parent]
                 fine_logits = group_query @ token_bank.T / math.sqrt(self.token_dim)
@@ -494,7 +503,7 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
                     torch.cat(fine_point_losses),
                     torch.cat(xyz_point_losses),
                 ]
-            )
+            ).float()
             branch_count = b * symmetry_slots
             branch_sums = query.new_zeros((3, branch_count)).scatter_add(
                 1, branch_index[None].expand(3, -1), point_components
