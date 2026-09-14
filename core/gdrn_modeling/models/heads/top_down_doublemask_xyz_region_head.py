@@ -174,11 +174,14 @@ class TopDownDoubleMaskXyzRegionHead(nn.Module):
             normal_init(self.xyz_out_layer, std=0.01)
             normal_init(self.region_out_layer, std=0.01)
 
-    def forward(self, x):
+    def forward_features(self, x):
         if isinstance(x, (tuple, list)) and len(x) == 1:
             x = x[0]
         for i, l in enumerate(self.features):
             x = l(x)
+        return x
+
+    def forward_outputs(self, x):
         if self.out_layer_shared:
             out = self.out_layer(x)
             mask_dim = self.mask_out_dim * self.mask_num_classes
@@ -209,6 +212,13 @@ class TopDownDoubleMaskXyzRegionHead(nn.Module):
 
             region = self.region_out_layer(x)
         return vis_mask, full_mask, coor_x, coor_y, coor_z, region
+
+    def forward(self, x, return_features=False):
+        features = self.forward_features(x)
+        outputs = self.forward_outputs(features)
+        if return_features:
+            return (*outputs, features)
+        return outputs
 
 
 def _get_deconv_pad_outpad(deconv_kernel):

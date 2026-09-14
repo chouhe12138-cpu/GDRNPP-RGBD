@@ -129,9 +129,13 @@ def training_geometry_renderer_type(cfg):
 
 def geometry_supervision_enabled(cfg):
     """Validate and return whether training needs rendered GT geometry targets."""
-    g_head_cfg = cfg.MODEL.POSE_NET.GEO_HEAD
+    net_cfg = cfg.MODEL.POSE_NET
+    g_head_cfg = net_cfg.GEO_HEAD
     enabled = bool(g_head_cfg.get("TRAIN_SUPERVISION", True))
     frozen = bool(g_head_cfg.FREEZE)
+    cad_cfg = net_cfg.get("CAD_HEAD", {})
+    cad_enabled = bool(cad_cfg.get("ENABLED", False))
+    cad_supervision = cad_enabled and bool(cad_cfg.get("TRAIN_SUPERVISION", True))
     renderer_type = training_geometry_renderer_type(cfg)
     if enabled and frozen:
         raise ValueError(
@@ -143,13 +147,18 @@ def geometry_supervision_enabled(cfg):
             "GEO_HEAD.TRAIN_SUPERVISION=False requires GEO_HEAD.FREEZE=True; "
             "enable geometry supervision before unfreezing the geometry head."
         )
-    if enabled and renderer_type is None:
+    if cad_supervision and bool(cad_cfg.get("FREEZE", False)):
+        raise ValueError("Frozen CAD_HEAD cannot request training supervision")
+    if cad_enabled and (not cad_supervision) and (not bool(cad_cfg.get("FREEZE", False))):
+        raise ValueError("Trainable CAD_HEAD requires TRAIN_SUPERVISION=True")
+    needs_geometry = enabled or cad_supervision
+    if needs_geometry and renderer_type is None:
         raise ValueError("Geometry supervision requires XYZ_RENDERER='cpp' or 'egl'")
-    if (not enabled) and renderer_type is not None:
+    if (not needs_geometry) and renderer_type is not None:
         raise ValueError(
             "Frozen geometry without supervision must disable the training XYZ_RENDERER"
         )
-    return enabled
+    return needs_geometry
 
 
 def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):

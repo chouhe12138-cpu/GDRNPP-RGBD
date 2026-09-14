@@ -1,5 +1,6 @@
 import copy
 import logging
+import os
 import time
 import numpy as np
 import torch
@@ -30,6 +31,7 @@ from .pose_from_pred_centroid_z_abs import pose_from_pred_centroid_z_abs
 from .net_factory import BACKBONES, POSE_CORRECTORS
 from .heads.gcr_pose_corrector import corrected_centroid_z
 from .heads.quality_coverage_attention import QualityCoverageAttention
+from .heads.global_hierarchical_cad_head import GlobalGuidedHierarchicalCADHead
 from core.utils.my_checkpoint import load_timm_pretrained
 
 logger = logging.getLogger(__name__)
@@ -59,6 +61,7 @@ class GDRN_DoubleMask(nn.Module):
         pnp_net=None,
         quality_coverage_net=None,
         pose_corrector=None,
+        cad_head=None,
     ):
         super().__init__()
         assert cfg.MODEL.POSE_NET.NAME == "GDRN_double_mask", cfg.MODEL.POSE_NET.NAME
@@ -69,6 +72,7 @@ class GDRN_DoubleMask(nn.Module):
         self.pnp_net = pnp_net
         self.quality_coverage_net = quality_coverage_net
         self.pose_corrector = pose_corrector
+        self.cad_head = cad_head
 
         self.cfg = cfg
         self.xyz_out_dim, self.mask_out_dim, self.region_out_dim = get_xyz_doublemask_region_out_dim(cfg)
@@ -119,12 +123,16 @@ class GDRN_DoubleMask(nn.Module):
         roi_image_hw=None,
         return_pose_debug=False,
         roi_zoom_cams=None,
+        cad_beam_ks=None,
+        return_dense_only=False,
+        return_cad_debug=False,
     ):
         cfg = self.cfg
         net_cfg = cfg.MODEL.POSE_NET
         g_head_cfg = net_cfg.GEO_HEAD
         pnp_net_cfg = net_cfg.PNP_NET
         geo_supervision = bool(g_head_cfg.get("TRAIN_SUPERVISION", True))
+        cad_enabled = self.cad_head is not None
         if do_loss and (not geo_supervision) and (not bool(g_head_cfg.FREEZE)):
             raise ValueError(
                 "GEO_HEAD.TRAIN_SUPERVISION=False requires GEO_HEAD.FREEZE=True; "
@@ -164,7 +172,20 @@ class GDRN_DoubleMask(nn.Module):
         conv_feat = self.backbone(x)  # [bs, c, 8, 8]
         if self.neck is not None:
             conv_feat = self.neck(conv_feat)
-        vis_mask, full_mask, coor_x, coor_y, coor_z, region = self.geo_head_net(conv_feat)
+        if cad_enabled:
+            if not hasattr(self.geo_head_net, "forward_features"):
+                raise TypeError("EXP021 requires a geo head with forward_features()")
+            (
+                vis_mask,
+                full_mask,
+                coor_x,
+                coor_y,
+                coor_z,
+                region,
+                decoder_feature,
+            ) = self.geo_head_net(conv_feat, return_features=True)
+        else:
+            vis_mask, full_mask, coor_x, coor_y, coor_z, region = self.geo_head_net(conv_feat)
 
         if g_head_cfg.XYZ_CLASS_AWARE:
             assert roi_classes is not None
@@ -186,6 +207,97 @@ class GDRN_DoubleMask(nn.Module):
             assert roi_classes is not None
             region = region.view(bs, num_classes, self.region_out_dim, out_res, out_res)
             region = region[torch.arange(bs).to(device), roi_classes]
+
+        cad_losses = {}
+        cad_stats = {}
+        cad_state = None
+        if cad_enabled:
+            forbidden = (
+                "XYZ_LW",
+                "MASK_LW",
+                "FULL_MASK_LW",
+                "REGION_LW",
+                "PM_LW",
+                "CENTROID_LW",
+                "Z_LW",
+                "ROT_LW",
+                "TRANS_LW",
+                "BIND_LW",
+                "REPROJ_LW",
+            )
+            nonzero = [name for name in forbidden if float(loss_cfg.get(name, 0.0)) != 0.0]
+            if nonzero:
+                raise ValueError(f"EXP021 CAD_HEAD requires legacy losses to be zero: {nonzero}")
+            if roi_classes is None or roi_extents is None:
+                raise ValueError("EXP021 CAD_HEAD requires roi_classes and roi_extents")
+            backbone_tensor = conv_feat[0] if isinstance(conv_feat, (tuple, list)) else conv_feat
+            enhanced_feature, global_bias = self.cad_head.enhance_backbone(
+                backbone_tensor, roi_classes
+            )
+            if self.cad_head.use_global_guidance:
+                decoder_feature = self.geo_head_net.forward_features(enhanced_feature)
+            cad_state, cad_losses, cad_stats = self.cad_head(
+                decoder_feature,
+                roi_classes,
+                global_bias=global_bias,
+                beam_ks=cad_beam_ks,
+                gt_xyz_norm=gt_xyz if do_loss else None,
+                gt_mask=gt_mask_visib if do_loss else None,
+            )
+            if do_loss:
+                storage = get_event_storage()
+                storage.put_scalars(
+                    **{
+                        "vis/cad_symmetry_branch_mean": float(
+                            cad_stats["selected_symmetry_branch_mean"]
+                        ),
+                        "vis/cad_foreground_pixels": float(cad_stats["cad_foreground_pixels"]),
+                    }
+                )
+                return {}, cad_losses
+
+            default_k = self.cad_head.default_beam_k
+            cad_xyz = cad_state["decoded"][default_k]["xyz_norm"]
+            coor_x, coor_y, coor_z = cad_xyz[:, 0:1], cad_xyz[:, 1:2], cad_xyz[:, 2:3]
+
+        if return_dense_only:
+            if do_loss:
+                raise ValueError("return_dense_only is an inference-only option")
+            dense = {
+                "mask": vis_mask,
+                "full_mask": full_mask,
+                "coor_x": coor_x,
+                "coor_y": coor_y,
+                "coor_z": coor_z,
+                "region": region,
+            }
+            if cad_state is not None:
+                dense.update(
+                    {
+                        "cad_xyz_by_k": {
+                            k: value["xyz_norm"] for k, value in cad_state["decoded"].items()
+                        },
+                    }
+                )
+                if return_cad_debug:
+                    dense.update(
+                        {
+                            "cad_coarse_logits": cad_state["coarse_logits"]
+                            .transpose(1, 2)
+                            .reshape(bs, 64, out_res, out_res),
+                            "cad_query": cad_state["query"],
+                            "cad_fine_tokens": cad_state["fine_tokens"],
+                            "cad_parent_by_k": {
+                                k: value["parent"]
+                                for k, value in cad_state["decoded"].items()
+                            },
+                            "cad_child_by_k": {
+                                k: value["child"]
+                                for k, value in cad_state["decoded"].items()
+                            },
+                        }
+                    )
+            return dense
 
         # -----------------------------------------------
         # get rot and trans from pnp_net
@@ -310,6 +422,21 @@ class GDRN_DoubleMask(nn.Module):
                         "region": region,
                     }
                 )
+            if cad_state is not None and return_cad_debug:
+                out_dict["cad_xyz_by_k"] = {
+                    k: value["xyz_norm"] for k, value in cad_state["decoded"].items()
+                }
+                out_dict["cad_coarse_logits"] = cad_state["coarse_logits"].transpose(1, 2).reshape(
+                    bs, 64, out_res, out_res
+                )
+                out_dict["cad_query"] = cad_state["query"]
+                out_dict["cad_fine_tokens"] = cad_state["fine_tokens"]
+                out_dict["cad_parent_by_k"] = {
+                    k: value["parent"] for k, value in cad_state["decoded"].items()
+                }
+                out_dict["cad_child_by_k"] = {
+                    k: value["child"] for k, value in cad_state["decoded"].items()
+                }
         else:
             out_dict = {}
             if return_pose_debug and pose_debug is not None:
@@ -369,6 +496,16 @@ class GDRN_DoubleMask(nn.Module):
                 roi_zoom_cams=roi_zoom_cams,
                 vis_extra=vis_extra,
             )
+            loss_dict.update(cad_losses)
+            if cad_stats:
+                vis_extra.update(
+                    {
+                        "vis/cad_symmetry_branch_mean": cad_stats[
+                            "selected_symmetry_branch_mean"
+                        ],
+                        "vis/cad_foreground_pixels": cad_stats["cad_foreground_pixels"],
+                    }
+                )
             vis_dict.update(vis_extra)
 
             if net_cfg.USE_MTL:
@@ -770,6 +907,30 @@ def build_model_optimizer(cfg, is_test=False):
             )
 
     # build model
+    cad_head = None
+    cad_cfg = net_cfg.get("CAD_HEAD", {})
+    if cad_cfg.get("ENABLED", False):
+        if not backbone_cfg.FREEZE or not net_cfg.GEO_HEAD.FREEZE or not net_cfg.PNP_NET.FREEZE:
+            raise ValueError("EXP021 V1 requires frozen BACKBONE/GEO_HEAD/PNP_NET")
+        if cfg.INPUT.WITH_DEPTH:
+            raise ValueError("EXP021 V1 is RGB-only")
+        hierarchy_path = os.path.expandvars(os.path.expanduser(cad_cfg.HIERARCHY_PATH))
+        if "$" in hierarchy_path:
+            raise ValueError(f"Unresolved EXP021 hierarchy path: {hierarchy_path}")
+        init_cfg = copy.deepcopy(cad_cfg.INIT_CFG)
+        init_cfg.update(hierarchy_path=hierarchy_path)
+        cad_head = GlobalGuidedHierarchicalCADHead(**init_cfg)
+        if cad_cfg.get("FREEZE", False):
+            for parameter in cad_head.parameters():
+                parameter.requires_grad = False
+        else:
+            params_lr_list.append(
+                {
+                    "params": filter(lambda p: p.requires_grad, cad_head.parameters()),
+                    "lr": float(cfg.SOLVER.BASE_LR) * float(cad_cfg.get("LR_MULT", 1.0)),
+                }
+            )
+
     pose_corrector = None
     corrector_cfg = net_cfg.get("POSE_CORRECTOR", {})
     if corrector_cfg.get("ENABLED", False):
@@ -800,6 +961,7 @@ def build_model_optimizer(cfg, is_test=False):
         pnp_net=pnp_net,
         quality_coverage_net=quality_coverage_net,
         pose_corrector=pose_corrector,
+        cad_head=cad_head,
     )
     if net_cfg.USE_MTL:
         params_lr_list.append(

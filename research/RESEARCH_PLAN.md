@@ -6,10 +6,11 @@
 直接姿态头有效利用。当前论文链保持 RGB 主干与 geometry head 的可比性，不把
 早期 oracle、PBR calibration 或 smoke 指标当作正式性能结果。
 
-2026-09-09 起主线聚焦 EXP020：保持 continuous normalized XYZ，用 GT-pose
-per-pixel correspondence reprojection loss 直接约束 Geometry/Correspondence Head，
-再由 matched classical PnP/RANSAC 判断 producer 是否更真实、更可用。2026-09-08
-提出的 EPro-PnP solver-in-the-loop 路线保留为历史候选，当前不启动。
+2026-09-14 起主线进入 EXP021：用固定 CAD `64×64` 层级、条件子区域路由和受限
+残差约束 dense correspondence 的表面身份，再检验 8×8 全局图像—CAD 交互能否
+改善共同姿态模式与 matched classical PnP/RANSAC。V1 只训练新增 CAD head，冻结
+官方 backbone/decoder/mask/Patch-PnP。EXP020 的正式 matched PnP 仍待补，作为前序
+证据缺口保留，不由 EXP021 替代。
 
 ## 已建立的证据
 
@@ -43,9 +44,12 @@ per-pixel correspondence reprojection loss 直接约束 Geometry/Correspondence 
    telemetry 已同步并保存紧凑原始证据。run exit code 与 matched PnP/RANSAC 正式
    评价尚未提供；B E15/E20/E25 score 与日志存在 epoch 冲突，reS/teS 待核对，
    详见 RECORD。不以 direct-pose 趋势代替主结论。
-4. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
+4. EXP021 V1 已完成实现与本地 CPU preflight；下一步依次完成真实 CUDA/EGL loss
+   标定、B/C one-step smoke、formal 和固定 support 的 K=1/2/4/8 matched evaluator。
+   不启动原设计中的 backbone 联合微调；是否进入下一轮由预注册机制和资源 gate 决定。
+5. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。
-5. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。
+6. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。
 
 ## 结果口径
 

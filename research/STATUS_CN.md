@@ -1,8 +1,30 @@
 # 当前研究状态
 
-最后核对：2026-09-13。
+最后核对：2026-09-14。
 
-## Active mainline（2026-09-09 起）
+## Active mainline（2026-09-14 起）
+
+**EXP021 global-guided hierarchical CAD correspondence**：用固定 CAD `64×64`
+层级统一粗区域、父区域内子区域与连续 XYZ 解码，受限残差限制跨叶子区域滑动；
+C 臂在 8×8 特征上增加两层图像—CAD Transformer、全局粗区域偏置和零初始化残差
+注入。V1 固定为 RGB 与冻结阶段，只训练新增 CAD head；不执行 backbone 联合微调。
+对称监督按实例从完整 BOP SE(3) 等价路径中选择一条，三项 loss 共用该分支。
+
+当前状态：`IMPLEMENTED / LOCAL_CUDA_CPP_SMOKE_PASS / EGL_SMOKE_PENDING /
+FORMAL_NOT_STARTED`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021 12 项
+测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
+参数，官方 checkpoint 只缺 `cad_head.*`，优化步后冻结张量不变。真实 LM-O 单目标
+evaluator 接线 smoke 已完成，能输出 fixed support、K=1/2/4/8、对称/路由/几何与
+RANSAC 计时；随机初始化 B 的数值不进入科学结论。本机 CUDA+CPP 真实 batch 标定
+建议 coarse/fine/XYZ 权重 `0.125/1/16`，加权梯度相对中位数
+`0.894/1.160/1.000`，已写入 B/C 共享配置；B/C CUDA+CPP one-step smoke PASS，
+峰值 allocated memory 约 0.979/1.035 GB。因本机 EGL 不支持 Bindless Textures，
+正式匹配的 EGL 标定/smoke、formal、完整 matched PnP/BOP 和 profile 尚未运行。
+
+协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
+[EXP021 RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md)。
+
+## Predecessor pending：EXP020（2026-09-09 起）
 
 **EXP020 correspondence supervision + ordinary PnP/RANSAC**：在保留 continuous
 normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection loss
@@ -68,8 +90,8 @@ Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），�
 学习以“能被显式求解器正确、稳定地使用”为目标；EPro-PnP 不是主要创新点。该路线及
 其 EXP019 机制证据（matched RANSAC 与 EPro-PnP 都稳定消费逐步改善的 XYZ，官方
 Patch-PnP 响应不足；用户 review 判定机制通过）**保留为历史记录，当前未安排实验，
-标为 Historical / Deferred**。当前 active mainline 是上方 EXP020 correspondence
-supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
+标为 Historical / Deferred**。当前 active mainline 是上方 EXP021，EXP020 的
+matched PnP 缺口仍保留；不启动 EPro。文献对照与口径见
 [notes/20260908-solver-in-the-loop-review.md](notes/20260908-solver-in-the-loop-review.md)
 与 [DECISIONS](DECISIONS.md)。
 
@@ -96,8 +118,8 @@ supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
 
 ## 当前代码边界
 
-- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017、已收口 EXP018、EXP019
-  和 EXP020（实现 + review-fix）。
+- 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017、已收口 EXP018、EXP019、
+  EXP020（实现 + review-fix）和 EXP021 V1。
 - EXP020 review-fix 只改 shared 层的 loss stats/guard 与 exp020 目录；EXP019
   历史 evaluator/结果未改动。
 - 本地 `.git` 历史是恢复兜底，禁止删除或重写；删除内容用普通提交表达。
@@ -106,11 +128,17 @@ supervision + ordinary PnP/RANSAC，不启动 EPro。文献对照与口径见
 
 ## 下一步
 
-1. E5–E40 BOP/ADD 已齐；补充 B E15/E20/E25 的明确 epoch 原始 score，核对 reS/teS
+1. 在服务器项目容器内生成/核对 EXP021 hierarchy，运行真实 CUDA/EGL loss 梯度
+   标定和 B/C one-step smoke；若权重建议不全为 1，先固定共享配置并重复 smoke。
+2. smoke 通过后启动 EXP021 B/C 唯一 formal run；固定 checkpoint，不按中间 LM-O
+   结果选择模型。
+3. 对 B/C 固定 checkpoint 做 K=1/2/4/8 fixed-support matched RANSAC-PnP、完整
+   BOP evaluator 与 batch-1 profile，按预注册 mechanism/resource gate 决策。
+4. EXP020 E5–E40 BOP/ADD 已齐；补充 B E15/E20/E25 的明确 epoch 原始 score，核对 reS/teS
    归属；补充 A/B run exit code 并核对 E40 checkpoint 文件。
-2. 使用明确的 A/B E40 checkpoint，用 `research/exp020/matched_pnp_eval.py` 做主下游评价（matched
+5. 使用明确的 A/B E40 checkpoint，用 `research/exp020/matched_pnp_eval.py` 做主下游评价（matched
    classical PnP/RANSAC，fixed support，A/B 只换 XYZ），必要时 `--bop-eval` 汇总
    BOP-AR/ADD(-S)/reS/teS。
-3. Gate 沿用相对阈值政策（±3%–±5%），先看方向一致性：correspondence error →
+6. Gate 沿用相对阈值政策（±3%–±5%），先看方向一致性：correspondence error →
    reprojection error → matched PnP pose 同方向。
-4. 暂不恢复 EXP014-D；不启动 EPro（Historical/Deferred）；不自动加 seed。
+7. 暂不恢复 EXP014-D；不启动 EPro（Historical/Deferred）；不自动加 seed。

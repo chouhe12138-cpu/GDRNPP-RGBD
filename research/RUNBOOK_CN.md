@@ -48,7 +48,8 @@ cd ../gdrnpp-exp009
 
 本地统一使用下面的入口创建 bundle；脚本要求 HEAD 位于已附着分支、working tree
 （包括 untracked 文件）为空、目标 bundle 不存在，并在创建后执行完整验证。bundle
-只包含当前分支及其可达历史，因此研究分支不会误打包旧 `main`：
+只包含当前分支及其可达历史，不要求切换到 `main`；因此可以保持 `main` 干净，并
+直接从当前研究分支生成 release：
 
 ```bash
 docker/l40/create_bundle.sh

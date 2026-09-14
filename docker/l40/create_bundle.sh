@@ -9,6 +9,9 @@ branch="$(git -C "${repo_root}" symbolic-ref --quiet --short HEAD)" || {
     echo "FAIL: bundle source must be an attached branch" >&2
     exit 1
 }
+# Research releases are cut directly from the current attached branch. Keeping
+# main clean is compatible with this flow; the clean-tree and exact-HEAD checks
+# below remain mandatory for every branch.
 status="$(git -C "${repo_root}" status --porcelain --untracked-files=all)"
 [[ -z "${status}" ]] || {
     echo "FAIL: Git working tree must be clean before bundle creation" >&2
