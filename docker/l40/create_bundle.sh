@@ -5,6 +5,9 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 output_dir="${1:-${repo_root}/.local/release}"
 
+mkdir -p "${output_dir}"
+output_dir="$(cd -- "${output_dir}" && pwd -P)"
+
 branch="$(git -C "${repo_root}" symbolic-ref --quiet --short HEAD)" || {
     echo "FAIL: bundle source must be an attached branch" >&2
     exit 1
@@ -27,7 +30,6 @@ bundle="${output_dir}/GDRNPP-RGBD-${short_sha}.bundle"
     exit 1
 }
 
-mkdir -p "${output_dir}"
 git -C "${repo_root}" bundle create "${bundle}" "${branch}"
 
 verify_repo="$(mktemp -d "/tmp/gdrnpp-bundle-verify-${short_sha}.XXXXXX")"

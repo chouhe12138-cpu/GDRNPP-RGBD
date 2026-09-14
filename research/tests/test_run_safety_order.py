@@ -40,9 +40,13 @@ def test_bundle_entrypoint_accepts_clean_research_branch(tmp_path):
     subprocess.run(["git", "-C", str(repo), "add", "tracked.txt", "docker/l40/create_bundle.sh"], check=True)
     subprocess.run(["git", "-C", str(repo), "commit", "-m", "fixture"], check=True, capture_output=True)
 
-    output = tmp_path / "bundles"
+    output = repo / ".bundles"
     result = subprocess.run(
-        [str(script), str(output)], check=True, capture_output=True, text=True
+        [str(script), ".bundles"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     assert "branch=exp-test" in result.stdout
     assert len(list(output.glob("GDRNPP-RGBD-*.bundle"))) == 1
