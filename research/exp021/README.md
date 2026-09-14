@@ -15,7 +15,9 @@ mask 分支和 Patch-PnP 全部冻结；只训练新增 CAD head。
 
 B/C 除 `use_global_guidance` 外配置相同。C 的共享模块与 B 按同一 seed 初始化；
 全局注入的最后一层为零初始化，因此初始 decoder 输入与冻结官方路径一致。
-V1 不解冻 backbone，也不训练原有 XYZ/Mask/Region/Pose loss。
+V1 不解冻 backbone，也不训练原有 XYZ/Mask/Region/Pose loss。正式 batch-48 训练使用
+16 个 DataLoader workers；batch-4 smoke 单独覆盖为 2。B 固定在 lab0/GPU 0，C 固定
+在 lab1/GPU 1，并使用相同源码、镜像、配置、seed、数据和权重并行运行。
 
 ## CAD 层级与解码
 
@@ -70,8 +72,10 @@ renderer、forward、backward、optimizer、总吞吐和峰值 allocated memory�
 不可用时以 CPP 隔离模型计算，最终仍须在服务器复核 EGL 总耗时。
 
 ```bash
-python -m research.exp021.profile_training --arm B --device cuda:0 --batch-size 48 --renderer-type cpp --warmup 5 --steps 20
-python -m research.exp021.profile_training --arm C --device cuda:0 --batch-size 48 --renderer-type cpp --warmup 5 --steps 20
+python -m research.exp021.profile_training --arm B --device cuda:0 \
+  --batch-size 48 --renderer-type cpp --num-workers 16 --warmup 5 --steps 20
+python -m research.exp021.profile_training --arm C --device cuda:0 \
+  --batch-size 48 --renderer-type cpp --num-workers 16 --warmup 5 --steps 20
 ```
 
 正式训练使用 `b_hierarchical.py` 和 `c_global.py`，唯一 run 目录由 launcher 设置。
@@ -105,6 +109,6 @@ python -m research.exp021.profile_inference \
 - 资源：batch-1、K=4、50 次 warmup/200 次 CUDA timing 下，C 相对 A 的中位延迟
   增幅不超过 25%，峰值 allocated memory 增幅不超过 20%。参数量同时如实记录。
 
-当前只完成实现、本地 CPU preflight 和有限 evaluator 接线 smoke。真实 CUDA/EGL
-loss 标定、one-step smoke、正式训练、完整 matched PnP/BOP 与资源 profile 均未运行，
-不能据本地随机初始化输出作科学判断。
+当前完成实现、本地验证和 source `9399608` 的服务器 EGL 标定/smoke/audit；性能修复
+release 的 EGL profile 正在复核，formal 尚未开始。不能据随机初始化输出或性能诊断
+作科学机制判断。

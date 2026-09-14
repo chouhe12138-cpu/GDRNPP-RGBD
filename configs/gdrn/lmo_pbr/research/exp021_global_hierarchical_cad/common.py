@@ -6,6 +6,10 @@ EXPERIMENT_ID = "EXP-20260914-021-global-guided-hierarchical-cad-correspondence"
 OUTPUT_DIR = "output/experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RUN-SET-BY-LAUNCHER"
 SEED = 42
 
+# Match the recent batch-48 formal/audit protocol.  Smoke configs explicitly
+# override this to two workers for their batch-4 contract.
+DATALOADER = dict(NUM_WORKERS=16)
+
 _cache_root = os.environ.get("GDRN_DATASET_CACHE_DIR", ".local/dataset_cache")
 _hierarchy_path = os.path.join(_cache_root, "exp021", "hierarchy_v1.npz")
 

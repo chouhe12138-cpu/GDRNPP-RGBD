@@ -21,8 +21,10 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
 - A：官方 GDRNPP checkpoint，只用于 GT-box matched evaluator 与 profile。
 - B：层级路由 + 受限残差。
 - C：B + 两层全局 Transformer、全局粗区域偏置、零初始化 256→1024 残差注入。
-- B/C：PBR40、batch 48、40 epoch、Ranger `lr=8e-4`、`wd=0.01`、warmup 200、
-  seed 42；正式训练前用一个真实 batch 校准三项梯度尺度。
+- B/C：PBR40、batch 48、16 DataLoader workers、40 epoch、Ranger `lr=8e-4`、
+  `wd=0.01`、warmup 200、seed 42；正式训练前用一个真实 batch 校准三项梯度尺度。
+- 并行执行固定为 B→lab0/物理 GPU 0、C→lab1/物理 GPU 1；两台 profile 使用相同
+  source、镜像、配置、seed、数据和权重，机器分配不随结果调整。
 - 主评价：官方 A 固定 support；K=1/2/4/8；matched RANSAC-PnP；完整 LM-O 上报告
   correspondence/normal/tangent/reprojection、路由诊断和 BOP AR/ADD(-S)/reS/teS。
 - gate 与命令见 [EXP021 README](../../exp021/README.md)。
@@ -76,15 +78,23 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
   全流程 `2.556 s`、`18.78 samples/s`、峰值 `1,618 MiB`；C 分别为 `2.229 s`、
   `2.966 s`、`16.18 samples/s`、`3,380 MiB`。B/C 达到预设模型训练步门槛
   `2.0/2.5 s`，batch-48 吞吐高于 batch 4；本地 CPP 全流程不作为服务器 EGL 门槛。
+- source `f29f9a0` 的 lab1/L40/EGL batch-48 profile 使用 2 workers 时，B/C 总耗时
+  均值为 `5.487/5.065 s`，其中 DataLoader 均值为 `3.588/2.777 s`；EGL geometry
+  仅为 `0.262/0.263 s`，不是主瓶颈。改为 8 workers 后，总耗时均值降至
+  `2.214/3.002 s`、中位数 `1.619/2.635 s`，DataLoader 均值降至
+  `0.621/0.507 s`，但仍出现 `3.590/4.511 s` 的偶发等待峰值。
 
 ## Derived / Interpretation / Decision
 
 - Derived：C 比 B 新增约 2.69M trainable 参数；真实延迟和显存必须以 CUDA profile
   为准，不能从参数量推出资源 gate。
 - Interpretation：本地证据支持实现契约与梯度隔离，尚不支持任何机制效果结论。
+- Interpretation：服务器 w2/w8 对比表明总耗时首先受 DataLoader 并发影响；近期
+  batch-48 formal/audit 均使用 16 workers，EXP021 先前继承公共基线的 8 属配置遗漏。
 - Decision：性能修复必须以新 commit 在服务器重新完成 EGL B/C smoke、batch-48
-  性能诊断与 audit；空闲 GPU 下总训练步达到 B/C `≤1.2/1.5 s` 后，才开始 formal；
-  不用 smoke 选择 checkpoint，不因 direct-pose telemetry 改写 matched-PnP 主 gate。
+  性能诊断与 audit；正式配置显式固定 16 workers，并按 B→lab0、C→lab1 并行执行。
+  空闲 GPU 下总训练步达到 B/C `≤1.2/1.5 s` 后，才开始 formal；不用 smoke 选择
+  checkpoint，不因 direct-pose telemetry 改写 matched-PnP 主 gate。
 
 ## 待生成的正式证据
 

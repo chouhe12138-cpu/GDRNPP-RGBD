@@ -23,8 +23,10 @@ source `9399608` 的服务器 EGL 标定、B/C smoke 与 batch-48 audit 已通�
 累计耗时 `0.9508 s/iter`，因此未启动 formal。定位发现旧 CAD loss 在本机 batch 48
 的 backward 超线性增至约 9.6 秒；向量化并按唯一类别复用 descriptor 后，B/C
 batch-48 前向+反向分别约 1.93/2.23 秒，峰值约 1.58/3.30 GiB，数值与梯度 reference
-测试一致。新 commit 的服务器 EGL 性能与 smoke 复核、formal、完整 matched
-PnP/BOP 和 profile 尚未运行。
+测试一致。source `f29f9a0` 的 lab1/EGL profile 发现 2 workers 导致 DataLoader
+均值约 2.8–3.6 秒；8 workers 将 B/C 总耗时均值降至约 2.21/3.00 秒，但仍有偶发
+等待峰值。EXP021 formal 已显式对齐近期协议为 16 workers，执行固定为 B→lab0、
+C→lab1；新 release 的双机 EGL profile/smoke、formal 和完整 matched PnP/BOP 尚未运行。
 
 协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
 [EXP021 RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md)。

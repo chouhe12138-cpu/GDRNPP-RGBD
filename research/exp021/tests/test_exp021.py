@@ -278,7 +278,11 @@ def test_geo_head_feature_api_is_backward_compatible():
 def test_configs_isolate_b_and_c_and_enable_geometry():
     b = Config.fromfile(str(CONFIG_ROOT / "b_hierarchical.py"))
     c = Config.fromfile(str(CONFIG_ROOT / "c_global.py"))
+    smoke_b = Config.fromfile(str(CONFIG_ROOT / "smoke_b.py"))
+    smoke_c = Config.fromfile(str(CONFIG_ROOT / "smoke_c.py"))
     assert geometry_supervision_enabled(b) and geometry_supervision_enabled(c)
+    assert b.DATALOADER.NUM_WORKERS == c.DATALOADER.NUM_WORKERS == 16
+    assert smoke_b.DATALOADER.NUM_WORKERS == smoke_c.DATALOADER.NUM_WORKERS == 2
     assert b.INPUT.WITH_DEPTH is False and c.INPUT.WITH_DEPTH is False
     assert b.MODEL.POSE_NET.BACKBONE.FREEZE
     assert b.MODEL.POSE_NET.GEO_HEAD.FREEZE
