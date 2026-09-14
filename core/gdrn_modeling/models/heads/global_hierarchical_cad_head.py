@@ -189,31 +189,45 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
     def _select(self, tensor: torch.Tensor, roi_classes: torch.Tensor) -> torch.Tensor:
         return tensor.index_select(0, roi_classes.long())
 
-    def _descriptors(self, roi_classes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        extents = self._select(self.extents, roi_classes).clamp_min(1e-8)
-        diameters = self._select(self.diameters, roi_classes).view(-1, 1, 1).clamp_min(1e-8)
-        coarse = self._select(self.coarse_anchors, roi_classes)
+    def _unique_descriptors(
+        self, roi_classes: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        descriptor_classes, descriptor_inverse = torch.unique(
+            roi_classes.long(), sorted=True, return_inverse=True
+        )
+        extents = self._select(self.extents, descriptor_classes).clamp_min(1e-8)
+        diameters = self._select(self.diameters, descriptor_classes).view(-1, 1, 1).clamp_min(1e-8)
+        coarse = self._select(self.coarse_anchors, descriptor_classes)
         coarse_desc = torch.cat(
             [
                 coarse / extents[:, None],
-                self._select(self.coarse_normals, roi_classes),
+                self._select(self.coarse_normals, descriptor_classes),
                 torch.zeros_like(coarse),
-                self._select(self.coarse_radii, roi_classes)[..., None] / diameters,
+                self._select(self.coarse_radii, descriptor_classes)[..., None] / diameters,
             ],
             dim=-1,
         )
-        fine = self._select(self.fine_anchors, roi_classes)
+        fine = self._select(self.fine_anchors, descriptor_classes)
         fine_desc = torch.cat(
             [
                 fine / extents[:, None, None],
-                self._select(self.fine_normals, roi_classes),
+                self._select(self.fine_normals, descriptor_classes),
                 (fine - coarse[:, :, None]) / extents[:, None, None],
-                self._select(self.fine_radii, roi_classes)[..., None]
+                self._select(self.fine_radii, descriptor_classes)[..., None]
                 / diameters[:, :, None],
             ],
             dim=-1,
         )
-        return self.cad_token_mlp(coarse_desc), self.cad_token_mlp(fine_desc)
+        return (
+            descriptor_classes,
+            descriptor_inverse,
+            self.cad_token_mlp(coarse_desc),
+            self.cad_token_mlp(fine_desc),
+        )
+
+    def _descriptors(self, roi_classes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        _, inverse, coarse_tokens, fine_tokens = self._unique_descriptors(roi_classes)
+        return coarse_tokens.index_select(0, inverse), fine_tokens.index_select(0, inverse)
 
     def enhance_backbone(
         self, backbone_feature: torch.Tensor, roi_classes: torch.Tensor
@@ -300,14 +314,19 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
         global_bias: torch.Tensor | None = None,
     ) -> tuple[dict, int, int]:
         query, h, w = self._queries(decoder_feature)
-        coarse_tokens, fine_tokens = self._descriptors(roi_classes)
+        descriptor_classes, descriptor_inverse, coarse_unique, fine_unique = (
+            self._unique_descriptors(roi_classes)
+        )
+        coarse_tokens = coarse_unique.index_select(0, descriptor_inverse)
         coarse_logits = torch.einsum("bnd,bkd->bnk", query, coarse_tokens) / math.sqrt(self.token_dim)
         if global_bias is not None:
             coarse_logits = coarse_logits + global_bias[:, None]
         return {
             "query": query,
             "coarse_logits": coarse_logits,
-            "fine_tokens": fine_tokens,
+            "descriptor_classes": descriptor_classes,
+            "descriptor_inverse": descriptor_inverse,
+            "fine_tokens_unique": fine_unique,
         }, h, w
 
     def decode(
@@ -320,7 +339,10 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
         state, h, w = self._encoded_state(decoder_feature, roi_classes, global_bias)
         query = state["query"]
         coarse_logits = state["coarse_logits"]
-        fine_tokens = state["fine_tokens"]
+        fine_tokens = state["fine_tokens_unique"].index_select(
+            0, state["descriptor_inverse"]
+        )
+        state["fine_tokens"] = fine_tokens
         fine_anchors = self._select(self.fine_anchors, roi_classes)
         fine_radii = self._select(self.fine_radii, roi_classes)
         extents = self._select(self.extents, roi_classes)
@@ -363,73 +385,145 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
     ) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         query = decoded_state["query"]
         coarse_logits = decoded_state["coarse_logits"]
-        fine_tokens = decoded_state["fine_tokens"]
-        coarse_anchors = self._select(self.coarse_anchors, roi_classes)
-        fine_anchors = self._select(self.fine_anchors, roi_classes)
-        fine_radii = self._select(self.fine_radii, roi_classes)
+        descriptor_classes = decoded_state["descriptor_classes"]
+        descriptor_inverse = decoded_state["descriptor_inverse"]
+        fine_tokens = decoded_state["fine_tokens_unique"]
         extents = self._select(self.extents, roi_classes)
-        b = query.shape[0]
-        component_losses = []
-        selected_branches = []
-        for batch_index in range(b):
-            mask = gt_mask[batch_index].reshape(-1) > 0.5
-            if not torch.any(mask):
-                zero = query[batch_index].sum() * 0.0
-                component_losses.append(torch.stack([zero, zero, zero]))
-                selected_branches.append(0)
-                continue
+        b, n, _ = query.shape
+        symmetry_slots = self.symmetry_transforms.shape[1]
+
+        with torch.no_grad():
             gt_metric = (
-                gt_xyz_norm[batch_index].permute(1, 2, 0).reshape(-1, 3) - 0.5
-            ) * extents[batch_index]
-            branch_losses = []
-            for target_all in self._symmetry_targets(gt_metric, int(roi_classes[batch_index])):
-                target = target_all[mask]
-                q = query[batch_index, mask]
-                coarse_label = torch.cdist(target, coarse_anchors[batch_index]).argmin(-1)
-                coarse_loss = F.cross_entropy(coarse_logits[batch_index, mask], coarse_label)
-                fine_logits = q.new_empty((q.shape[0], 64))
-                fine_label = torch.empty(q.shape[0], dtype=torch.long, device=q.device)
-                for parent in coarse_label.unique(sorted=True):
-                    parent_int = int(parent.item())
-                    chosen = coarse_label == parent
-                    anchors = fine_anchors[batch_index, parent_int]
-                    fine_label[chosen] = torch.cdist(target[chosen], anchors).argmin(-1)
-                    fine_logits[chosen] = (
-                        q[chosen] @ fine_tokens[batch_index, parent_int].T
-                    ) / math.sqrt(self.token_dim)
-                fine_loss = F.cross_entropy(fine_logits, fine_label)
-                anchor = fine_anchors[batch_index, coarse_label, fine_label]
-                radius = fine_radii[batch_index, coarse_label, fine_label]
-                leaf_token = fine_tokens[batch_index, coarse_label, fine_label]
-                residual = self.bounded_residual(
-                    self.residual_head(torch.cat([q, leaf_token], dim=-1)), radius
-                )
-                pred_norm = (anchor + residual) / extents[batch_index] + 0.5
-                target_norm = target / extents[batch_index] + 0.5
-                xyz_loss = F.smooth_l1_loss(
-                    pred_norm,
-                    target_norm,
-                    beta=self.xyz_smooth_l1_beta,
-                    reduction="mean",
-                )
-                branch_losses.append(torch.stack([coarse_loss, fine_loss, xyz_loss]))
-            branches = torch.stack(branch_losses)
-            totals = (
-                branches[:, 0] * self.coarse_loss_weight
-                + branches[:, 1] * self.fine_loss_weight
-                + branches[:, 2] * self.xyz_loss_weight
+                gt_xyz_norm.permute(0, 2, 3, 1).reshape(b, n, 3) - 0.5
+            ) * extents[:, None]
+            transforms = self._select(self.symmetry_transforms, roi_classes)
+            rotations = transforms[:, :, :3, :3]
+            translations = transforms[:, :, :3, 3]
+            symmetry_targets = torch.einsum(
+                "bsni,bsij->bsnj",
+                gt_metric[:, None] - translations[:, :, None],
+                rotations,
             )
-            selected = int(totals.detach().argmin().item())
-            component_losses.append(branches[selected])
-            selected_branches.append(selected)
-        components = torch.stack(component_losses).mean(0)
+            valid_symmetry = (
+                torch.arange(symmetry_slots, device=query.device)[None]
+                < self._select(self.symmetry_counts, roi_classes)[:, None]
+            )
+            foreground = gt_mask.reshape(b, n) > 0.5
+            valid = valid_symmetry[:, :, None] & foreground[:, None]
+            locations = valid.nonzero(as_tuple=False)
+
+        zero = query.sum() * 0.0
+        if locations.numel() == 0:
+            components = torch.stack([zero, zero, zero])
+            selected = torch.zeros(b, dtype=torch.long, device=query.device)
+        else:
+            batch_index, symmetry_index, pixel_index = locations.unbind(1)
+            target = symmetry_targets[batch_index, symmetry_index, pixel_index]
+            q = query[batch_index, pixel_index]
+            branch_index = batch_index * symmetry_slots + symmetry_index
+
+            with torch.no_grad():
+                coarse_labels = []
+                for start in range(0, target.shape[0], 32768):
+                    stop = min(start + 32768, target.shape[0])
+                    anchors = self.coarse_anchors.index_select(
+                        0, roi_classes[batch_index[start:stop]].long()
+                    )
+                    coarse_labels.append(
+                        torch.cdist(target[start:stop, None], anchors).squeeze(1).argmin(-1)
+                    )
+                coarse_label = torch.cat(coarse_labels)
+
+            coarse_point_loss = F.cross_entropy(
+                coarse_logits[batch_index, pixel_index], coarse_label, reduction="none"
+            )
+            route_key = descriptor_inverse[batch_index] * 64 + coarse_label
+            order = torch.argsort(route_key)
+            sorted_key = route_key[order]
+            unique_keys, group_counts = torch.unique_consecutive(
+                sorted_key, return_counts=True
+            )
+            group_keys = unique_keys.detach().cpu().tolist()
+            group_sizes = group_counts.detach().cpu().tolist()
+
+            q = q[order]
+            target = target[order]
+            branch_index = branch_index[order]
+            batch_index = batch_index[order]
+            coarse_point_loss = coarse_point_loss[order]
+            fine_point_losses = []
+            xyz_point_losses = []
+            offset = 0
+            for key, count in zip(group_keys, group_sizes):
+                stop = offset + count
+                descriptor_index, parent = divmod(key, 64)
+                object_class = descriptor_classes[descriptor_index]
+                group_target = target[offset:stop]
+                group_query = q[offset:stop]
+                anchors = self.fine_anchors[object_class, parent]
+                with torch.no_grad():
+                    fine_label = torch.cdist(group_target, anchors).argmin(-1)
+                token_bank = fine_tokens[descriptor_index, parent]
+                fine_logits = group_query @ token_bank.T / math.sqrt(self.token_dim)
+                fine_point_losses.append(
+                    F.cross_entropy(fine_logits, fine_label, reduction="none")
+                )
+                anchor = anchors[fine_label]
+                radius = self.fine_radii[object_class, parent, fine_label]
+                leaf_token = token_bank[fine_label]
+                residual = self.bounded_residual(
+                    self.residual_head(torch.cat([group_query, leaf_token], dim=-1)),
+                    radius,
+                )
+                group_extents = extents[batch_index[offset:stop]]
+                pred_norm = (anchor + residual) / group_extents + 0.5
+                target_norm = group_target / group_extents + 0.5
+                xyz_point_losses.append(
+                    F.smooth_l1_loss(
+                        pred_norm,
+                        target_norm,
+                        beta=self.xyz_smooth_l1_beta,
+                        reduction="none",
+                    ).mean(-1)
+                )
+                offset = stop
+
+            point_components = torch.stack(
+                [
+                    coarse_point_loss,
+                    torch.cat(fine_point_losses),
+                    torch.cat(xyz_point_losses),
+                ]
+            )
+            branch_count = b * symmetry_slots
+            branch_sums = query.new_zeros((3, branch_count)).scatter_add(
+                1, branch_index[None].expand(3, -1), point_components
+            )
+            counts = torch.bincount(branch_index, minlength=branch_count)
+            branch_components = branch_sums / counts.clamp_min(1).to(query.dtype)[None]
+            branch_components = branch_components.view(3, b, symmetry_slots)
+            branch_components = branch_components + zero
+            weighted = (
+                branch_components[0] * self.coarse_loss_weight
+                + branch_components[1] * self.fine_loss_weight
+                + branch_components[2] * self.xyz_loss_weight
+            )
+            branch_valid = valid_symmetry & (counts.view(b, symmetry_slots) > 0)
+            empty = ~foreground.any(-1)
+            branch_valid[empty, 0] = True
+            weighted = weighted.masked_fill(~branch_valid, torch.inf)
+            selected = weighted.detach().argmin(-1)
+            selected_components = branch_components.permute(1, 2, 0)[
+                torch.arange(b, device=query.device), selected
+            ]
+            components = selected_components.mean(0)
         losses = {
             "loss_cad_coarse": components[0] * self.coarse_loss_weight,
             "loss_cad_fine": components[1] * self.fine_loss_weight,
             "loss_cad_xyz": components[2] * self.xyz_loss_weight,
         }
         stats = {
-            "selected_symmetry_branch_mean": query.new_tensor(selected_branches, dtype=torch.float32).mean(),
+            "selected_symmetry_branch_mean": selected.to(torch.float32).mean(),
             "cad_foreground_pixels": (gt_mask > 0.5).sum().detach(),
         }
         return losses, stats

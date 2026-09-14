@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -24,12 +25,88 @@ ROOT = Path(__file__).resolve().parents[3]
 CONFIG_ROOT = ROOT / "configs/gdrn/lmo_pbr/research/exp021_global_hierarchical_cad"
 
 
+def _reference_loss(head, decoded_state, roi_classes, gt_xyz_norm, gt_mask):
+    """Small-input oracle preserving the original per-instance implementation."""
+    query = decoded_state["query"]
+    coarse_logits = decoded_state["coarse_logits"]
+    fine_tokens = decoded_state["fine_tokens_unique"].index_select(
+        0, decoded_state["descriptor_inverse"]
+    )
+    coarse_anchors = head._select(head.coarse_anchors, roi_classes)
+    fine_anchors = head._select(head.fine_anchors, roi_classes)
+    fine_radii = head._select(head.fine_radii, roi_classes)
+    extents = head._select(head.extents, roi_classes)
+    component_losses = []
+    selected_branches = []
+    for batch_index in range(query.shape[0]):
+        mask = gt_mask[batch_index].reshape(-1) > 0.5
+        if not torch.any(mask):
+            zero = query[batch_index].sum() * 0.0
+            component_losses.append(torch.stack([zero, zero, zero]))
+            selected_branches.append(0)
+            continue
+        gt_metric = (
+            gt_xyz_norm[batch_index].permute(1, 2, 0).reshape(-1, 3) - 0.5
+        ) * extents[batch_index]
+        branch_losses = []
+        for target_all in head._symmetry_targets(
+            gt_metric, int(roi_classes[batch_index])
+        ):
+            target = target_all[mask]
+            q = query[batch_index, mask]
+            coarse_label = torch.cdist(target, coarse_anchors[batch_index]).argmin(-1)
+            coarse_loss = torch.nn.functional.cross_entropy(
+                coarse_logits[batch_index, mask], coarse_label
+            )
+            fine_logits = q.new_empty((q.shape[0], 64))
+            fine_label = torch.empty(q.shape[0], dtype=torch.long, device=q.device)
+            for parent in coarse_label.unique(sorted=True):
+                parent_int = int(parent.item())
+                chosen = coarse_label == parent
+                anchors = fine_anchors[batch_index, parent_int]
+                fine_label[chosen] = torch.cdist(target[chosen], anchors).argmin(-1)
+                fine_logits[chosen] = (
+                    q[chosen] @ fine_tokens[batch_index, parent_int].T
+                ) / math.sqrt(head.token_dim)
+            fine_loss = torch.nn.functional.cross_entropy(fine_logits, fine_label)
+            anchor = fine_anchors[batch_index, coarse_label, fine_label]
+            radius = fine_radii[batch_index, coarse_label, fine_label]
+            leaf_token = fine_tokens[batch_index, coarse_label, fine_label]
+            residual = head.bounded_residual(
+                head.residual_head(torch.cat([q, leaf_token], dim=-1)), radius
+            )
+            pred_norm = (anchor + residual) / extents[batch_index] + 0.5
+            target_norm = target / extents[batch_index] + 0.5
+            xyz_loss = torch.nn.functional.smooth_l1_loss(
+                pred_norm,
+                target_norm,
+                beta=head.xyz_smooth_l1_beta,
+                reduction="mean",
+            )
+            branch_losses.append(torch.stack([coarse_loss, fine_loss, xyz_loss]))
+        branches = torch.stack(branch_losses)
+        totals = (
+            branches[:, 0] * head.coarse_loss_weight
+            + branches[:, 1] * head.fine_loss_weight
+            + branches[:, 2] * head.xyz_loss_weight
+        )
+        selected = int(totals.detach().argmin().item())
+        component_losses.append(branches[selected])
+        selected_branches.append(selected)
+    components = torch.stack(component_losses).mean(0)
+    return {
+        "loss_cad_coarse": components[0] * head.coarse_loss_weight,
+        "loss_cad_fine": components[1] * head.fine_loss_weight,
+        "loss_cad_xyz": components[2] * head.xyz_loss_weight,
+    }, torch.tensor(selected_branches)
+
+
 @pytest.fixture()
 def hierarchy_path(tmp_path):
     rng = np.random.default_rng(7)
     coarse = rng.normal(size=(8, 64, 3)).astype(np.float32) * 0.02
     fine = coarse[:, :, None] + rng.normal(size=(8, 64, 64, 3)).astype(np.float32) * 0.002
-    identity = np.tile(np.eye(4, dtype=np.float32), (8, 1, 1, 1))
+    identity = np.tile(np.eye(4, dtype=np.float32), (8, 2, 1, 1))
     path = tmp_path / "hierarchy.npz"
     np.savez_compressed(
         path,
@@ -93,6 +170,7 @@ def test_decode_shapes_and_beams(hierarchy_path, global_guidance):
         torch.randn(2, 256, 64, 64), classes, bias, beam_ks=(1, 2, 4, 8)
     )
     assert not losses
+    assert state["fine_tokens"].shape == (2, 64, 64, 256)
     assert set(state["decoded"]) == {1, 2, 4, 8}
     assert all(value["xyz_norm"].shape == (2, 3, 64, 64) for value in state["decoded"].values())
 
@@ -110,6 +188,69 @@ def test_teacher_forced_losses_are_foreground_only_and_backward(hierarchy_path):
     assert int(stats["cad_foreground_pixels"]) == 16
     sum(losses.values()).backward()
     assert feature.grad is not None and torch.isfinite(feature.grad).all()
+
+
+def test_vectorized_loss_matches_reference_values_and_gradients(hierarchy_path):
+    torch.manual_seed(23)
+    reference = GlobalGuidedHierarchicalCADHead(
+        str(hierarchy_path),
+        coarse_loss_weight=0.125,
+        fine_loss_weight=1.0,
+        xyz_loss_weight=16.0,
+    )
+    optimized = GlobalGuidedHierarchicalCADHead(
+        str(hierarchy_path),
+        coarse_loss_weight=0.125,
+        fine_loss_weight=1.0,
+        xyz_loss_weight=16.0,
+    )
+    optimized.load_state_dict(reference.state_dict())
+    for head in (reference, optimized):
+        head.symmetry_counts[0] = 2
+        head.symmetry_transforms[0, 1, :3, :3] = torch.tensor(
+            [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
+        )
+
+    classes = torch.tensor([0, 0, 5])
+    gt = torch.rand(3, 3, 8, 8) * 0.2 + 0.4
+    mask = torch.zeros(3, 8, 8)
+    mask[0, 1:7, 2:6] = 1
+    mask[1, 2:6, 1:7] = 1
+    mask[2] = 0  # preserve the original zero-loss empty-instance behavior
+    reference_feature = torch.randn(3, 256, 8, 8, requires_grad=True)
+    optimized_feature = reference_feature.detach().clone().requires_grad_(True)
+
+    reference_state = reference._encoded_state(reference_feature, classes)[0]
+    reference_losses, reference_selected = _reference_loss(
+        reference, reference_state, classes, gt, mask
+    )
+    optimized_state = optimized._encoded_state(optimized_feature, classes)[0]
+    optimized_losses, optimized_stats = optimized.loss(
+        optimized_state, classes, gt, mask
+    )
+    for name in reference_losses:
+        assert torch.allclose(
+            optimized_losses[name], reference_losses[name], rtol=2e-5, atol=2e-6
+        )
+    assert torch.equal(
+        optimized_stats["selected_symmetry_branch_mean"],
+        reference_selected.float().mean(),
+    )
+
+    sum(reference_losses.values()).backward()
+    sum(optimized_losses.values()).backward()
+    assert torch.allclose(
+        optimized_feature.grad, reference_feature.grad, rtol=3e-5, atol=3e-6
+    )
+    reference_parameters = dict(reference.named_parameters())
+    for name, parameter in optimized.named_parameters():
+        reference_grad = reference_parameters[name].grad
+        if reference_grad is None:
+            assert parameter.grad is None
+        else:
+            assert torch.allclose(
+                parameter.grad, reference_grad, rtol=3e-5, atol=3e-6
+            ), name
 
 
 def test_symmetry_targets_use_full_se3(hierarchy_path):

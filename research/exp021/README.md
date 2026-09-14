@@ -65,6 +65,15 @@ python -m research.exp021.real_smoke --arm both --device cuda:0 \
 诊断。报告会写出 `formal_renderer_match=false`；该结果不能替代服务器 EGL smoke，
 正式训练配置仍固定为 EGL。
 
+训练性能使用真实 online-geometry batch 分阶段测量。诊断报告分别记录 DataLoader、
+renderer、forward、backward、optimizer、总吞吐和峰值 allocated memory；本机 EGL
+不可用时以 CPP 隔离模型计算，最终仍须在服务器复核 EGL 总耗时。
+
+```bash
+python -m research.exp021.profile_training --arm B --device cuda:0 --batch-size 48 --renderer-type cpp --warmup 5 --steps 20
+python -m research.exp021.profile_training --arm C --device cuda:0 --batch-size 48 --renderer-type cpp --warmup 5 --steps 20
+```
+
 正式训练使用 `b_hierarchical.py` 和 `c_global.py`，唯一 run 目录由 launcher 设置。
 训练 checkpoint 不含 CAD 几何 buffer，加载时仍必须提供同版本 hierarchy artifact。
 

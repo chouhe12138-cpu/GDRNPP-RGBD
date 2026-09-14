@@ -10,8 +10,8 @@ C 臂在 8×8 特征上增加两层图像—CAD Transformer、全局粗区域偏
 注入。V1 固定为 RGB 与冻结阶段，只训练新增 CAD head；不执行 backbone 联合微调。
 对称监督按实例从完整 BOP SE(3) 等价路径中选择一条，三项 loss 共用该分支。
 
-当前状态：`IMPLEMENTED / LOCAL_CUDA_CPP_SMOKE_PASS / EGL_SMOKE_PENDING /
-FORMAL_NOT_STARTED`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021 12 项
+当前状态：`PERFORMANCE_FIX_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING /
+FORMAL_NOT_STARTED`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021 13 项
 测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
 参数，官方 checkpoint 只缺 `cad_head.*`，优化步后冻结张量不变。真实 LM-O 单目标
 evaluator 接线 smoke 已完成，能输出 fixed support、K=1/2/4/8、对称/路由/几何与
@@ -19,7 +19,12 @@ RANSAC 计时；随机初始化 B 的数值不进入科学结论。本机 CUDA+C
 建议 coarse/fine/XYZ 权重 `0.125/1/16`，加权梯度相对中位数
 `0.894/1.160/1.000`，已写入 B/C 共享配置；B/C CUDA+CPP one-step smoke PASS，
 峰值 allocated memory 约 0.979/1.035 GB。因本机 EGL 不支持 Bindless Textures，
-正式匹配的 EGL 标定/smoke、formal、完整 matched PnP/BOP 和 profile 尚未运行。
+source `9399608` 的服务器 EGL 标定、B/C smoke 与 batch-48 audit 已通过，但 B smoke
+累计耗时 `0.9508 s/iter`，因此未启动 formal。定位发现旧 CAD loss 在本机 batch 48
+的 backward 超线性增至约 9.6 秒；向量化并按唯一类别复用 descriptor 后，B/C
+batch-48 前向+反向分别约 1.93/2.23 秒，峰值约 1.58/3.30 GiB，数值与梯度 reference
+测试一致。新 commit 的服务器 EGL 性能与 smoke 复核、formal、完整 matched
+PnP/BOP 和 profile 尚未运行。
 
 协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
 [EXP021 RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md)。

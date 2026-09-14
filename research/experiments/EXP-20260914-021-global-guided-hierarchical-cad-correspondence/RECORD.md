@@ -1,7 +1,7 @@
 # EXP021 全局引导的层级 CAD 对应预测
 
 - `experiment_id`: `EXP-20260914-021-global-guided-hierarchical-cad-correspondence`
-- 状态：`IMPLEMENTED / LOCAL_CUDA_CPP_SMOKE_PASS / EGL_SMOKE_PENDING / FORMAL_NOT_STARTED`
+- 状态：`PERFORMANCE_FIX_LOCAL_PASS / SERVER_EGL_REVALIDATION_PENDING / FORMAL_NOT_STARTED`
 - 日期：2026-09-14
 - seed：42（训练）；20260914（CAD 表面采样）；20260730+目标序号（RANSAC）
 - 实现开始时的父 commit：`c2b7c2f`；正式 run 记录实际 release commit
@@ -60,14 +60,30 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
   `0.5181/4.1125/0.05608`。ignored JSON 位于当前 experiment output 下的
   `local-calibration-cpp-b1-weighted-config.json` 与
   `local-smoke-cpp-b1-weighted-config.json`。
+- source commit `9399608` 的服务器 EGL 标定、B/C one-step smoke 和 batch-48 audit
+  均 PASS，标定仍建议 `0.125/1/16`；batch-48 峰值 allocated 为 B
+  `3,056,498,176`、C `4,875,776,512` bytes。用户报告 managed smoke 已完成；但 B
+  在 iter 499 的累计耗时为 `0.9508 s/iter`，明显慢于历史 batch-4 smoke，故未启动
+  formal，并转入训练性能修复。
+- 修复前本机 RTX 4060 + CPP 分段结果：B batch 4 不同真实 batch 总计约
+  `0.353 s/iter`；B batch 48 前向+反向约 `12.0 s`，其中 backward 约 `9.6 s`，
+  峰值 allocated `3,014 MiB`。逐实例、逐对称分支、逐 coarse-parent 构图导致
+  batch 扩展时 backward 超线性退化；PnP 未进入训练路径，B 也未执行 Transformer。
+- loss 执行重写后，reference oracle 覆盖重复类别、双对称分支和空前景，三项 loss、
+  分支选择、输入及全部 CAD-head 参数梯度均在浮点容差内一致。13 项 EXP021 测试通过。
+  本机 B batch 4 连续真实 batch 总计约 `0.292 s/iter`。正式诊断入口经 5 步 warmup
+  和 20 个不同真实 batch 测得：B batch 48 平均 forward+backward `1.933 s`、CPP
+  全流程 `2.556 s`、`18.78 samples/s`、峰值 `1,618 MiB`；C 分别为 `2.229 s`、
+  `2.966 s`、`16.18 samples/s`、`3,380 MiB`。B/C 达到预设模型训练步门槛
+  `2.0/2.5 s`，batch-48 吞吐高于 batch 4；本地 CPP 全流程不作为服务器 EGL 门槛。
 
 ## Derived / Interpretation / Decision
 
 - Derived：C 比 B 新增约 2.69M trainable 参数；真实延迟和显存必须以 CUDA profile
   为准，不能从参数量推出资源 gate。
 - Interpretation：本地证据支持实现契约与梯度隔离，尚不支持任何机制效果结论。
-- Decision：待服务器真实 CUDA/EGL loss 标定确认当前权重且 B/C one-step smoke
-  通过后，才开始 formal；
+- Decision：性能修复必须以新 commit 在服务器重新完成 EGL B/C smoke、batch-48
+  性能诊断与 audit；空闲 GPU 下总训练步达到 B/C `≤1.2/1.5 s` 后，才开始 formal；
   不用 smoke 选择 checkpoint，不因 direct-pose telemetry 改写 matched-PnP 主 gate。
 
 ## 待生成的正式证据
