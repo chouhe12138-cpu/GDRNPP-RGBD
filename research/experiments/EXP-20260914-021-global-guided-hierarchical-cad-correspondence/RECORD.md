@@ -4,7 +4,7 @@
 - 状态：`IMPLEMENTED / LOCAL_CUDA_CPP_SMOKE_PASS / EGL_SMOKE_PENDING / FORMAL_NOT_STARTED`
 - 日期：2026-09-14
 - seed：42（训练）；20260914（CAD 表面采样）；20260730+目标序号（RANSAC）
-- 当前源码基点：`c2b7c2f` 上的未提交实现；正式 run 必须记录实际 commit
+- 实现开始时的父 commit：`c2b7c2f`；正式 run 记录实际 release commit
 
 ## 研究问题与固定范围
 
