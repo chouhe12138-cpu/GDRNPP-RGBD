@@ -18,12 +18,22 @@ B/C 除 `use_global_guidance` 外配置相同。C 的共享模块与 B 按同一
 V1 不解冻 backbone，也不训练原有 XYZ/Mask/Region/Pose loss。正式 batch-48 训练使用
 16 个 DataLoader workers；batch-4 smoke 单独覆盖为 2。B 固定在 lab0/GPU 0，C 固定
 在 lab1/GPU 1，并使用相同源码、镜像、配置、seed、数据和权重并行运行。B/C 正式
-训练显式启用 FP16 AMP；几何 target、nearest-anchor `cdist` 与分支聚合保留 FP32。
+训练显式启用 FP16 AMP；几何 target、nearest-anchor 平方距离与分支聚合保留 FP32。
 
 EXP021 的训练专用路径在 backbone 后先做可选全局增强，再只调用一次
 `geo_head.forward_features()`。它不计算零权重的旧 mask/XYZ/region 输出，也不进入
 Patch-PnP；C 的梯度仍经冻结 decoder 的运算回到 global-guidance 参数。推理路径保持
 原 dense outputs 和 K-beam 行为。
+
+训练 loss 将有效 `(descriptor,parent)` 路由在 GPU 上打包为固定 256 点 blocks，
+以平方距离和 batched matmul 计算 coarse/fine label、fine logits 与受限 residual；
+不把 route keys/counts 搬到 CPU，也不逐 group 调用小规模 `cdist`。CAD-only online
+batch 从 CPU mapper 输出直接准备 EGL metadata，并跳过零权重 legacy Region/PnP
+targets；EGL/native renderer 本身及其逐 ROI draw 契约不变。
+
+该加速不改变 EXP021 的科学变量、loss 语义或评估协议，作为既有 formal 内的工程
+实现更新记录，不另建 formal 实验；当前远程训练完成后直接进入固定 checkpoint 的
+下一阶段评价。
 
 ## CAD 层级与解码
 
@@ -70,6 +80,15 @@ python -m research.exp021.calibrate_loss_weights --device cuda:0 \
 python -m research.exp021.real_smoke --arm both --device cuda:0 \
   --precision config \
   --output output/experiments/EXP021-egl-smoke.json
+```
+
+本地可用 CPP renderer 做固定真实 batch 的多步可优化性检查；该检查要求 loss finite、
+冻结隔离成立且末段总 loss 均值低于初段，不是正式性能结果：
+
+```bash
+python -m research.exp021.real_smoke --arm both --device cuda:0 \
+  --renderer-type cpp --precision config --batch-size 2 --steps 20 \
+  --output output/experiments/EXP021-local-loss-descent.json
 ```
 
 若本机 EGL 驱动缺少所需 OpenGL 扩展，可显式加 `--renderer-type cpp` 做本地 CUDA

@@ -211,8 +211,11 @@ class GDRN_DoubleMask(nn.Module):
             backbone_tensor = (
                 conv_feat[0] if isinstance(conv_feat, (tuple, list)) else conv_feat
             )
+            descriptor_state = self.cad_head._descriptor_state(roi_classes)
             enhanced_feature, global_bias = self.cad_head.enhance_backbone(
-                backbone_tensor, roi_classes
+                backbone_tensor,
+                roi_classes,
+                descriptor_state=descriptor_state,
             )
             decoder_feature = self.geo_head_net.forward_features(enhanced_feature)
             _cad_state, cad_losses, cad_stats = self.cad_head(
@@ -222,19 +225,18 @@ class GDRN_DoubleMask(nn.Module):
                 beam_ks=cad_beam_ks,
                 gt_xyz_norm=gt_xyz,
                 gt_mask=gt_mask_visib,
+                descriptor_state=descriptor_state,
             )
-            storage = get_event_storage()
-            storage.put_scalars(
-                **{
-                    "vis/cad_symmetry_branch_mean": float(
-                        cad_stats["selected_symmetry_branch_mean"]
-                    ),
-                    "vis/cad_foreground_pixels": float(
-                        cad_stats["cad_foreground_pixels"]
-                    ),
+            return {
+                "_train_stats": {
+                    "vis/cad_symmetry_branch_mean": cad_stats[
+                        "selected_symmetry_branch_mean"
+                    ],
+                    "vis/cad_foreground_pixels": cad_stats[
+                        "cad_foreground_pixels"
+                    ],
                 }
-            )
-            return {}, cad_losses
+            }, cad_losses
 
         if cad_enabled:
             if not hasattr(self.geo_head_net, "forward_features"):
@@ -295,8 +297,11 @@ class GDRN_DoubleMask(nn.Module):
             if roi_classes is None or roi_extents is None:
                 raise ValueError("EXP021 CAD_HEAD requires roi_classes and roi_extents")
             backbone_tensor = conv_feat[0] if isinstance(conv_feat, (tuple, list)) else conv_feat
+            descriptor_state = self.cad_head._descriptor_state(roi_classes)
             enhanced_feature, global_bias = self.cad_head.enhance_backbone(
-                backbone_tensor, roi_classes
+                backbone_tensor,
+                roi_classes,
+                descriptor_state=descriptor_state,
             )
             if self.cad_head.use_global_guidance:
                 decoder_feature = self.geo_head_net.forward_features(enhanced_feature)
@@ -307,6 +312,7 @@ class GDRN_DoubleMask(nn.Module):
                 beam_ks=cad_beam_ks,
                 gt_xyz_norm=None,
                 gt_mask=None,
+                descriptor_state=descriptor_state,
             )
 
             default_k = self.cad_head.default_beam_k

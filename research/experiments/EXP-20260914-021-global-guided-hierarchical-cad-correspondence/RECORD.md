@@ -1,7 +1,7 @@
 # EXP021 全局引导的层级 CAD 对应预测
 
 - `experiment_id`: `EXP-20260914-021-global-guided-hierarchical-cad-correspondence`
-- 状态：`SERVER_EGL_CALIBRATION_PASS / COARSE_WEIGHT_UPDATE_REVALIDATION_PENDING / FP32_B_REPLACED / FP32_C_ACTIVE_PENDING_RESTART`
+- 状态：`LOCAL_GPU_VECTORIZATION_PASS / FORMAL_TRAINING_ACTIVE_USER_REPORTED / RUN_METADATA_PENDING`
 - 日期：2026-09-14
 - seed：42（训练）；20260914（CAD 表面采样）；20260730+目标序号（RANSAC）
 - 实现开始时的父 commit：`c2b7c2f`；正式 run 记录实际 release commit
@@ -120,6 +120,43 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
   lab0 已切换到新 release 才能产生这些结果，因此旧 FP32 B 已被替换；其最终 iteration
   尚未随 JSON 提供。lab1 的旧 FP32 C 在本轮 gate 期间继续运行，待更新权重复核通过
   后再精确终止。
+- 2026-09-15 本地工程优化将训练 loss 的 `(descriptor,parent)` 路由改为 GPU 排序后
+  的 256 点 padded blocks；每个 block 只保留一份 64-way fine anchor/token bank，
+  coarse/fine label 使用 FP32 平方距离矩阵，删除训练路径的 `cpu().tolist()`、
+  data-dependent Python group loop 和 `torch.cdist`。C 的全局交互与 loss 同时复用一次
+  CAD descriptor 编码。hierarchy、三项 loss、对称分支选择和 checkpoint key 未改。
+- 同次优化增加 CAD-only online-geometry batch：pose/class/crop K 从原 CPU batch 直接
+  提供给现有逐 ROI renderer，并批量送往 GPU backprojection；不修改 EGL/native API，
+  不再生成未使用的旧 Region `cdist`、ROI2D、pose points 等 GPU targets。DataLoader
+  仍为每步预取，正式 16-worker 策略未改。
+- 优化后 EXP021 20 项测试通过，包括旧实现 oracle 与新实现的 label、loss、输入及
+  参数梯度等价、跨 256 点 block、重复类别、对称分支、空前景和轻量 online batch；
+  完整 `pytest -q research` 为 188 passed。B/C CPU preflight PASS，trainable 参数仍为
+  233,347 / 2,923,587，冻结参数不变。
+- 本机 RTX 4060 + CPP、batch 2、AMP、固定真实 batch 20-step smoke B/C PASS；GradScaler
+  均保持 `65536`，无非有限梯度或跳步。B 总 loss 前/后 5 步均值
+  `5.21869→5.11502`，C 为 `5.29877→5.07820`；三项 loss 全程 finite，CAD 参数更新，
+  冻结参数不变。峰值 allocated 为 B/C `1.103/1.170 GB`。CPP smoke 只验证本地工程与
+  可优化性，不替代服务器 EGL gate。
+- 优化后本机 CPP、batch-1、AMP 标定 raw gradient norm 为
+  `7.841665/1.271669/0.0684941`，复现优化前 `7.8417/1.2717/0.06850`；本机仍建议
+  `0.125/1/16`。这支持真实 batch 上梯度语义未改变，但正式配置继续采用已决定的
+  EGL 建议 `0.25/1/16`，等待服务器复核。
+- 本机 CPP、batch 48、16 workers、5 warmup + 20 measured 的 AMP profile PASS。
+  B forward/backward 均值为 `327.38/99.00 ms`、端到端中位数 `0.8821 s`、峰值
+  `2.659 GB`；C 为 `352.09/170.62 ms`、`1.0084 s`、`4.186 GB`。相对上次同机 AMP
+  记录，模型前反向由 B/C `1.851/2.029 s` 降至 `0.426/0.523 s`，但峰值显存提高；
+  DataLoader 仍出现 `8.95/6.87 s` 最大等待。不同 sampled batch、coarse weight 版本
+  与系统长尾限制严格 matched 解释，本次不设置时间 gate，只将方向与资源量记录为
+  工程证据。
+- 由上述同机记录计算，B/C 模型前反向分别加速 `4.34×/3.88×`，即耗时下降
+  `76.96%/74.24%`；端到端中位数分别加速 `2.66×/2.55×`，即耗时下降
+  `62.37%/60.73%`。公式为 `speedup = old/new`、`reduction = 1-new/old`；这些派生量
+  沿用上一条的可比性限制，不作为 formal 科学 gate。
+- 2026-09-15 用户确认远程 formal 已在训练；本次加速属于同一 EXP021 formal 的工程
+  实现更新，不新建 experiment_id 或 formal 实验，训练完成后直接在加速版本进入下一
+  阶段。当前尚未提供唯一 run_id、source commit、进度与退出状态，完成后再同步记录；
+  在此之前不干扰服务器训练。
 
 ## Derived / Interpretation / Decision
 
@@ -133,19 +170,27 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
 - Interpretation：lab0 EGL profile 中 AMP 对 C 的端到端中位数和显存有明确工程收益；
   B 的 20-step 结果受 DataLoader 长尾影响，且模型 forward+backward 没有稳定缩短，
   不据此承诺 B formal 的显著加速。AMP 的数值完整性与冻结隔离门禁已经通过。
-- Decision：原空闲 GPU `≤1.2/1.5 s` 启动 gate 及当前实际偏离继续作为 Observed
-  保留。2026-09-14 用户接受训练耗时，并决定以同代码 FP32→AMP 相对提速和数值完整性
-  做本轮工程 review；新 release 必须先在服务器完成 EGL 标定、B/C smoke 和 matched
-  profile。通过后终止待替换 FP32 runs，正式配置固定 AMP + 16 workers，按 B→lab0、
-  C→lab1 从官方 checkpoint 重启；不用 smoke 选择 checkpoint，不因 direct-pose
-  telemetry 改写 matched-PnP 主 gate。
-- Decision：正式 EGL 单 batch 标定优先于本机 CPP 标定；将 coarse/fine/XYZ 从
-  `0.125/1/16` 更新为 `0.25/1/16`。新配置必须重新提交、生成唯一 bundle，并在
-  lab0 重跑 EGL 标定与 B/C AMP smoke；建议一致后才替换 lab1 和启动 formal。
+- Interpretation：本地向量化结果支持此前训练热路径包含 CPU 调度与小 kernel 问题；
+  同时 online renderer 和 DataLoader 长尾仍独立存在，不能把端到端波动只归因于 AMP
+  或 CAD loss。padded blocks 以额外临时显存换取矩阵化吞吐，当前本机 B/C 峰值仍在
+  8 GB 内，但正式资源事实须由新 release 的 L40/EGL profile 复核。
+- Decision：本次向量化和 AMP 路径优化只改变工程实现与资源表现，不改变 EXP021 的
+  hierarchy、loss、科学变量或结果语义，因此并入现有 formal，不产生新的 formal
+  实验。等待当前远程训练完成后，直接进入固定 checkpoint 的下一阶段评价。
+- Decision（2026-09-14，后被当前执行状态取代）：原空闲 GPU `≤1.2/1.5 s` 启动 gate
+  及实际偏离继续作为 Observed 保留；当时计划以同代码 FP32→AMP 相对提速和数值完整性
+  做工程 review，并在新 release 的 EGL 标定、B/C smoke 和 matched profile 后重启。
+  该历史决策不再表示 formal 尚未启动。
+- Decision：正式 EGL 单 batch 标定优先于本机 CPP 标定；coarse/fine/XYZ 已从
+  `0.125/1/16` 更新为 `0.25/1/16`。2026-09-15 用户确认远程 formal 正在训练，当前
+  不干扰运行；具体 source 与 gate 证据待训练完成后随 run metadata 一并核对。
 
 ## 待生成的正式证据
 
-- 更新为 `0.25/1/16` 后的 loss 梯度标定 JSON 与 B/C CUDA/EGL smoke。
-- B/C 唯一 run_id、源码 commit、checkpoint 文件名/epoch、全部预定正式评估点。
+- 当前远程 formal 的唯一 run_id、source commit、进度与退出状态（用户报告训练中，
+  待完成后同步）。
+- 含 GPU route blocks 与 CAD-only online batch 的 L40/EGL profile（工程补充证据，
+  不构成新 formal，也不阻塞训练后的下一阶段）。
+- B/C checkpoint 文件名/epoch、全部预定正式评估点。
 - E40 A/B/C matched K sweep、完整 BOP evaluator 输出、gate report、batch-1 profile。
 - 最终与最佳点的聚合和逐物体结果；失败 run 保留原因与有效证据边界。

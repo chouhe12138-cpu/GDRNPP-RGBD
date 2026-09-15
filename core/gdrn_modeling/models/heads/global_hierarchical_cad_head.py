@@ -16,6 +16,8 @@ LMO_OBJECT_IDS = (1, 5, 6, 8, 9, 10, 11, 12)
 HIERARCHY_VERSION = 1
 HIERARCHY_SAMPLE_COUNT = 200_000
 HIERARCHY_SEED = 20260914
+_ROUTE_BLOCK_SIZE = 256
+_COARSE_LABEL_CHUNK_SIZE = 32768
 
 
 def load_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
@@ -225,16 +227,34 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
             self.cad_token_mlp(fine_desc),
         )
 
+    def _descriptor_state(self, roi_classes: torch.Tensor) -> dict[str, torch.Tensor]:
+        classes, inverse, coarse_tokens, fine_tokens = self._unique_descriptors(
+            roi_classes
+        )
+        return {
+            "classes": classes,
+            "inverse": inverse,
+            "coarse_tokens": coarse_tokens,
+            "fine_tokens": fine_tokens,
+        }
+
     def _descriptors(self, roi_classes: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         _, inverse, coarse_tokens, fine_tokens = self._unique_descriptors(roi_classes)
         return coarse_tokens.index_select(0, inverse), fine_tokens.index_select(0, inverse)
 
     def enhance_backbone(
-        self, backbone_feature: torch.Tensor, roi_classes: torch.Tensor
+        self,
+        backbone_feature: torch.Tensor,
+        roi_classes: torch.Tensor,
+        descriptor_state: dict[str, torch.Tensor] | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         if not self.use_global_guidance:
             return backbone_feature, None
-        coarse_tokens, _ = self._descriptors(roi_classes)
+        if descriptor_state is None:
+            descriptor_state = self._descriptor_state(roi_classes)
+        coarse_tokens = descriptor_state["coarse_tokens"].index_select(
+            0, descriptor_state["inverse"]
+        )
         image = self.image_projection(backbone_feature).flatten(2).transpose(1, 2)
         if image.shape[1] != 64:
             raise ValueError(f"EXP021 expects an 8x8 backbone feature, got {image.shape[1]} tokens")
@@ -312,11 +332,15 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
         decoder_feature: torch.Tensor,
         roi_classes: torch.Tensor,
         global_bias: torch.Tensor | None = None,
+        descriptor_state: dict[str, torch.Tensor] | None = None,
     ) -> tuple[dict, int, int]:
         query, h, w = self._queries(decoder_feature)
-        descriptor_classes, descriptor_inverse, coarse_unique, fine_unique = (
-            self._unique_descriptors(roi_classes)
-        )
+        if descriptor_state is None:
+            descriptor_state = self._descriptor_state(roi_classes)
+        descriptor_classes = descriptor_state["classes"]
+        descriptor_inverse = descriptor_state["inverse"]
+        coarse_unique = descriptor_state["coarse_tokens"]
+        fine_unique = descriptor_state["fine_tokens"]
         coarse_tokens = coarse_unique.index_select(0, descriptor_inverse)
         coarse_logits = torch.einsum("bnd,bkd->bnk", query, coarse_tokens) / math.sqrt(self.token_dim)
         if global_bias is not None:
@@ -335,8 +359,11 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
         roi_classes: torch.Tensor,
         global_bias: torch.Tensor | None = None,
         beam_ks: Iterable[int] = (4,),
+        descriptor_state: dict[str, torch.Tensor] | None = None,
     ) -> dict:
-        state, h, w = self._encoded_state(decoder_feature, roi_classes, global_bias)
+        state, h, w = self._encoded_state(
+            decoder_feature, roi_classes, global_bias, descriptor_state
+        )
         query = state["query"]
         coarse_logits = state["coarse_logits"]
         fine_tokens = state["fine_tokens_unique"].index_select(
@@ -375,6 +402,60 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
             translation = transform[:3, 3]
             targets.append((flat - translation) @ rotation)
         return targets
+
+    @staticmethod
+    def _squared_distances(
+        points: torch.Tensor, anchors: torch.Tensor
+    ) -> torch.Tensor:
+        """Pairwise squared distance for [..., P, 3] and [..., A, 3]."""
+        point_norm = points.square().sum(dim=-1, keepdim=True)
+        anchor_norm = anchors.square().sum(dim=-1).unsqueeze(-2)
+        product = torch.matmul(points, anchors.transpose(-1, -2))
+        return (point_norm + anchor_norm - 2.0 * product).clamp_min_(0.0)
+
+    @staticmethod
+    def _pack_route_blocks(
+        route_key: torch.Tensor, block_size: int = _ROUTE_BLOCK_SIZE
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Pack sorted variable-size routes into fixed-size GPU blocks.
+
+        Returns the sort order, padded indices into that sorted order, a padding
+        mask, and the route key for every block. Only the final allocation shape
+        is materialized as a host scalar; route membership never leaves CUDA.
+        """
+        order = torch.argsort(route_key)
+        sorted_key = route_key.index_select(0, order)
+        unique_keys, group_counts = torch.unique_consecutive(
+            sorted_key, return_counts=True
+        )
+        group_ids = torch.repeat_interleave(
+            torch.arange(unique_keys.numel(), device=route_key.device), group_counts
+        )
+        group_starts = torch.cumsum(group_counts, dim=0) - group_counts
+        within_group = torch.arange(
+            route_key.numel(), device=route_key.device
+        ) - group_starts.index_select(0, group_ids)
+        blocks_per_group = torch.div(
+            group_counts + block_size - 1, block_size, rounding_mode="floor"
+        )
+        block_starts = torch.cumsum(blocks_per_group, dim=0) - blocks_per_group
+        block_ids = block_starts.index_select(0, group_ids) + torch.div(
+            within_group, block_size, rounding_mode="floor"
+        )
+        slots = torch.remainder(within_group, block_size)
+        num_blocks = int(blocks_per_group.sum().item())
+        packed = torch.full(
+            (num_blocks, block_size),
+            -1,
+            dtype=torch.long,
+            device=route_key.device,
+        )
+        packed[block_ids, slots] = torch.arange(
+            route_key.numel(), device=route_key.device
+        )
+        valid = packed >= 0
+        block_keys = torch.repeat_interleave(unique_keys, blocks_per_group)
+        return order, packed, valid, block_keys
 
     def loss(
         self,
@@ -430,78 +511,92 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
             with torch.no_grad(), torch.autocast(
                 device_type=query.device.type, enabled=False
             ):
-                coarse_labels = []
-                for start in range(0, target.shape[0], 32768):
-                    stop = min(start + 32768, target.shape[0])
+                coarse_label = torch.empty(
+                    target.shape[0], dtype=torch.long, device=query.device
+                )
+                for start in range(0, target.shape[0], _COARSE_LABEL_CHUNK_SIZE):
+                    stop = min(start + _COARSE_LABEL_CHUNK_SIZE, target.shape[0])
                     anchors = self.coarse_anchors.index_select(
                         0, roi_classes[batch_index[start:stop]].long()
                     )
-                    coarse_labels.append(
-                        torch.cdist(target[start:stop, None], anchors).squeeze(1).argmin(-1)
-                    )
-                coarse_label = torch.cat(coarse_labels)
+                    coarse_label[start:stop] = self._squared_distances(
+                        target[start:stop, None], anchors
+                    ).squeeze(1).argmin(-1)
 
             coarse_point_loss = F.cross_entropy(
                 coarse_logits[batch_index, pixel_index], coarse_label, reduction="none"
             )
             route_key = descriptor_inverse[batch_index] * 64 + coarse_label
-            order = torch.argsort(route_key)
-            sorted_key = route_key[order]
-            unique_keys, group_counts = torch.unique_consecutive(
-                sorted_key, return_counts=True
+            order, packed, packed_valid, block_keys = self._pack_route_blocks(
+                route_key
             )
-            group_keys = unique_keys.detach().cpu().tolist()
-            group_sizes = group_counts.detach().cpu().tolist()
+            sorted_q = q.index_select(0, order)
+            sorted_target = target.index_select(0, order)
+            sorted_branch = branch_index.index_select(0, order)
+            sorted_batch = batch_index.index_select(0, order)
+            sorted_coarse_loss = coarse_point_loss.index_select(0, order)
 
-            q = q[order]
-            target = target[order]
-            branch_index = branch_index[order]
-            batch_index = batch_index[order]
-            coarse_point_loss = coarse_point_loss[order]
-            fine_point_losses = []
-            xyz_point_losses = []
-            offset = 0
-            for key, count in zip(group_keys, group_sizes):
-                stop = offset + count
-                descriptor_index, parent = divmod(key, 64)
-                object_class = descriptor_classes[descriptor_index]
-                group_target = target[offset:stop]
-                group_query = q[offset:stop]
-                anchors = self.fine_anchors[object_class, parent]
-                with torch.no_grad(), torch.autocast(
-                    device_type=query.device.type, enabled=False
-                ):
-                    fine_label = torch.cdist(group_target, anchors).argmin(-1)
-                token_bank = fine_tokens[descriptor_index, parent]
-                fine_logits = group_query @ token_bank.T / math.sqrt(self.token_dim)
-                fine_point_losses.append(
-                    F.cross_entropy(fine_logits, fine_label, reduction="none")
-                )
-                anchor = anchors[fine_label]
-                radius = self.fine_radii[object_class, parent, fine_label]
-                leaf_token = token_bank[fine_label]
-                residual = self.bounded_residual(
-                    self.residual_head(torch.cat([group_query, leaf_token], dim=-1)),
-                    radius,
-                )
-                group_extents = extents[batch_index[offset:stop]]
-                pred_norm = (anchor + residual) / group_extents + 0.5
-                target_norm = group_target / group_extents + 0.5
-                xyz_point_losses.append(
-                    F.smooth_l1_loss(
-                        pred_norm,
-                        target_norm,
-                        beta=self.xyz_smooth_l1_beta,
-                        reduction="none",
-                    ).mean(-1)
-                )
-                offset = stop
+            safe_packed = packed.clamp_min(0)
+            packed_q = sorted_q[safe_packed]
+            packed_target = sorted_target[safe_packed]
+            packed_batch = sorted_batch[safe_packed]
+            descriptor_index = torch.div(block_keys, 64, rounding_mode="floor")
+            parent = torch.remainder(block_keys, 64)
+            object_class = descriptor_classes.index_select(0, descriptor_index)
+            anchors = self.fine_anchors[object_class, parent]
+            token_bank = fine_tokens[descriptor_index, parent]
+
+            with torch.no_grad(), torch.autocast(
+                device_type=query.device.type, enabled=False
+            ):
+                fine_label = self._squared_distances(
+                    packed_target.float(), anchors.float()
+                ).argmin(-1)
+            fine_logits = torch.matmul(
+                packed_q, token_bank.transpose(1, 2)
+            ) / math.sqrt(self.token_dim)
+            fine_loss_grid = F.cross_entropy(
+                fine_logits.flatten(0, 1),
+                fine_label.flatten(),
+                reduction="none",
+            ).view_as(fine_label)
+            anchor = torch.gather(
+                anchors,
+                1,
+                fine_label[..., None].expand(-1, -1, 3),
+            )
+            radius = torch.gather(
+                self.fine_radii[object_class, parent], 1, fine_label
+            )
+            leaf_token = torch.gather(
+                token_bank,
+                1,
+                fine_label[..., None].expand(-1, -1, self.token_dim),
+            )
+            residual = self.bounded_residual(
+                self.residual_head(torch.cat([packed_q, leaf_token], dim=-1)),
+                radius,
+            )
+            packed_extents = extents[packed_batch]
+            pred_norm = (anchor + residual) / packed_extents + 0.5
+            target_norm = packed_target / packed_extents + 0.5
+            xyz_loss_grid = F.smooth_l1_loss(
+                pred_norm,
+                target_norm,
+                beta=self.xyz_smooth_l1_beta,
+                reduction="none",
+            ).mean(-1)
+
+            packed_branch = sorted_branch[safe_packed]
+            packed_coarse_loss = sorted_coarse_loss[safe_packed]
+            flat_valid = packed_valid.flatten()
+            branch_index = packed_branch.flatten()[flat_valid]
 
             point_components = torch.stack(
                 [
-                    coarse_point_loss,
-                    torch.cat(fine_point_losses),
-                    torch.cat(xyz_point_losses),
+                    packed_coarse_loss.flatten()[flat_valid],
+                    fine_loss_grid.flatten()[flat_valid],
+                    xyz_loss_grid.flatten()[flat_valid],
                 ]
             ).float()
             branch_count = b * symmetry_slots
@@ -545,6 +640,7 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
         beam_ks: Iterable[int] | None = None,
         gt_xyz_norm: torch.Tensor | None = None,
         gt_mask: torch.Tensor | None = None,
+        descriptor_state: dict[str, torch.Tensor] | None = None,
     ) -> tuple[dict, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
         beam_ks = tuple(beam_ks or (self.default_beam_k,))
         losses: dict[str, torch.Tensor] = {}
@@ -553,9 +649,15 @@ class GlobalGuidedHierarchicalCADHead(nn.Module):
             if gt_mask is None:
                 raise ValueError("gt_mask is required with gt_xyz_norm")
             state, _h, _w = self._encoded_state(
-                decoder_feature, roi_classes, global_bias
+                decoder_feature, roi_classes, global_bias, descriptor_state
             )
             losses, stats = self.loss(state, roi_classes, gt_xyz_norm, gt_mask)
         else:
-            state = self.decode(decoder_feature, roi_classes, global_bias, beam_ks)
+            state = self.decode(
+                decoder_feature,
+                roi_classes,
+                global_bias,
+                beam_ks,
+                descriptor_state,
+            )
         return state, losses, stats

@@ -429,21 +429,21 @@ class GDRN_Lite(LightningLite):
                     inp,
                     gt_xyz=batch.get("roi_xyz", None),
                     gt_xyz_bin=batch.get("roi_xyz_bin", None),
-                    gt_mask_trunc=batch["roi_mask_trunc"],
-                    gt_mask_visib=batch["roi_mask_visib"],
+                    gt_mask_trunc=batch.get("roi_mask_trunc", None),
+                    gt_mask_visib=batch.get("roi_mask_visib", None),
                     gt_mask_full=batch.get("roi_mask_full", None),
                     gt_mask_obj=batch.get("roi_mask_obj", None),
                     gt_region=batch.get("roi_region", None),
                     gt_ego_rot=batch.get("ego_rot", None),
                     gt_trans=batch.get("trans", None),
-                    gt_trans_ratio=batch["roi_trans_ratio"],
+                    gt_trans_ratio=batch.get("roi_trans_ratio", None),
                     gt_points=batch.get("roi_points", None),
                     sym_infos=batch.get("sym_info", None),
-                    roi_classes=batch["roi_cls"],
-                    roi_cams=batch["roi_cam"],
-                    roi_whs=batch["roi_wh"],
-                    roi_centers=batch["roi_center"],
-                    resize_ratios=batch["resize_ratio"],
+                    roi_classes=batch.get("roi_cls", None),
+                    roi_cams=batch.get("roi_cam", None),
+                    roi_whs=batch.get("roi_wh", None),
+                    roi_centers=batch.get("roi_center", None),
+                    resize_ratios=batch.get("resize_ratio", None),
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_coord_2d_rel=batch.get("roi_coord_2d_rel", None),
                     roi_extents=batch.get("roi_extent", None),
@@ -462,6 +462,9 @@ class GDRN_Lite(LightningLite):
                 losses_reduced = sum(loss for loss in loss_dict_reduced.values())
                 if self.is_global_zero:
                     storage.put_scalars(total_loss=losses_reduced, **loss_dict_reduced)
+                    train_stats = out_dict.get("_train_stats", {})
+                    if train_stats:
+                        storage.put_scalars(**train_stats)
 
                 # backward & optimize ======================================================
                 accumulation_divisor = solver_utils.accumulation_window_size(

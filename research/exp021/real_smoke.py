@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-real-batch CUDA/EGL optimization smoke for EXP021 B/C."""
+"""Fixed-real-batch CUDA/EGL optimization smoke for EXP021 B/C."""
 
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ def run_arm(
     batch_size: int,
     renderer_type: str = "egl",
     precision: str = "config",
+    steps: int = 1,
 ) -> dict:
     config = CONFIG_ROOT / ("b_hierarchical.py" if arm == "B" else "c_global.py")
     cfg = Config.fromfile(str(config))
@@ -76,29 +77,57 @@ def run_arm(
         kwargs["roi_zoom_cams"] = batch.get("roi_zoom_K")
         kwargs["cad_beam_ks"] = (4,)
         torch.cuda.reset_peak_memory_stats(device)
-        with EventStorage(), autocast_context(effective_precision, device):
-            _output, losses = model(model_input_from_batch(cfg, batch), **kwargs)
-        if set(losses) != {"loss_cad_coarse", "loss_cad_fine", "loss_cad_xyz"}:
-            raise RuntimeError(f"Unexpected losses: {sorted(losses)}")
-        total = sum(losses.values())
         scale_before = float(scaler.get_scale())
-        scaler.scale(total).backward()
-        scaler.unscale_(optimizer)
         trainable = {name: value for name, value in model.named_parameters() if value.requires_grad}
-        active = [
-            name
-            for name, value in trainable.items()
-            if value.grad is not None and torch.count_nonzero(value.grad).item() > 0
-        ]
-        if not active or any(not name.startswith("cad_head.") for name in active):
-            raise RuntimeError(f"Invalid active gradients: {active}")
-        if not gradients_are_finite(trainable.values()):
-            raise RuntimeError("EXP021 smoke produced non-finite unscaled gradients")
         trainable_before = {
             name: value.detach().clone() for name, value in trainable.items()
         }
-        scaler.step(optimizer)
-        scaler.update()
+        loss_history = []
+        active = []
+        with EventStorage() as storage:
+            for step in range(steps):
+                storage.iter = step
+                optimizer.zero_grad(set_to_none=True)
+                with autocast_context(effective_precision, device):
+                    _output, losses = model(
+                        model_input_from_batch(cfg, batch), **kwargs
+                    )
+                if set(losses) != {
+                    "loss_cad_coarse",
+                    "loss_cad_fine",
+                    "loss_cad_xyz",
+                }:
+                    raise RuntimeError(f"Unexpected losses: {sorted(losses)}")
+                total = sum(losses.values())
+                if not torch.isfinite(total):
+                    raise RuntimeError(f"Non-finite EXP021 loss at step {step}")
+                loss_history.append(
+                    {
+                        **{
+                            name: float(value.detach())
+                            for name, value in losses.items()
+                        },
+                        "total": float(total.detach()),
+                    }
+                )
+                scaler.scale(total).backward()
+                scaler.unscale_(optimizer)
+                active = [
+                    name
+                    for name, value in trainable.items()
+                    if value.grad is not None
+                    and torch.count_nonzero(value.grad).item() > 0
+                ]
+                if not active or any(
+                    not name.startswith("cad_head.") for name in active
+                ):
+                    raise RuntimeError(f"Invalid active gradients: {active}")
+                if not gradients_are_finite(trainable.values()):
+                    raise RuntimeError(
+                        f"EXP021 smoke produced non-finite gradients at step {step}"
+                    )
+                scaler.step(optimizer)
+                scaler.update()
         optimizer_step_applied = any(
             not torch.equal(trainable_before[name], value.detach())
             for name, value in trainable.items()
@@ -114,12 +143,29 @@ def run_arm(
             raise RuntimeError(f"Frozen parameters changed: {changed_frozen[:5]}")
         if arm == "C" and not any(name.startswith("cad_head.global_") for name in active):
             raise RuntimeError("C smoke did not route gradients through global guidance")
+        loss_descent = None
+        if steps > 1:
+            window = min(5, steps // 2)
+            first_mean = sum(row["total"] for row in loss_history[:window]) / window
+            last_mean = sum(row["total"] for row in loss_history[-window:]) / window
+            loss_descent = {
+                "window": window,
+                "first_mean": first_mean,
+                "last_mean": last_mean,
+                "passed": last_mean < first_mean,
+            }
+            if not loss_descent["passed"]:
+                raise RuntimeError(
+                    "EXP021 fixed-batch loss did not decrease: "
+                    f"first={first_mean}, last={last_mean}"
+                )
         return {
             "status": "PASS",
             "arm": arm,
             "real_data": True,
             "formal_training": False,
             "batch_size": batch_size,
+            "steps": steps,
             "renderer_type": renderer_type,
             "formal_renderer_match": renderer_type == "egl",
             "precision": effective_precision,
@@ -129,7 +175,9 @@ def run_arm(
             "optimizer_step_applied": optimizer_step_applied,
             "trainable_parameters": sum(value.numel() for value in trainable.values()),
             "active_gradient_tensors": len(active),
-            "losses": {name: float(value.detach()) for name, value in losses.items()},
+            "losses": loss_history[-1],
+            "loss_history": loss_history,
+            "loss_descent": loss_descent,
             "peak_allocated_bytes": int(torch.cuda.max_memory_allocated(device)),
             "frozen_parameters_unchanged": True,
         }
@@ -145,10 +193,13 @@ def main() -> int:
     )
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=2)
+    parser.add_argument("--steps", type=int, default=1)
     parser.add_argument("--renderer-type", choices=("egl", "cpp"), default="egl")
     parser.add_argument("--precision", choices=PRECISION_CHOICES, default="config")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.batch_size < 1 or args.steps < 1:
+        parser.error("--batch-size and --steps must be positive")
     device = torch.device(args.device)
     if device.type != "cuda" or not torch.cuda.is_available():
         raise RuntimeError("EXP021 real smoke requires CUDA/EGL")
@@ -161,6 +212,7 @@ def main() -> int:
             args.batch_size,
             args.renderer_type,
             args.precision,
+            args.steps,
         )
         for arm in arms
     }

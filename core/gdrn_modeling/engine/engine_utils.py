@@ -230,6 +230,12 @@ def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):
 
 
 def batch_data_train_online(cfg, data, renderer, device="cuda"):
+    cad_cfg = cfg.MODEL.POSE_NET.get("CAD_HEAD", {})
+    if bool(cad_cfg.get("ENABLED", False)) and bool(
+        cad_cfg.get("TRAIN_SUPERVISION", False)
+    ):
+        return batch_data_train_online_cad(cfg, data, renderer, device=device)
+
     # batch training data, rendering xyz online
     net_cfg = cfg.MODEL.POSE_NET
     g_head_cfg = net_cfg.GEO_HEAD
@@ -367,6 +373,108 @@ def batch_data_train_online(cfg, data, renderer, device="cuda"):
 
     if cfg.TRAIN.VIS:
         vis_batch(cfg, batch, phase="train")
+    return batch
+
+
+def batch_data_train_online_cad(cfg, data, renderer, device="cuda"):
+    """Build the minimal online-geometry batch consumed by the CAD-only path.
+
+    EGL still renders one ROI at a time because each sample has a different K,
+    but render metadata stays on CPU instead of making a GPU-to-CPU round trip
+    per ROI. Legacy Region/PnP supervision tensors are not produced.
+    """
+    net_cfg = cfg.MODEL.POSE_NET
+    out_res = net_cfg.OUTPUT_RES
+    batch_size = len(data)
+
+    roi_classes_cpu = torch.as_tensor(
+        [item["roi_cls"] for item in data], dtype=torch.long
+    )
+    roi_cams_cpu = torch.stack([item["cam"] for item in data], dim=0).float()
+    roi_centers_cpu = torch.stack(
+        [item["bbox_center"] for item in data], dim=0
+    ).float()
+    roi_scales_cpu = torch.as_tensor(
+        [item["scale"] for item in data], dtype=torch.float32
+    ).view(batch_size, -1)
+    rotations_cpu = torch.stack([item["ego_rot"] for item in data], dim=0).float()
+    translations_cpu = torch.stack([item["trans"] for item in data], dim=0).float()
+    crop_xy_cpu = roi_centers_cpu - roi_scales_cpu / 2.0
+    resize_ratio_cpu = out_res / roi_scales_cpu
+    zoom_k_cpu = get_K_crop_resize(
+        roi_cams_cpu, crop_xy_cpu, resize_ratio_cpu
+    )
+    poses_cpu = torch.cat(
+        [rotations_cpu, translations_cpu.unsqueeze(-1)], dim=-1
+    ).numpy()
+    classes_cpu = roi_classes_cpu.numpy()
+    zoom_k_numpy = zoom_k_cpu.numpy()
+
+    batch = {
+        "roi_img": torch.stack(
+            [item["roi_img"] for item in data], dim=0
+        ).to(device, non_blocking=True),
+        "roi_cls": roi_classes_cpu.to(device, non_blocking=True),
+        "roi_extent": torch.stack(
+            [item["roi_extent"] for item in data], dim=0
+        ).to(device=device, dtype=torch.float32, non_blocking=True),
+        "roi_mask_visib": torch.stack(
+            [item["roi_mask_visib"] for item in data], dim=0
+        ).to(device=device, dtype=torch.float32, non_blocking=True),
+    }
+    rotations = rotations_cpu.to(device, non_blocking=True)
+    translations = translations_cpu.to(device, non_blocking=True)
+    zoom_k = zoom_k_cpu.to(device, non_blocking=True)
+
+    if net_cfg.XYZ_BP:
+        pc_cam_tensor = torch.empty(
+            out_res, out_res, 4, dtype=torch.float32, device=device
+        )
+        roi_depth = torch.empty(
+            batch_size, out_res, out_res, dtype=torch.float32, device=device
+        )
+        for index in range(batch_size):
+            renderer.render(
+                [int(classes_cpu[index])],
+                [poses_cpu[index]],
+                K=zoom_k_numpy[index],
+                pc_cam_tensor=pc_cam_tensor,
+            )
+            roi_depth[index].copy_(pc_cam_tensor[:, :, 2], non_blocking=True)
+        roi_xyz = misc.calc_xyz_bp_batch(
+            roi_depth,
+            rotations,
+            translations,
+            zoom_k,
+            fmt="BHWC",
+        )
+    else:
+        pc_obj_tensor = torch.empty(
+            out_res, out_res, 4, dtype=torch.float32, device=device
+        )
+        roi_xyz = torch.empty(
+            batch_size, out_res, out_res, 3, dtype=torch.float32, device=device
+        )
+        for index in range(batch_size):
+            renderer.render(
+                [int(classes_cpu[index])],
+                [poses_cpu[index]],
+                K=zoom_k_numpy[index],
+                pc_obj_tensor=pc_obj_tensor,
+            )
+            roi_xyz[index].copy_(pc_obj_tensor[:, :, :3], non_blocking=True)
+
+    roi_mask_obj = (
+        (roi_xyz[..., 0] != 0)
+        & (roi_xyz[..., 1] != 0)
+        & (roi_xyz[..., 2] != 0)
+    ).to(torch.float32)
+    batch["roi_mask_visib"] = batch["roi_mask_visib"] * roi_mask_obj
+    batch["roi_xyz"] = (
+        rearrange(roi_xyz, "b h w c -> b c h w")
+        / batch["roi_extent"].view(batch_size, 3, 1, 1)
+        + 0.5
+    )
     return batch
 
 

@@ -11,7 +11,10 @@ from detectron2.utils.events import EventStorage
 from mmcv import Config
 from mmcv.utils import ConfigDict
 
-from core.gdrn_modeling.engine.engine_utils import geometry_supervision_enabled
+from core.gdrn_modeling.engine.engine_utils import (
+    batch_data_train_online,
+    geometry_supervision_enabled,
+)
 from core.gdrn_modeling.models.GDRN_double_mask import GDRN_DoubleMask
 from core.gdrn_modeling.models.heads.global_hierarchical_cad_head import (
     GlobalGuidedHierarchicalCADHead,
@@ -55,8 +58,14 @@ class _TrainingPathCADHead(nn.Module):
         self.use_global_guidance = global_guidance
         self.default_beam_k = 4
         self.scale = nn.Parameter(torch.tensor(0.0 if global_guidance else 1.0))
+        self.descriptor_calls = 0
 
-    def enhance_backbone(self, feature, _classes):
+    def _descriptor_state(self, _classes):
+        self.descriptor_calls += 1
+        return {"sentinel": True}
+
+    def enhance_backbone(self, feature, _classes, descriptor_state=None):
+        assert descriptor_state == {"sentinel": True}
         if self.use_global_guidance:
             return feature + self.scale, feature.new_zeros((feature.shape[0], 64))
         return feature, None
@@ -346,6 +355,46 @@ def test_vectorized_loss_matches_reference_values_and_gradients(hierarchy_path):
             ), name
 
 
+def test_vectorized_loss_matches_reference_across_route_blocks(hierarchy_path):
+    torch.manual_seed(37)
+    reference = GlobalGuidedHierarchicalCADHead(str(hierarchy_path))
+    optimized = GlobalGuidedHierarchicalCADHead(str(hierarchy_path))
+    optimized.load_state_dict(reference.state_dict())
+    for head in (reference, optimized):
+        head.coarse_anchors[0].fill_(1.0)
+        head.coarse_anchors[0, 0].zero_()
+        head.fine_anchors[0, 0].fill_(1.0)
+        head.fine_anchors[0, 0, 0].zero_()
+
+    classes = torch.tensor([0])
+    gt = torch.full((1, 3, 17, 17), 0.5)
+    mask = torch.ones(1, 17, 17)
+    reference_feature = torch.randn(1, 256, 17, 17, requires_grad=True)
+    optimized_feature = reference_feature.detach().clone().requires_grad_(True)
+    reference_state = reference._encoded_state(reference_feature, classes)[0]
+    reference_losses, reference_selected = _reference_loss(
+        reference, reference_state, classes, gt, mask
+    )
+    optimized_state = optimized._encoded_state(optimized_feature, classes)[0]
+    optimized_losses, optimized_stats = optimized.loss(
+        optimized_state, classes, gt, mask
+    )
+
+    for name in reference_losses:
+        assert torch.allclose(
+            optimized_losses[name], reference_losses[name], rtol=2e-5, atol=2e-6
+        )
+    assert torch.equal(
+        optimized_stats["selected_symmetry_branch_mean"],
+        reference_selected.float().mean(),
+    )
+    sum(reference_losses.values()).backward()
+    sum(optimized_losses.values()).backward()
+    assert torch.allclose(
+        optimized_feature.grad, reference_feature.grad, rtol=3e-5, atol=3e-6
+    )
+
+
 def test_symmetry_targets_use_full_se3(hierarchy_path):
     head = GlobalGuidedHierarchicalCADHead(str(hierarchy_path))
     rotation = torch.tensor([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
@@ -384,6 +433,7 @@ def test_cad_training_uses_one_feature_decoder_and_no_legacy_outputs(
             do_loss=True,
         )
     assert set(losses) == {"loss_cad_xyz"}
+    assert model.cad_head.descriptor_calls == 1
     assert model.geo_head_net.feature_calls == 1
     assert model.geo_head_net.output_calls == 0
     expected = image + (model.cad_head.scale if global_guidance else 0)
@@ -391,6 +441,88 @@ def test_cad_training_uses_one_feature_decoder_and_no_legacy_outputs(
     sum(losses.values()).backward()
     assert model.cad_head.scale.grad is not None
     assert torch.isfinite(model.cad_head.scale.grad)
+
+
+def test_route_blocks_keep_routes_separate_and_cover_every_point():
+    route_key = torch.tensor([7] * 300 + [2] * 3 + [11] * 517)
+    order, packed, valid, block_keys = (
+        GlobalGuidedHierarchicalCADHead._pack_route_blocks(route_key)
+    )
+    assert valid.sum().item() == route_key.numel()
+    packed_sorted = packed.clamp_min(0)
+    packed_keys = route_key[order][packed_sorted]
+    assert torch.equal(packed_keys[valid], block_keys[:, None].expand_as(packed_keys)[valid])
+    recovered = order[packed[valid]]
+    assert torch.equal(recovered.sort().values, torch.arange(route_key.numel()))
+
+
+def test_squared_distance_labels_match_cdist():
+    torch.manual_seed(91)
+    points = torch.randn(7, 23, 3)
+    anchors = torch.randn(7, 64, 3)
+    expected = torch.cdist(points, anchors).argmin(-1)
+    actual = GlobalGuidedHierarchicalCADHead._squared_distances(
+        points, anchors
+    ).argmin(-1)
+    assert torch.equal(actual, expected)
+
+
+class _FakeCADRenderer:
+    def __init__(self):
+        self.calls = []
+
+    def render(self, obj_ids, poses, K=None, pc_obj_tensor=None, **_kwargs):
+        self.calls.append((obj_ids, np.asarray(poses[0]).copy(), np.asarray(K).copy()))
+        pc_obj_tensor.zero_()
+        pc_obj_tensor[..., :3] = torch.tensor([0.02, 0.04, 0.06])
+
+
+def test_cad_online_batch_uses_cpu_render_metadata_and_skips_legacy_targets():
+    cfg = ConfigDict(
+        MODEL=ConfigDict(
+            POSE_NET=ConfigDict(
+                OUTPUT_RES=2,
+                XYZ_BP=False,
+                CAD_HEAD=ConfigDict(ENABLED=True, TRAIN_SUPERVISION=True),
+            )
+        )
+    )
+    data = []
+    for index in range(2):
+        data.append(
+            {
+                "roi_img": torch.full((3, 4, 4), float(index)),
+                "roi_cls": index + 1,
+                "cam": torch.tensor(
+                    [[100.0, 0.0, 20.0], [0.0, 120.0, 30.0], [0.0, 0.0, 1.0]]
+                ),
+                "bbox_center": torch.tensor([12.0, 14.0]),
+                "scale": 8.0,
+                "ego_rot": torch.eye(3),
+                "trans": torch.tensor([0.1, 0.2, 0.3]),
+                "roi_extent": torch.tensor([0.2, 0.4, 0.6]),
+                "roi_mask_visib": torch.ones(2, 2),
+                "roi_fps_points": torch.randn(64, 3),
+                "roi_points": torch.randn(32, 3),
+            }
+        )
+    renderer = _FakeCADRenderer()
+    batch = batch_data_train_online(cfg, data, renderer, device="cpu")
+    assert set(batch) == {
+        "roi_img",
+        "roi_cls",
+        "roi_extent",
+        "roi_mask_visib",
+        "roi_xyz",
+    }
+    assert len(renderer.calls) == 2
+    expected_pose = torch.cat([torch.eye(3), data[0]["trans"][:, None]], dim=1)
+    assert np.array_equal(renderer.calls[0][1], expected_pose.numpy())
+    expected_k = torch.tensor(
+        [[25.0, 0.0, 3.0], [0.0, 30.0, 5.0], [0.0, 0.0, 1.0]]
+    )
+    assert np.array_equal(renderer.calls[0][2], expected_k.numpy())
+    assert torch.allclose(batch["roi_xyz"][0, :, 0, 0], torch.tensor([0.6, 0.6, 0.6]))
 
 
 def test_configs_isolate_b_and_c_and_enable_geometry():
