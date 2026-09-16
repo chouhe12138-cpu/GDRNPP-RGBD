@@ -1,5 +1,7 @@
 """CPU contracts for the progressive PCC implementation."""
 
+import math
+
 import numpy as np
 import pytest
 import torch
@@ -8,6 +10,9 @@ from mmcv import Config
 from core.gdrn_modeling.models.heads.progressive_pcc_head import (
     ProgressivePCCHead,
     load_pcc_hierarchy,
+)
+from core.gdrn_modeling.models.heads.global_hierarchical_cad_head import (
+    GlobalGuidedHierarchicalCADHead,
 )
 from core.utils.solver_utils import build_lr_scheduler
 from research.exp022.build_hierarchy import SOURCE_DEFAULT, _reused_object
@@ -80,6 +85,78 @@ def test_symmetric_subset_branch_is_finite(head):
     losses, stats = head(feature, classes, xyz, visible)
     assert all(torch.isfinite(value) for value in losses.values())
     assert 0 <= stats["selected_symmetry_branch_mean"] <= 0.5
+
+
+def test_symmetric_branch_shares_stage1_and_handles_empty_visibility(head):
+    calls = []
+    handle = head.stages[0].query.register_forward_hook(lambda *_: calls.append(1))
+    try:
+        feature = torch.randn(2, 1024, 8, 8)
+        classes = torch.tensor([0, 5])
+        xyz = torch.full((2, 3, 64, 64), 0.5)
+        mask = torch.zeros(2, 1, 64, 64)
+        losses, stats = head(feature, classes, xyz, mask)
+        assert len(calls) == 1
+        assert all(torch.isfinite(value) for value in losses.values())
+        assert losses["loss_pcc_route"] == 0
+        assert losses["loss_pcc_residual"] == 0
+        assert torch.isfinite(stats["selected_symmetry_branch_mean"])
+        sum(losses.values()).backward()
+        assert torch.isfinite(head.stages[0].query.weight.grad).all()
+    finally:
+        handle.remove()
+
+
+@pytest.mark.parametrize("sparse_routes", [False, True])
+def test_static_block_match_matches_original_packing_and_gradients(head, sparse_routes):
+    torch.manual_seed(19)
+    query = torch.randn(257, 32, requires_grad=True)
+    bank = torch.randn(2, 64, 32, requires_grad=True)
+    object_inverse = torch.randint(0, 2, (257,))
+    parent = torch.randint(0, 8, (257,))
+    if sparse_routes:
+        object_inverse = torch.cat((torch.zeros(200, dtype=torch.long),
+                                    torch.ones(57, dtype=torch.long)))
+        parent = torch.cat((torch.zeros(200, dtype=torch.long),
+                            torch.full((57,), 7, dtype=torch.long)))
+    target = torch.randn(257, 3)
+    anchors = head.level2_anchors[:2]
+
+    def original_match(q, tokens):
+        keys = object_inverse * 8 + parent
+        order, packed, valid, block_keys = GlobalGuidedHierarchicalCADHead._pack_route_blocks(keys, 64)
+        safe = packed.clamp_min(0)
+        block_query = q.index_select(0, order)[safe]
+        child_tokens = tokens.reshape(2, 8, 8, 32)[block_keys // 8, block_keys % 8]
+        logits = torch.bmm(block_query, child_tokens.transpose(1, 2)) / math.sqrt(32)
+        context = torch.bmm(torch.softmax(logits.float(), -1), child_tokens)
+        valid_flat = valid.flatten()
+        positions = safe.flatten()[valid_flat]
+        sorted_logits = torch.zeros(257, 8).index_copy(0, positions, logits.flatten(0, 1)[valid_flat])
+        sorted_context = torch.zeros(257, 32).index_copy(0, positions, context.flatten(0, 1)[valid_flat])
+        output_logits = torch.zeros_like(sorted_logits).index_copy(0, order, sorted_logits)
+        output_context = torch.zeros_like(sorted_context).index_copy(0, order, sorted_context)
+        block_target = target.index_select(0, order)[safe]
+        child_anchors = anchors.reshape(2, 8, 8, 3)[block_keys // 8, block_keys % 8]
+        labels = (block_target[:, :, None, :] - child_anchors[:, None]).square().sum(-1).argmin(-1)
+        sorted_labels = torch.zeros(257, dtype=torch.long)
+        sorted_labels[positions] = labels.flatten()[valid_flat]
+        output_labels = torch.zeros_like(sorted_labels).index_copy(0, order, sorted_labels)
+        return output_logits, output_context, output_labels
+
+    old_logits, old_context, old_labels = original_match(query, bank)
+    new_logits, new_context, new_labels = head._match(
+        query, object_inverse, parent, bank, target, anchors
+    )
+    torch.testing.assert_close(new_logits, old_logits, rtol=1e-5, atol=1e-6)
+    torch.testing.assert_close(new_context, old_context, rtol=1e-5, atol=1e-6)
+    torch.testing.assert_close(new_labels, old_labels)
+    old_grads = torch.autograd.grad(old_logits.square().mean() + old_context.square().mean(),
+                                    (query, bank), retain_graph=True)
+    new_grads = torch.autograd.grad(new_logits.square().mean() + new_context.square().mean(),
+                                    (query, bank))
+    for new, old in zip(new_grads, old_grads):
+        torch.testing.assert_close(new, old, rtol=1e-4, atol=1e-6)
 
 
 @pytest.mark.parametrize("name", ["train_reused.py", "smoke_reused.py", "smoke_independent.py"])

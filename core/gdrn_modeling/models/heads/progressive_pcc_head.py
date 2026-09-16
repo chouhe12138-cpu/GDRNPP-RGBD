@@ -15,7 +15,7 @@ from .global_hierarchical_cad_head import GlobalGuidedHierarchicalCADHead
 
 OBJECT_IDS = (1, 5, 6, 8, 9, 10, 11, 12)
 LEVEL_SIZES = (8, 64, 512, 4096)
-BLOCK_SIZE = 64
+MATCH_BLOCK_SIZE = 16
 
 
 def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
@@ -138,42 +138,56 @@ class ProgressivePCCHead(nn.Module):
     def _match(self, query: torch.Tensor, object_inverse: torch.Tensor,
                parent: torch.Tensor, token_bank: torch.Tensor,
                target: torch.Tensor | None = None, anchors: torch.Tensor | None = None):
-        """Evaluate local 8-way banks in fixed GPU blocks, not per-pixel gathers."""
+        """Pack equal routes into statically bounded blocks without a CUDA scalar read."""
         num_parents = token_bank.shape[1] // 8
         keys = object_inverse.long() * num_parents + parent.long()
-        order, packed, valid, block_keys = GlobalGuidedHierarchicalCADHead._pack_route_blocks(
-            keys, BLOCK_SIZE
+        count = query.shape[0]
+        num_keys = token_bank.shape[0] * num_parents
+        # Sum(ceil(group_count / block)) is bounded by ceil(count / block) + num_keys.
+        max_blocks = (count + MATCH_BLOCK_SIZE - 1) // MATCH_BLOCK_SIZE + num_keys
+        order = torch.argsort(keys)
+        sorted_keys = keys.index_select(0, order)
+        group_counts = torch.bincount(keys, minlength=num_keys)
+        group_starts = group_counts.cumsum(0) - group_counts
+        blocks_per_group = torch.div(group_counts + MATCH_BLOCK_SIZE - 1,
+                                     MATCH_BLOCK_SIZE, rounding_mode="floor")
+        block_starts = blocks_per_group.cumsum(0) - blocks_per_group
+        within = torch.arange(count, device=query.device) - group_starts[sorted_keys]
+        block_ids = block_starts[sorted_keys] + torch.div(
+            within, MATCH_BLOCK_SIZE, rounding_mode="floor"
         )
+        slots = within.remainder(MATCH_BLOCK_SIZE)
+        packed = torch.full((max_blocks, MATCH_BLOCK_SIZE), -1,
+                            device=query.device, dtype=torch.long)
+        packed[block_ids, slots] = torch.arange(count, device=query.device)
+        valid = packed >= 0
         safe = packed.clamp_min(0)
-        sorted_query = query.index_select(0, order)
-        block_query = sorted_query[safe]
-        token = token_bank.reshape(token_bank.shape[0], num_parents, 8, self.token_dim)[
-            torch.div(block_keys, num_parents, rounding_mode="floor"),
-            torch.remainder(block_keys, num_parents),
-        ]
+        block_keys = torch.searchsorted(block_starts.contiguous(),
+                                         torch.arange(max_blocks, device=query.device),
+                                         right=True).sub(1).clamp_(0, num_keys - 1)
+        token = token_bank.reshape(-1, 8, self.token_dim).index_select(0, block_keys)
+        block_query = query.index_select(0, order)[safe]
         logits = torch.bmm(block_query, token.transpose(1, 2)) / math.sqrt(self.token_dim)
         probability = torch.softmax(logits.float(), dim=-1).to(token.dtype)
         context = torch.bmm(probability, token)
-        valid_flat = valid.flatten()
-        sorted_positions = safe.flatten()[valid_flat]
-        sorted_logits = torch.zeros((query.shape[0], 8), device=query.device, dtype=logits.dtype)
-        sorted_context = torch.zeros(query.shape, device=query.device, dtype=context.dtype)
-        sorted_logits = sorted_logits.index_copy(0, sorted_positions, logits.flatten(0, 1)[valid_flat])
-        sorted_context = sorted_context.index_copy(0, sorted_positions, context.flatten(0, 1)[valid_flat])
-        out_logits = torch.zeros_like(sorted_logits).index_copy(0, order, sorted_logits)
-        out_context = torch.zeros_like(sorted_context).index_copy(0, order, sorted_context)
+        # All padded slots write to a discarded sentinel, leaving one scatter per output.
+        positions = torch.where(valid.flatten(), order[safe.flatten()], count)
+        out_logits = torch.zeros((count + 1, 8), device=query.device, dtype=logits.dtype).index_copy(
+            0, positions, logits.flatten(0, 1)
+        )[:count]
+        out_context = torch.zeros((count + 1, self.token_dim), device=query.device,
+                                  dtype=context.dtype).index_copy(
+            0, positions, context.flatten(0, 1)
+        )[:count]
         if target is None:
             return out_logits, out_context, None
         block_target = target.index_select(0, order)[safe].float()
-        block_anchors = anchors.reshape(anchors.shape[0], num_parents, 8, 3)[
-            torch.div(block_keys, num_parents, rounding_mode="floor"),
-            torch.remainder(block_keys, num_parents),
-        ].float()
+        block_anchors = anchors.reshape(-1, 8, 3).index_select(0, block_keys).float()
         with torch.no_grad(), torch.autocast(device_type=query.device.type, enabled=False):
             label = self._squared_distances(block_target, block_anchors).argmin(-1)
-        sorted_label = torch.zeros(query.shape[0], device=query.device, dtype=torch.long)
-        sorted_label[sorted_positions] = label.flatten()[valid_flat]
-        out_label = torch.zeros_like(sorted_label).index_copy(0, order, sorted_label)
+        out_label = torch.zeros(count + 1, device=query.device, dtype=torch.long).index_copy(
+            0, positions, label.flatten()
+        )[:count]
         return out_logits, out_context, out_label
 
     @staticmethod
@@ -190,36 +204,60 @@ class ProgressivePCCHead(nn.Module):
         with torch.no_grad(), torch.autocast(device_type=points.device.type, enabled=False):
             return (points.float()[:, None] - candidates).square().sum(-1).argmin(-1)
 
-    def _train_branch(self, backbone: torch.Tensor, classes: torch.Tensor,
-                      inverse: torch.Tensor, tokens: list[torch.Tensor],
-                      target_metric: torch.Tensor, mask: torch.Tensor):
+    def _target_paths(self, targets, inverse: torch.Tensor, level_anchors):
+        """Prepare all resolution-specific teacher paths outside the stage forward."""
+        paths = []
+        batch = inverse.shape[0]
+        with torch.no_grad():
+            for depth, (points, valid) in enumerate(targets, start=1):
+                pixels = points.shape[1]
+                object_index = inverse[:, None].expand(-1, pixels).reshape(-1)
+                parent = torch.zeros(batch * pixels, device=inverse.device, dtype=torch.long)
+                flat_points = points.reshape(-1, 3)
+                for ancestor in range(depth - 1):
+                    parent = parent * 8 + self._nearest_child(
+                        flat_points, object_index, parent, level_anchors[ancestor]
+                    )
+                child = self._nearest_child(flat_points, object_index, parent,
+                                            level_anchors[depth - 1])
+                paths.append((points, valid, parent, child))
+        return paths
+
+    @staticmethod
+    def _transform_targets(targets, rotation: torch.Tensor, translation: torch.Tensor):
+        # Rigid transforms commute with mask-weighted area averaging at each resolution.
+        return [(torch.bmm(points - translation[:, None], rotation), valid)
+                for points, valid in targets]
+
+    def _stage1(self, backbone: torch.Tensor, inverse: torch.Tensor,
+                tokens: list[torch.Tensor]):
         feature = self.input_adapter(backbone)
-        stage_losses = []
+        batch = backbone.shape[0]
+        query = self.stages[0].queries(feature)
+        object_index = inverse[:, None].expand(-1, 64).reshape(-1)
+        parent = torch.zeros(batch * 64, device=inverse.device, dtype=torch.long)
+        logits, context, _ = self._match(query.reshape(-1, self.token_dim), object_index,
+                                         parent, tokens[0])
+        feature = self.stages[0].fuse(feature, context.view(batch, 64, self.token_dim))
+        return self.refinements[0](feature), logits.view(batch, 64, 8)
+
+    def _train_branch(self, feature: torch.Tensor, stage1_logits: torch.Tensor,
+                      paths, classes: torch.Tensor, inverse: torch.Tensor,
+                      tokens: list[torch.Tensor], mask: torch.Tensor):
+        points, valid, _, child = paths[0]
+        first_loss = F.cross_entropy(stage1_logits.float().transpose(1, 2),
+                                     child.view(classes.shape[0], -1), reduction="none")
+        stage_losses = [(first_loss * valid).sum(-1) / valid.sum(-1).clamp_min(1)]
         final_query = final_parent = final_child = final_target = final_valid = None
         batch = classes.shape[0]
-        for depth, stage in enumerate(self.stages, start=1):
+        for depth in range(2, 5):
+            stage = self.stages[depth - 1]
             size = 4 * (2 ** depth)
             query = stage.queries(feature)
-            points, valid = self._targets_at_resolution(target_metric, mask, size)
+            points, valid, parent, child = paths[depth - 1]
             point_classes = inverse[:, None].expand(-1, size * size).reshape(-1)
-            parent = torch.zeros(batch * size * size, device=classes.device, dtype=torch.long)
-            # Teacher-forcing parent IDs are recomputed at this resolution from
-            # the same target point, preventing cross-resolution label aliasing.
-            with torch.no_grad():
-                for ancestor in range(depth - 1):
-                    anchors = getattr(self, f"level{ancestor+1}_anchors")
-                    source = anchors.index_select(0, torch.unique(classes, sorted=True))
-                    child = self._nearest_child(
-                        points.reshape(-1, 3), point_classes, parent, source
-                    )
-                    parent = parent * 8 + child
-            level_anchors = getattr(self, f"level{depth}_anchors").index_select(
-                0, torch.unique(classes, sorted=True)
-            )
-            logits, context, child = self._match(
-                query.reshape(-1, self.token_dim), point_classes, parent,
-                tokens[depth-1], points.reshape(-1, 3), level_anchors,
-            )
+            logits, context, _ = self._match(query.reshape(-1, self.token_dim),
+                                             point_classes, parent, tokens[depth - 1])
             pixel_loss = F.cross_entropy(logits.float(), child, reduction="none").view(batch, -1)
             stage_losses.append((pixel_loss * valid).sum(-1) / valid.sum(-1).clamp_min(1))
             feature = stage.fuse(feature, context.view(batch, size * size, self.token_dim))
@@ -349,7 +387,7 @@ class ProgressivePCCHead(nn.Module):
                 gt_xyz_norm: torch.Tensor | None = None, gt_mask: torch.Tensor | None = None):
         if backbone.ndim != 4 or tuple(backbone.shape[1:]) != (1024, 8, 8):
             raise ValueError(f"EXP022 expects [B,1024,8,8], got {tuple(backbone.shape)}")
-        _unique, inverse, tokens = self._tokens(roi_classes)
+        unique, inverse, tokens = self._tokens(roi_classes)
         if gt_xyz_norm is None:
             return self._infer(backbone, roi_classes, inverse, tokens)
         if gt_mask is None:
@@ -357,29 +395,37 @@ class ProgressivePCCHead(nn.Module):
         if gt_mask.ndim == 3:
             gt_mask = gt_mask[:, None]
         metric = (gt_xyz_norm.float() - 0.5) * self.extents.index_select(0, roi_classes)[:, :, None, None]
+        target_pyramid = [self._targets_at_resolution(metric, gt_mask, 4 * (2 ** depth))
+                          for depth in range(1, 5)]
+        level_anchors = [getattr(self, f"level{depth}_anchors").index_select(0, unique)
+                         for depth in range(1, 5)]
         transforms = self.symmetry_transforms.index_select(0, roi_classes).float()
         counts = self.symmetry_counts.index_select(0, roi_classes)
         rotation = transforms[:, 0, :3, :3]
         translation = transforms[:, 0, :3, 3]
-        canonical = torch.einsum("bchw,bci->bihw", metric - translation[:, :, None, None], rotation)
+        canonical = self._transform_targets(target_pyramid, rotation, translation)
+        canonical_paths = self._target_paths(canonical, inverse, level_anchors)
+        stage1_feature, stage1_logits = self._stage1(backbone, inverse, tokens)
         base = torch.stack(self._train_branch(
-            backbone, roi_classes, inverse, tokens, canonical, gt_mask
+            stage1_feature, stage1_logits, canonical_paths, roi_classes, inverse, tokens, gt_mask
         )[:3], dim=-1)
         selected = torch.zeros(len(roi_classes), device=roi_classes.device, dtype=torch.long)
         symmetric = torch.nonzero(counts > 1, as_tuple=False).flatten()
         if symmetric.numel():
             sym_classes = roi_classes.index_select(0, symmetric)
-            _sym_unique, sym_inverse, sym_tokens = self._tokens(sym_classes)
-            sym_metric = metric.index_select(0, symmetric)
+            sym_inverse = inverse.index_select(0, symmetric)
             sym_transforms = transforms.index_select(0, symmetric)
             rotation = sym_transforms[:, 1, :3, :3]
             translation = sym_transforms[:, 1, :3, 3]
-            alternate_target = torch.einsum(
-                "bchw,bci->bihw", sym_metric - translation[:, :, None, None], rotation
+            alternate_targets = self._transform_targets(
+                [(points.index_select(0, symmetric), valid.index_select(0, symmetric))
+                 for points, valid in target_pyramid], rotation, translation
             )
+            alternate_paths = self._target_paths(alternate_targets, sym_inverse, level_anchors)
             alternate = torch.stack(self._train_branch(
-                backbone.index_select(0, symmetric), sym_classes, sym_inverse, sym_tokens,
-                alternate_target, gt_mask.index_select(0, symmetric)
+                stage1_feature.index_select(0, symmetric),
+                stage1_logits.index_select(0, symmetric), alternate_paths,
+                sym_classes, sym_inverse, tokens, gt_mask.index_select(0, symmetric)
             )[:3], dim=-1)
             weights = base.new_tensor([self.route_weight, self.residual_weight, self.mask_weight])
             use_alternate = ((alternate - base.index_select(0, symmetric)) * weights).sum(-1).detach() < 0
