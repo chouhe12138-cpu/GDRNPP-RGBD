@@ -55,7 +55,7 @@ def main() -> int:
     data_ref = ref.__dict__[metadata.ref_key]
     renderer = get_renderer(cfg, data_ref, obj_names=metadata.objs,
                             gpu_id=torch.device(args.device).index or 0)
-    timings, history = [], []
+    timings, history, phases = [], [], []
     try:
         iterator = iter(build_gdrn_train_loader(cfg, cfg.DATASETS.TRAIN))
         raw = next(iterator)
@@ -71,20 +71,33 @@ def main() -> int:
                 _, losses = model(image, roi_classes=classes, gt_xyz=batch["roi_xyz"],
                                   gt_mask_visib=batch["roi_mask_visib"], do_loss=True)
                 total = sum(losses.values())
+            torch.cuda.synchronize()
+            forward_end = time.perf_counter()
             if not torch.isfinite(total):
                 raise RuntimeError("Non-finite EXP022 smoke loss")
             scaler.scale(total).backward()
+            torch.cuda.synchronize()
+            backward_end = time.perf_counter()
             scaler.unscale_(optimizer)
             if any(p.grad is not None and not torch.isfinite(p.grad).all()
                    for p in model.pcc_head.parameters()):
                 raise RuntimeError("Non-finite EXP022 smoke gradient")
+            torch.cuda.synchronize()
+            audit_end = time.perf_counter()
             scale_before = scaler.get_scale()
             scaler.step(optimizer)
             scaler.update()
             if scaler.get_scale() < scale_before:
                 raise RuntimeError("EXP022 AMP skipped an optimizer step")
             torch.cuda.synchronize()
-            timings.append((time.perf_counter() - started) * 1000)
+            finished = time.perf_counter()
+            timings.append((finished - started) * 1000)
+            phases.append({
+                "forward_ms": (forward_end - started) * 1000,
+                "backward_ms": (backward_end - forward_end) * 1000,
+                "unscale_and_gradient_audit_ms": (audit_end - backward_end) * 1000,
+                "optimizer_ms": (finished - audit_end) * 1000,
+            })
             history.append({name: float(value.detach()) for name, value in losses.items()})
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=True):
             output = model(image, roi_classes=classes, return_pcc_debug=True)
@@ -96,8 +109,17 @@ def main() -> int:
                           "batch_size": args.batch_size, "steps": args.steps,
                           "official_backbone_tensors": loaded,
                           "trainable_parameters": sum(p.numel() for p in model.pcc_head.parameters()),
+                          "total_parameters": sum(p.numel() for p in model.parameters()),
+                          "backbone_parameters": sum(p.numel() for p in model.backbone.parameters()),
+                          "class_histogram": torch.bincount(classes, minlength=8).cpu().tolist(),
+                          "symmetric_instances": int((model.pcc_head.symmetry_counts[classes] > 1).sum()),
                           "losses": history, "step_median_ms": statistics.median(timings),
                           "step_times_ms": timings,
+                          "phase_times_ms": phases,
+                          "post_first_step_phase_medians_ms": {
+                              key: statistics.median(row[key] for row in phases[1:])
+                              for key in phases[0]
+                          } if len(phases) > 1 else None,
                           "peak_allocated_gb": torch.cuda.max_memory_allocated() / 1e9}, indent=2))
     finally:
         if hasattr(renderer, "close"):

@@ -13,8 +13,11 @@ EXP022 渐进式层级 CAD 对应与多尺度 PCC：冻结官方 RGB ConvNeXt，
 FORMAL_NOT_STARTED`。主层级及独立消融层级已生成至 ignored cache；EXP022 单元/配置
 9 项和完整 research 197 项通过；官方 340 个 backbone 张量加载和仅 3,684,168 个 PCC
 参数可训练的 CPU 前后向通过。本机 CUDA+CPP batch4/batch48 两步 AMP 均无跳步，固定
-batch 的第二步模型优化耗时约 `0.168/0.670 s`，batch48 峰值 allocated `3.632 GB`；
-不含每步 DataLoader/renderer，不等于服务器 EGL 吞吐。LM-O 单目标随机 PCC 的 fixed-support
+batch 的第二步模型优化耗时约 `0.168/0.670 s`；另一次固定真实 batch48 十步诊断中，第
+2–10 步耗时中位数 `0.640 s`（forward `0.350 s`、backward `0.282 s`），峰值 allocated
+`3.635 GB`；模型共 `91.249M` 参数，其中 frozen backbone `87.564M`、trainable PCC
+`3.684M`。上述固定 batch 计时不含每步 DataLoader/renderer，不等于服务器 EGL 吞吐。
+LM-O 单目标随机 PCC 的 fixed-support
 evaluator 接线通过，随机数值不进入科学结论。服务器 EGL profile、正式 E5–E40、完整
 matched PnP/BOP 尚未生成。EXP021 B/C comparator 待现有实验完成后确定；不能用当前 E15 direct-pose
 指标代替 matched correspondence 判断。协议和入口见 [EXP022 README](exp022/README.md)，
