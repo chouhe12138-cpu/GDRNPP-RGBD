@@ -107,6 +107,17 @@ def test_symmetric_branch_shares_stage1_and_handles_empty_visibility(head):
         handle.remove()
 
 
+def test_symmetry_selection_ignores_mask_but_trains_selected_mask(head):
+    canonical = torch.tensor([[1.0, 1.0, 0.0], [1.0, 1.0, 10.0]], requires_grad=True)
+    alternate = torch.tensor([[0.9, 1.0, 100.0], [1.1, 1.0, -100.0]], requires_grad=True)
+    selected, use_alternate = head._select_symmetry_losses(canonical, alternate)
+    torch.testing.assert_close(use_alternate, torch.tensor([True, False]))
+    torch.testing.assert_close(selected[:, 2], torch.tensor([100.0, 10.0]))
+    selected.sum().backward()
+    torch.testing.assert_close(canonical.grad[:, 2], torch.tensor([0.0, 1.0]))
+    torch.testing.assert_close(alternate.grad[:, 2], torch.tensor([1.0, 0.0]))
+
+
 @pytest.mark.parametrize("sparse_routes", [False, True])
 def test_static_block_match_matches_original_packing_and_gradients(head, sparse_routes):
     torch.manual_seed(19)
@@ -176,3 +187,18 @@ def test_warmup_transitions_directly_to_cosine():
     assert factor(40) == pytest.approx(1.0)
     assert factor(41) < 1.0
     assert factor(1000) == pytest.approx(0.01)
+
+
+def test_formal_v1_parameters_are_explicit(head):
+    cfg = Config.fromfile("configs/gdrn/lmo_pbr/research/exp022_progressive_pcc/train_reused.py")
+    init = cfg.MODEL.POSE_NET.PCC_HEAD.INIT_CFG
+    assert (init.route_weight, init.residual_weight, init.mask_weight) == (1.0, 1.0, 1.0)
+    assert (init.residual_beta, init.beam_k, init.token_dim) == (0.1, 2, 256)
+    assert all(stage.gate_logit.item() == -4.0 for stage in head.stages)
+    optimizer = cfg.SOLVER.OPTIMIZER_CFG
+    assert (optimizer.type, optimizer.lr, optimizer.weight_decay, optimizer.betas) == (
+        "AdamW", 3e-4, 0.01, (0.9, 0.999)
+    )
+    assert (cfg.SOLVER.WARMUP_RATIO, cfg.SOLVER.TARGET_LR_FACTOR, cfg.SEED) == (
+        0.04, 0.01, 42
+    )

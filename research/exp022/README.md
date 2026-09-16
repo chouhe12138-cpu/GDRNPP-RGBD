@@ -6,8 +6,9 @@
 
 - 主层级 `reused_v1.npz`：把 EXP021 的 64×64 叶子无损重排为 8⁴；叶子 anchor、法向、半径不变。消融层级 `independent_v2.npz` 从模型表面重新采样并递归分组；单点 cell 的半径下限为 `1e-5 m`，仅做 smoke，不安排 40 epoch。
 - 四级分辨率 8/16/32/64，每级 8 路；训练按当前分辨率的 GT 父路径 teacher forcing，推理保留 Top-2 完整路径 ID 和归一化累计 log score。8 路条件概率仅用于 soft CAD context。跨尺度路由状态按双线性权重合并同 ID 路径后再取 Top-2。
-- 对称物体按完整 SE(3) 等价变换选择一个 instance-consistent 分支，四级 CE 与残差共用该分支。最终点为叶子 anchor 加不超过该叶子半径的 3D 残差。
+- 对称物体按完整 SE(3) 等价变换选择一个 instance-consistent 分支；选择分数仅为加权四级 CE 与加权 residual loss 之和，不含 mask loss。选定后该分支的四级 CE、residual 和 mask loss 一起训练。最终点为叶子 anchor 加不超过该叶子半径的 3D 残差。
 - PBR40、batch 48、40 epoch、16 workers、seed 42、AdamW `3e-4`、4% linear warmup + cosine、显式 FP16 AMP。正式配置每 5 epoch 做原有 direct-pose 评估，输出仍通过 explicit RANSAC-PnP。
+- V1 固定值：route/residual/mask 权重均为 `1.0`，residual Smooth L1 `beta=0.1`，`beam_k=2`，PCC token 维度 `256`，四级 fusion gate logit 初值均为 `-4.0`；AdamW `weight_decay=0.01`、`betas=(0.9,0.999)`，warmup ratio `0.04`，cosine 终点 LR factor `0.01`。warmup 结束即进入 cosine，不额外保持平坦学习率。
 - 主比较使用官方模型生成的固定 support、相同 2D 点与 RANSAC 设置；EXP021 B 或 C 的正式 comparator 在其结果完整后选择。EXP022 自身 mask 的 native-support pose 单独标为 supplemental，不与 fixed-support 主结果混用。
 
 ## 本地检查

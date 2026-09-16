@@ -11,7 +11,7 @@ EXP022 渐进式层级 CAD 对应与多尺度 PCC：冻结官方 RGB ConvNeXt，
 
 当前状态：`STAGE1_IMPLEMENTED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING /
 FORMAL_NOT_STARTED`。主层级及独立消融层级已生成至 ignored cache；EXP022 单元/配置
-12 项和完整 research 200 项通过；官方 340 个 backbone 张量加载和仅 3,684,168 个 PCC
+14 项和完整 research 202 项通过；官方 340 个 backbone 张量加载和仅 3,684,168 个 PCC
 参数可训练的 CPU 前后向通过。本机 CUDA+CPP batch4/batch48 两步 AMP 均无跳步，固定
 batch 的第二步模型优化耗时约 `0.168/0.670 s`；另一次固定真实 batch48 十步诊断中，第
 2–10 步耗时中位数 `0.640 s`（forward `0.350 s`、backward `0.282 s`），峰值 allocated
@@ -21,6 +21,9 @@ batch 的第二步模型优化耗时约 `0.168/0.670 s`；另一次固定真实 
 整步中位数 `664.30 ms`、峰值 `3.6429 GB`；共享 Stage-1/token 编码、集中准备标签及
 16 像素静态分组匹配后为 `490.38 ms`、`3.6065 GB`，无 AMP 跳步。该对照仍不含逐步
 DataLoader/renderer；服务器 EGL 结果未生成。
+正式训练前已将对称等价分支的选择分数限定为 route CE 与 residual loss；选定分支的
+mask loss 仍参与训练。正式 V1 其他权重与优化器参数保持原配置。修正后本机
+CUDA+CPP batch4 含 `2/4` 个对称实例的两步 AMP smoke PASS，无跳步；服务器验证未做。
 LM-O 单目标随机 PCC 的 fixed-support
 evaluator 接线通过，随机数值不进入科学结论。服务器 EGL profile、正式 E5–E40、完整
 matched PnP/BOP 尚未生成。EXP021 B/C comparator 待现有实验完成后确定；不能用当前 E15 direct-pose

@@ -285,6 +285,14 @@ class ProgressivePCCHead(nn.Module):
         route_loss = torch.stack(stage_losses).mean(0)
         return route_loss, residual_loss, mask_loss, mask_logit
 
+    def _select_symmetry_losses(self, canonical: torch.Tensor,
+                                alternate: torch.Tensor):
+        """Select a CAD-equivalent branch by geometry, then keep all its losses."""
+        weights = canonical.new_tensor([self.route_weight, self.residual_weight])
+        use_alternate = (((alternate[:, :2] - canonical[:, :2]) * weights)
+                         .sum(-1).detach() < 0)
+        return torch.where(use_alternate[:, None], alternate, canonical), use_alternate
+
     @staticmethod
     def _resize_sparse_paths(indices: torch.Tensor, log_scores: torch.Tensor):
         """Bilinearly mix four spatial neighbours of a sparse categorical path state."""
@@ -427,9 +435,9 @@ class ProgressivePCCHead(nn.Module):
                 stage1_logits.index_select(0, symmetric), alternate_paths,
                 sym_classes, sym_inverse, tokens, gt_mask.index_select(0, symmetric)
             )[:3], dim=-1)
-            weights = base.new_tensor([self.route_weight, self.residual_weight, self.mask_weight])
-            use_alternate = ((alternate - base.index_select(0, symmetric)) * weights).sum(-1).detach() < 0
-            replacement = torch.where(use_alternate[:, None], alternate, base.index_select(0, symmetric))
+            replacement, use_alternate = self._select_symmetry_losses(
+                base.index_select(0, symmetric), alternate
+            )
             base = base.index_copy(0, symmetric, replacement)
             selected = selected.index_copy(0, symmetric, use_alternate.long())
         chosen = base.mean(0)

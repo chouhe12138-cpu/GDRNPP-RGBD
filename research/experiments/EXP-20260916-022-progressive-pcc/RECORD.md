@@ -11,6 +11,8 @@
 
 主臂 `train_reused.py`，正式训练 40 epoch、batch 48、16 workers、AdamW `3e-4`、4% warmup 后 cosine、AMP FP16，E5/E10/E15/E20/E25/E30/E35/E40 为预定正式评估点。EXP021 comparator 选择待其结果完整后确定，不据现有 E15 指标事后指定。
 
+2026-09-16 正式训练前协议修正：先前本地 smoke 的对称分支选择分数包含 mask loss；正式 V1 改为仅以加权 route CE 与 residual loss 选择等价 SE(3) 分支，选定后该分支的 route、residual、mask 三项 loss 均参与训练。既有本机性能与 loss 观察保留为修正前代码的工程记录，不冒充修正后的正式结果。其余 V1 固定值已在正式配置中明确：三项 loss 权重均为 `1.0`，residual beta `0.1`，beam K `2`，token 维度 `256`，四级 fusion gate logit 初值 `-4.0`；AdamW `lr=3e-4`、`weight_decay=0.01`、`betas=(0.9,0.999)`，warmup ratio `0.04` 后立即 cosine，终点 LR factor `0.01`，seed `42`。本次不调整这些值。
+
 ## 评价与 gate（预注册）
 
 - Integrity：层级 8⁴/对象顺序/叶子映射、官方 340 个 backbone 张量加载、冻结/梯度隔离、四级概率归一化/路径合法、残差半径、可见 mask、GT 几何和 fixed support 评价链。失败则不能进入机制判断。
@@ -28,6 +30,7 @@
 - 提交 `2ad21a1` 后增加分段计时、参数与类别计数的本机诊断；batch48 固定真实 batch 10 步 AMP PASS。模型参数共 `91,248,584`，其中 frozen backbone `87,564,416`，trainable PCC `3,684,168`。第 2–10 步中位数：forward `349.85 ms`、backward `282.02 ms`、unscale+逐参数 finite 检查 `7.97 ms`、optimizer `1.45 ms`；整步中位数 `640.30 ms`，峰值 allocated `3.6353 GB`。另一 batch48 三步采样中，对称对象 `13/48`；其第 2–3 步 forward/backward 均值约 `351.63/296.47 ms`。不同 batch 的对称占比与内容未严格匹配，不能把两次耗时差归因于某一项。
 - 2026-09-16 本地匹配性能对照：同一 RTX 4060、CUDA+CPP、seed 42、同一类别直方图 `[8,6,8,6,5,4,6,5]`（对称实例 `10/48`）、batch48、固定真实 batch 各 6 步 AMP。原实现第 2–6 步整步中位数 `664.30 ms`，forward/backward 中位数 `354.15/299.97 ms`，峰值 allocated `3.6429 GB`；静态 16 像素分组 packing、单次输出重排、共享 Stage-1/token 编码及按分辨率集中准备标签后，对应为 `490.38 ms`、`253.05/225.30 ms`、`3.6065 GB`。整步差值 `-173.93 ms`，按原值计算下降 `26.2%`。两次均无 AMP 跳步；第一步 route/residual/mask loss 原实现为 `2.168833/0.456654/0.776884`，新实现为 `2.168796/0.456656/0.776884`。这只是同机固定 batch 工程对照，不含 DataLoader/renderer 的逐步耗时，不是服务器 EGL 或正式训练吞吐。
 - 此次工程改动后，EXP022 单元/配置测试 `12 passed`，完整 research 回归 `200 passed`；官方权重 CPU preflight PASS，加载 backbone 340 个张量，可训练参数仍为 `3,684,168`。匹配器旧分组实现与新实现的 FP32 logits/context/label/输入和 token 梯度有数值对照测试（含稀疏 route）；空 visible mask 与对称分支 Stage-1 单次执行有单元检查。本机主层级 CUDA+CPP batch4 两步 AMP smoke PASS，无跳步，第二步固定 batch 耗时 `138.52 ms`，峰值 allocated `0.9934 GB`。独立层级 CUDA+CPP batch4 两步 AMP smoke 同样 PASS，无跳步，第二步 `131.60 ms`、峰值 `0.9934 GB`。
+- 正式训练前的对称分支选择修正后，EXP022 测试 `14 passed`、完整 research 回归 `202 passed`。新增检查覆盖 mask loss 不参与分支选择、选定分支 mask loss 的梯度，以及上述正式 V1 固定参数。本机 CUDA+CPP、seed 42、batch4 含 `2/4` 个对称实例的两步 AMP smoke PASS、无跳步；第二步 route/residual/mask loss 为 `1.720196/0.412373/0.375587`，峰值 allocated `0.9934 GB`。这是修正后本机固定 batch 检查，不是服务器 EGL 或正式训练结果。
 - 独立消融 `independent_v2.npz` 的本机 CUDA+CPP batch4 两步 AMP smoke PASS，无跳步；第二步固定 batch 优化耗时 `195.2 ms`，峰值 allocated `0.9977 GB`。不进入正式 40 epoch。
 - LM-O 单目标 fixed-support evaluator 接线 smoke COMPLETE：官方 A 和随机初始化 PCC 均生成固定支持集 correspondence、原生分辨率四级路由、PnP、own-mask supplemental 与计时字段；随机 PCC 数值不进入科学结论。最终接线输出在 ignored `output/experiments/exp022-evaluator-random-wiring-smoke-3/`；第一次索引错误的失败产物和第二次旧口径输出均保留，不参与正式结果。
 - 服务器 CUDA/EGL 真 batch、稳定 batch48 profile、正式训练、完整 matched PnP/BOP：未运行或未生成。所有 E5–E40 指标：未生成。正式 checkpoint/运行目录：未生成。
