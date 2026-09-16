@@ -2,6 +2,24 @@
 
 最后核对：2026-09-16。
 
+## EXP022 第一阶段（2026-09-16 起）
+
+EXP022 渐进式层级 CAD 对应与多尺度 PCC：冻结官方 RGB ConvNeXt，主臂把 EXP021 的
+4096 个叶子重排为 8⁴；四级 8 路局部匹配使用 GT-parent 监督与 Top-2 完整路径推理，
+经多尺度细化、球形有界残差和可见 mask 输出连续 XYZ，再交 explicit RANSAC-PnP。
+独立表面重采样 8⁴ 只做消融 smoke。第二阶段的全量 backbone 训练暂缓。
+
+当前状态：`STAGE1_IMPLEMENTED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING /
+FORMAL_NOT_STARTED`。主层级及独立消融层级已生成至 ignored cache；EXP022 单元/配置
+9 项和完整 research 197 项通过；官方 340 个 backbone 张量加载和仅 3,684,168 个 PCC
+参数可训练的 CPU 前后向通过。本机 CUDA+CPP batch4/batch48 两步 AMP 均无跳步，固定
+batch 的第二步模型优化耗时约 `0.168/0.670 s`，batch48 峰值 allocated `3.632 GB`；
+不含每步 DataLoader/renderer，不等于服务器 EGL 吞吐。LM-O 单目标随机 PCC 的 fixed-support
+evaluator 接线通过，随机数值不进入科学结论。服务器 EGL profile、正式 E5–E40、完整
+matched PnP/BOP 尚未生成。EXP021 B/C comparator 待现有实验完成后确定；不能用当前 E15 direct-pose
+指标代替 matched correspondence 判断。协议和入口见 [EXP022 README](exp022/README.md)，
+原始工程观察见 [EXP022 RECORD](experiments/EXP-20260916-022-progressive-pcc/RECORD.md)。
+
 ## Active mainline（2026-09-14 起）
 
 **EXP021 global-guided hierarchical CAD correspondence**：用固定 CAD `64×64`

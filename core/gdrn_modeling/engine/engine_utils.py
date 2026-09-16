@@ -130,6 +130,13 @@ def training_geometry_renderer_type(cfg):
 def geometry_supervision_enabled(cfg):
     """Validate and return whether training needs rendered GT geometry targets."""
     net_cfg = cfg.MODEL.POSE_NET
+    pcc_cfg = net_cfg.get("PCC_HEAD", {})
+    if pcc_cfg.get("ENABLED", False):
+        if net_cfg.NAME != "GDRN_PCC" or not net_cfg.BACKBONE.FREEZE:
+            raise ValueError("EXP022 requires GDRN_PCC with a frozen backbone")
+        if training_geometry_renderer_type(cfg) is None:
+            raise ValueError("EXP022 requires online geometry renderer")
+        return True
     g_head_cfg = net_cfg.GEO_HEAD
     enabled = bool(g_head_cfg.get("TRAIN_SUPERVISION", True))
     frozen = bool(g_head_cfg.FREEZE)
@@ -231,6 +238,9 @@ def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):
 
 def batch_data_train_online(cfg, data, renderer, device="cuda"):
     cad_cfg = cfg.MODEL.POSE_NET.get("CAD_HEAD", {})
+    pcc_cfg = cfg.MODEL.POSE_NET.get("PCC_HEAD", {})
+    if bool(pcc_cfg.get("ENABLED", False)):
+        return batch_data_train_online_cad(cfg, data, renderer, device=device)
     if bool(cad_cfg.get("ENABLED", False)) and bool(
         cad_cfg.get("TRAIN_SUPERVISION", False)
     ):

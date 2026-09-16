@@ -50,6 +50,7 @@ from core.gdrn_modeling.models import (
     GDRN_cls2reg,
     GDRN_double_mask,
     GDRN_Dstream_double_mask,
+    GDRN_PCC,
 )  # noqa
 
 

@@ -201,14 +201,23 @@ def build_lr_scheduler(
     """Build a LR scheduler from config."""
     name = cfg.SOLVER.LR_SCHEDULER_NAME
     if name.lower() == "flat_and_anneal":
+        warmup_ratio = cfg.SOLVER.get("WARMUP_RATIO", None)
+        warmup_iters = (
+            round(total_iters * float(warmup_ratio))
+            if warmup_ratio is not None else cfg.SOLVER.WARMUP_ITERS
+        )
+        anneal_point = (
+            float(warmup_ratio)
+            if warmup_ratio is not None else cfg.SOLVER.ANNEAL_POINT
+        )
         return flat_and_anneal_lr_scheduler(
             optimizer,
             total_iters=total_iters,  # NOTE: TOTAL_EPOCHS * len(train_loader)
             warmup_factor=cfg.SOLVER.WARMUP_FACTOR,
-            warmup_iters=cfg.SOLVER.WARMUP_ITERS,
+            warmup_iters=warmup_iters,
             warmup_method=cfg.SOLVER.WARMUP_METHOD,  # default "linear"
             anneal_method=cfg.SOLVER.ANNEAL_METHOD,
-            anneal_point=cfg.SOLVER.ANNEAL_POINT,  # default 0.72
+            anneal_point=anneal_point,  # default 0.72
             steps=cfg.SOLVER.get("REL_STEPS", [2 / 3.0, 8 / 9.0]),  # default [2/3., 8/9.], relative decay steps
             target_lr_factor=cfg.SOLVER.get("TARGET_LR_FACTOR", 0),
             poly_power=cfg.SOLVER.get("POLY_POWER", 1.0),

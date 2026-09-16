@@ -12,15 +12,16 @@
 | 已集成研究扩展 | `core/gdrn_modeling/models/heads/` | hierarchical、EXP013、GLM、EXP017/B、GCR、official random 等 head；保留原 registry 和 checkpoint 路径 |
 | EXP020 几何重投影监督 | `core/gdrn_modeling/losses/correspondence_reprojection_loss.py` | EXP020 纯 Tensor loss；经 `GDRN_double_mask.gdrn_loss`/`engine` 透传在线 `roi_zoom_K`；不新增模型参数。stats 区分 loss 值与真实 `mean_reproj_px`；`valid_ratio` 以 GT foreground 为分母；`REPROJ_LW>0 && USE_MTL=True` fail-fast |
 | EXP021 层级 CAD 对应 | `core/gdrn_modeling/models/heads/global_hierarchical_cad_head.py` | 固定 64×64 CAD 层级、共享几何 token、GT-parent 细路由、Top-K 联合解码、受限残差及可选 8×8 全局引导；训练走单次 feature-only decoder，AMP 下几何标签保持 FP32；CAD 几何为外部非持久 buffer |
+| EXP022 多尺度 PCC | `core/gdrn_modeling/models/GDRN_PCC.py`、`heads/progressive_pcc_head.py` | 冻结官方 backbone，四级 8 路局部匹配与 Top-2 路由、多尺度细化、有界残差和可见 mask；独立于旧 decoder/Patch-PnP |
 | 研究集成点 | `core/gdrn_modeling/models/`、`datasets/`、`engine/` | 模型工厂和 GDRN_double_mask 接线；F 深度统计、GCR image_hw/pose/loss 传递；早期 CPM/quality 接线仍存在 |
-| 实验专用验证 | `research/next_pose_head/`、`exp013/`、`exp014/`、`exp017/`、`exp017b/`、`exp018/`、`exp019/`、`exp020/`、`exp021/` | preflight、测试和说明；EXP020 含 matched PnP 与 loss 标定；EXP021 含 hierarchy 生成、B/C preflight、FP32/AMP CUDA smoke/标定/profile 及 K-sweep matched evaluator |
+| 实验专用验证 | `research/next_pose_head/`、`exp013/`、`exp014/`、`exp017/`、`exp017b/`、`exp018/`、`exp019/`、`exp020/`、`exp021/`、`exp022/` | preflight、测试和说明；EXP020 含 matched PnP 与 loss 标定；EXP021 含 hierarchy 生成、B/C preflight、FP32/AMP CUDA smoke/标定/profile 及 K-sweep matched evaluator；EXP022 含层级生成、CPU/CUDA smoke 与 fixed-support evaluator |
 | 公共研究工程检查 | `research/run_contract.py`、`research/tests/` | 当前 smoke/formal/eval 配置约束、launcher/cache 等回归；训练协议约束不适用于所有诊断 |
 | 可复用结构诊断 | `research/diagnostics/pose_structure/` | D1–D6、指标、模型访问和报告；支持范围受 head/decode 契约限制 |
 | 专用诊断 | `research/diagnostics/exp019_epro/`、`pose_structure/f_glm_diagnostic.py` | EXP019 固定历史协议；F 专用干预。EXP019 使用说明在 `research/exp019/README.md` |
 | 通用工具 | `tools/` 及 core/lib/det 内部 tools/scripts | checkpoint 转换、BOP 合并/时间处理、上游数据准备和可视化；不是统一测试套件 |
 | 环境与运行脚本 | `scripts/`、`docker/l40/`、core/det 的 shell 入口 | 环境构建、诊断、受管服务器运行、bundle，以及上游 train/test；不同契约不混用 |
 | shared/base 配置 | `configs/gdrn/lmo_pbr/research/_base_/`、`controls/`、`templates/` | 公共评估/训练协议、长期 control、新实验配置模板 |
-| 实验配置 | 同配置根目录下 EXP012、EXP013、EXP017、EXP018、EXP020、EXP021 | train/eval/smoke，以及部分实验的 audit48；EXP021 在 `exp021_global_hierarchical_cad/`，B/C 唯一结构差异为全局引导开关 |
+| 实验配置 | 同配置根目录下 EXP012、EXP013、EXP017、EXP018、EXP020、EXP021、EXP022 | train/eval/smoke，以及部分实验的 audit48；EXP021 在 `exp021_global_hierarchical_cad/`，B/C 唯一结构差异为全局引导开关；EXP022 在 `exp022_progressive_pcc/` |
 | 诊断配置 | `configs/gdrn/lmo_pbr/research/exp019/epro_diagnostic.py`、`research/diagnostics/exp019_epro/config.py` | 前者是声明文件；实际 runner 使用后者的 ExperimentConfig，模型配置另由 CLI 传入 |
 
 研究验证和诊断调用 core，core 使用 lib 的几何、renderer 与 evaluator。det 也使用
