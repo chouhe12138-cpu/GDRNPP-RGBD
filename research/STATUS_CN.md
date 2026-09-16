@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-15。
+最后核对：2026-09-16。
 
 ## Active mainline（2026-09-14 起）
 
@@ -10,8 +10,8 @@ C 臂在 8×8 特征上增加两层图像—CAD Transformer、全局粗区域偏
 注入。V1 固定为 RGB 与冻结阶段，只训练新增 CAD head；不执行 backbone 联合微调。
 对称监督按实例从完整 BOP SE(3) 等价路径中选择一条，三项 loss 共用该分支。
 
-当前状态：`LOCAL_GPU_VECTORIZATION_PASS / FORMAL_TRAINING_ACTIVE_USER_REPORTED /
-RUN_METADATA_PENDING`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
+当前状态：`FORMAL_BC_E15_AVAILABLE / TRAINING_EXIT_UNCONFIRMED /
+MATCHED_PNP_PENDING`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
 20 项测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
 参数，官方 checkpoint 只缺 `cad_head.*`，优化步后冻结张量不变。真实 LM-O 单目标
 evaluator 接线 smoke 已完成，能输出 fixed support、K=1/2/4/8、对称/路由/几何与
@@ -50,14 +50,24 @@ B/C forward+backward 均值约为 `0.426/0.523 s`，端到端中位数约
 `0.882/1.008 s`，峰值约 `2.659/4.186 GB`。相对同机优化前 AMP 记录，B/C 模型
 前反向分别加速约 `4.34×/3.88×`（耗时下降 `77.0%/74.2%`），端到端中位数加速约
 `2.66×/2.55×`（耗时下降 `62.4%/60.7%`）；该比较受 sampled batch、权重版本和
-DataLoader 长尾限制，不设严格时间 gate。用户确认远程 formal 已在训练，具体 run_id、
-source 和进度待训练完成后同步；本次加速作为同一 EXP021 formal 的工程实现更新，不
-新建 formal 实验，完成后直接在加速版本进入下一阶段。
+DataLoader 长尾限制，不设严格时间 gate。本次加速作为同一 EXP021 formal 的工程
+实现更新，不新建 formal 实验；实际训练 run 的 source 与进度见下段。
+
+2026-09-16 同步的 B/C 日志均记录 source `effc99b`、seed 42、FP16 AMP；
+B run `RUN-20260914-125103-formal-s42-a01`，C run
+`RUN-20260914-125349-formal-s42-a01`。两臂 E5/E10/E15 的 checkpoint 保存日志、
+常规 direct-pose `EVAL_SUMMARY` 与 BOP score JSON 已记录于 EXP021 RECORD；
+六份 score 的 BOP AR 均与对应 epoch 日志相等。E10 B/C BOP AR
+`0.685010/0.693179`、ADD(-S)0.1d `0.526644/0.560554`、reS
+`0.521107/0.538639`、teS `0.793080/0.803460`。日志副本最后一条训练指标为
+B iter `100499/255920`、C iter `97499/255920`，均处于 epoch 16；
+退出码与后续进度未提供。所获 formal 源码是 `effc99b`，不包含后续本地
+`f01dff5` 加速；完整 fixed-support matched PnP、E40 和资源 gate 均尚未生成。
 
 协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
 [EXP021 RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md)。
 
-## Predecessor pending：EXP020（2026-09-09 起）
+## 已结束的前序实验：EXP020（2026-09-16 决定不再补证）
 
 **EXP020 correspondence supervision + ordinary PnP/RANSAC**：在保留 continuous
 normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection loss
@@ -66,7 +76,9 @@ normalized XYZ 的前提下，用 GT-pose per-pixel correspondence reprojection 
 backbone/PNP_NET 冻结、GEO_HEAD trainable、pose-level losses 显式清零以隔离
 producer；无新增模型参数，官方 checkpoint strict 兼容。
 
-当前状态：`E40_AVAILABLE / MATCHED_PNP_PENDING / EXIT_CODE_UNCONFIRMED`。第一阶段实现
+当前状态：`CLOSED / E40_DIRECT_POSE_RECORDED / MATCHED_PNP_NOT_RUN /
+EXIT_CODE_UNCONFIRMED`。用户决定结束后续工作；原始结果及证据缺口保留，
+不补做 matched PnP，不据 direct-pose telemetry 增加机制结论。第一阶段实现
 （commit `64e9098`）与 2026-09-09 审查修复（matched evaluator、A/B 跨 checkpoint
 fixed support、diagnostics、USE_MTL guard、gradient-scale calibration）均已完成并
 本地验证。首个服务器 release `698a8fe` 错配 CPP online training renderer，运行
@@ -124,7 +136,7 @@ Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），�
 其 EXP019 机制证据（matched RANSAC 与 EPro-PnP 都稳定消费逐步改善的 XYZ，官方
 Patch-PnP 响应不足；用户 review 判定机制通过）**保留为历史记录，当前未安排实验，
 标为 Historical / Deferred**。当前 active mainline 是上方 EXP021，EXP020 的
-matched PnP 缺口仍保留；不启动 EPro。文献对照与口径见
+matched PnP 缺口作为已结束实验的未生成证据保留；不启动 EPro。文献对照与口径见
 [notes/20260908-solver-in-the-loop-review.md](notes/20260908-solver-in-the-loop-review.md)
 与 [DECISIONS](DECISIONS.md)。
 
@@ -161,16 +173,11 @@ matched PnP 缺口仍保留；不启动 EPro。文献对照与口径见
 
 ## 下一步
 
-1. 不干扰当前远程 formal；等待训练完成后同步唯一 run_id、source commit、退出状态、
-   checkpoint 文件名/epoch 和全部预定正式评估点。
+1. 不干扰远程 formal；B/C run_id 和 source 已记录，待训练结束后补充退出状态、
+   E20–E40 checkpoint 文件名/epoch 和剩余预定正式评估点。
 2. 训练完成后直接使用加速版本进入下一阶段，不为本次工程加速另建 formal 实验。
 3. 对 B/C 固定 checkpoint 做 K=1/2/4/8 fixed-support matched RANSAC-PnP、完整
    BOP evaluator 与 batch-1 profile，按预注册 mechanism/resource gate 决策。
-4. EXP020 E5–E40 BOP/ADD 已齐；补充 B E15/E20/E25 的明确 epoch 原始 score，核对 reS/teS
-   归属；补充 A/B run exit code 并核对 E40 checkpoint 文件。
-5. 使用明确的 A/B E40 checkpoint，用 `research/exp020/matched_pnp_eval.py` 做主下游评价（matched
-   classical PnP/RANSAC，fixed support，A/B 只换 XYZ），必要时 `--bop-eval` 汇总
-   BOP-AR/ADD(-S)/reS/teS。
-6. Gate 沿用相对阈值政策（±3%–±5%），先看方向一致性：correspondence error →
-   reprojection error → matched PnP pose 同方向。
-7. 暂不恢复 EXP014-D；不启动 EPro（Historical/Deferred）；不自动加 seed。
+4. EXP020 后续补证已结束；B E15/E20/E25 score 归属、A/B exit code 与正式 matched
+   PnP 未核实或未生成，保留缺口，不安排追加执行。
+5. 暂不恢复 EXP014-D；不启动 EPro（Historical/Deferred）；不自动加 seed。

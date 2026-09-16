@@ -9,8 +9,8 @@
 2026-09-14 起主线进入 EXP021：用固定 CAD `64×64` 层级、条件子区域路由和受限
 残差约束 dense correspondence 的表面身份，再检验 8×8 全局图像—CAD 交互能否
 改善共同姿态模式与 matched classical PnP/RANSAC。V1 只训练新增 CAD head，冻结
-官方 backbone/decoder/mask/Patch-PnP。EXP020 的正式 matched PnP 仍待补，作为前序
-证据缺口保留，不由 EXP021 替代。
+官方 backbone/decoder/mask/Patch-PnP。EXP020 已于 2026-09-16 按用户决定结束后续
+补证；正式 matched PnP 未运行，作为前序证据缺口保留，不由 EXP021 替代。
 
 ## 已建立的证据
 
@@ -42,10 +42,12 @@
 3. EXP020 已完成实现、review-fix、36 项实验测试、EGL server smoke、fixed-support
    evaluator smoke 与梯度尺度标定；A/B 日志已到达 E40，全部 E5–E40 direct-pose
    telemetry 已同步并保存紧凑原始证据。run exit code 与 matched PnP/RANSAC 正式
-   评价尚未提供；B E15/E20/E25 score 与日志存在 epoch 冲突，reS/teS 待核对，
-   详见 RECORD。不以 direct-pose 趋势代替主结论。
-4. EXP021 V1 已完成实现与本地 CPU preflight；下一步依次完成真实 CUDA/EGL loss
-   标定、B/C one-step smoke、formal 和固定 support 的 K=1/2/4/8 matched evaluator。
+   评价未生成；B E15/E20/E25 score 与日志存在 epoch 冲突，reS/teS 未核对。
+   用户于 2026-09-16 决定结束后续补证，保留上述缺口；详见 RECORD。不以
+   direct-pose 趋势代替主结论。
+4. EXP021 V1 已完成实现、本地 CPU preflight 和 CUDA/EGL 工程检查；B/C formal
+   source `effc99b` 的 E5/E10/E15 评估已记录。待完整 formal 训练结束后执行
+   固定 support 的 K=1/2/4/8 matched evaluator。
    不启动原设计中的 backbone 联合微调；是否进入下一轮由预注册机制和资源 gate 决定。
 5. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。

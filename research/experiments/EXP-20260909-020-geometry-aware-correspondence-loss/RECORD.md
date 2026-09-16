@@ -309,3 +309,11 @@ Decision：不依据 direct-pose telemetry 宣布 EXP020 机制通过或失败�
 协议。后续补充退出状态与 E40 明确 checkpoint，使用专用 evaluator 完成 fixed-support
 matched PnP/RANSAC，报告 correspondence error → reprojection error → pose 的响应关系；
 沿用相对阈值政策（±3%–±5%，饱和指标仍绝对），不自动增加训练或 seed。
+
+## 2026-09-16 工作安排更新（Decision）
+
+用户决定结束 EXP020 后续补证，不再继续本实验；上述原始结果、epoch 冲突和当时的
+后续计划保留为历史记录。正式 matched PnP/RANSAC 未运行，A/B run exit code 未核实，
+B E15/E20/E25 的 reS/teS epoch 归属未核实；这些缺口不以 EXP021 结果填补，
+也不据此追加机制结论。状态：`CLOSED / E40_DIRECT_POSE_RECORDED /
+MATCHED_PNP_NOT_RUN / EXIT_CODE_UNCONFIRMED`。

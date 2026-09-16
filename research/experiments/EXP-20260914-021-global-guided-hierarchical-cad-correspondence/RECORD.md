@@ -1,7 +1,7 @@
 # EXP021 全局引导的层级 CAD 对应预测
 
 - `experiment_id`: `EXP-20260914-021-global-guided-hierarchical-cad-correspondence`
-- 状态：`LOCAL_GPU_VECTORIZATION_PASS / FORMAL_TRAINING_ACTIVE_USER_REPORTED / RUN_METADATA_PENDING`
+- 状态：`FORMAL_BC_E15_AVAILABLE / TRAINING_EXIT_UNCONFIRMED / MATCHED_PNP_PENDING`
 - 日期：2026-09-14
 - seed：42（训练）；20260914（CAD 表面采样）；20260730+目标序号（RANSAC）
 - 实现开始时的父 commit：`c2b7c2f`；正式 run 记录实际 release commit
@@ -187,10 +187,79 @@ matched RANSAC-PnP。V1 只做冻结阶段，不执行原方案中的 backbone �
 
 ## 待生成的正式证据
 
-- 当前远程 formal 的唯一 run_id、source commit、进度与退出状态（用户报告训练中，
-  待完成后同步）。
+- 当前 B/C formal 的后续进度、退出状态和剩余固定评估点（截至所获日志均为 E15）。
 - 含 GPU route blocks 与 CAD-only online batch 的 L40/EGL profile（工程补充证据，
   不构成新 formal，也不阻塞训练后的下一阶段）。
-- B/C checkpoint 文件名/epoch、全部预定正式评估点。
+- B/C E20–E40 checkpoint 文件名/epoch、全部剩余预定正式评估点；已记录 E5/E10/E15
+  的保存日志，不把保存日志等同于服务器文件存在性核验。
 - E40 A/B/C matched K sweep、完整 BOP evaluator 输出、gate report、batch-1 profile。
 - 最终与最佳点的聚合和逐物体结果；失败 run 保留原因与有效证据边界。
+
+## 2026-09-16 同步：B/C formal E5/E10/E15（Observed）
+
+本节只记录所获训练日志和常规 direct-pose 评估，不执行 EXP021 专用 fixed-support
+matched RANSAC-PnP、K sweep、机制 gate 或 batch-1 资源 gate。来源为
+`E:\6D姿态估计\EXP021\B` 和 `E:\6D姿态估计\EXP021\C`；两臂各有一份
+`console.log` 及 E5/E10/E15 的 `scores_bop19_<epoch>epoch.json`。从日志逐字提取
+`EVAL_SUMMARY` JSON，并将六份 score JSON 按字段和值保存为紧凑副本：
+
+- B：[`RUN-20260914-125103-formal-s42-a01/eval_summary.jsonl`](evidence/RUN-20260914-125103-formal-s42-a01/eval_summary.jsonl)；同目录含三份 score JSON。
+- C：[`RUN-20260914-125349-formal-s42-a01/eval_summary.jsonl`](evidence/RUN-20260914-125349-formal-s42-a01/eval_summary.jsonl)；同目录含三份 score JSON。
+
+两份 `RUN_INFO` 均记录 seed `42`、source
+`effc99b93eb70a9197805a427ce0156365a2bbae`，B 使用 `b_hierarchical.py`，C
+使用 `c_global.py`，镜像标签同为
+`gdrnpp-research:torch220-cu121-sm89-c0be1ade7ea9`。本次 formal 的 source 是
+`effc99b`，不是后续本地 GPU 加速提交 `f01dff5`。日志显示 native FP16 AMP、
+从官方 checkpoint 加载并自 iteration 0 开始。E5/E10/E15 的
+`model_epoch_005.pth`、`model_epoch_010.pth`、`model_epoch_015.pth` 均有保存日志，
+但未核验服务器上权重文件的存在或内容；用户提供的 C 目录另有
+`model_epoch_010.pth`，本次未读取权重，也未将其纳入 Git。
+
+六份 score JSON 的 `bop19_average_recall` 与对应 epoch 日志的
+`EVAL_SUMMARY.bop_ar` 全部逐点相等。表中 ADD(-S)0.1d 来自
+`EVAL_SUMMARY.add_s_0.1d`，不是 score JSON 的 `bop19_average_recall_ad`；
+BOP、reS、teS 来自各自的 score JSON。以下三点均为预定中间评估点，并非
+E40 最终评价：
+
+| Epoch | 臂 | BOP AR | ADD(-S)0.1d | AR_reS | AR_teS |
+|---:|---|---:|---:|---:|---:|
+| 5 | B | 0.683502 | 0.525952 | 0.521799 | 0.799539 |
+| 5 | C | 0.685772 | 0.498270 | 0.543483 | 0.790542 |
+| 10 | B | 0.685010 | 0.526644 | 0.521107 | 0.793080 |
+| 10 | C | 0.693179 | 0.560554 | 0.538639 | 0.803460 |
+| 15 | B | 0.676270 | 0.489965 | 0.525952 | 0.788697 |
+| 15 | C | 0.683116 | 0.491349 | 0.531488 | 0.787313 |
+
+### 相同 epoch 的 C−B 差值（Derived）
+
+由上方原始 JSON 中未舍入的对应数值按 `C − B` 计算，表中仅作显示舍入：
+
+| Epoch | Δ BOP AR | Δ ADD(-S)0.1d | Δ AR_reS | Δ AR_teS |
+|---:|---:|---:|---:|---:|
+| 5 | +0.002270 | -0.027682 | +0.021684 | -0.008997 |
+| 10 | +0.008168 | +0.033910 | +0.017532 | +0.010381 |
+| 15 | +0.006847 | +0.001384 | +0.005536 | -0.001384 |
+
+### 已获三个评估点的逐物体 ADD(-S)0.1d（Observed）
+
+以下数值对应 `EVAL_SUMMARY.add_s_obj_recalls`，完整精度见随附 JSONL；
+三点全部列出，不把当前 E15 当作完整 formal 的最终点。
+
+| 物体 | B E5 | C E5 | B E10 | C E10 | B E15 | C E15 |
+|---|---:|---:|---:|---:|---:|---:|
+| ape | 0.440000 | 0.497143 | 0.474286 | 0.468571 | 0.314286 | 0.468571 |
+| can | 0.698492 | 0.673367 | 0.703518 | 0.809045 | 0.698492 | 0.743719 |
+| cat | 0.450292 | 0.345029 | 0.403509 | 0.385965 | 0.391813 | 0.403509 |
+| driller | 0.805000 | 0.815000 | 0.760000 | 0.855000 | 0.785000 | 0.800000 |
+| duck | 0.416667 | 0.316667 | 0.450000 | 0.516667 | 0.255556 | 0.233333 |
+| eggbox | 0.500000 | 0.305556 | 0.483333 | 0.405556 | 0.450000 | 0.233333 |
+| glue | 0.671429 | 0.735714 | 0.721429 | 0.764286 | 0.600000 | 0.728571 |
+| holepuncher | 0.235000 | 0.310000 | 0.240000 | 0.285000 | 0.395000 | 0.325000 |
+
+日志副本的最后一条 `my_writer`：B 为 `20260916_011855`、epoch 16、
+iter `100499/255920`（39.3%）、`max_mem=1738M`；C 为 `20260916_045330`、
+epoch 16、iter `97499/255920`（38.1%）、`max_mem=3176M`。两份所获日志中均未
+检出 `Traceback`、`CUDA out of memory`、`OutOfMemoryError` 或 `ERROR`；
+日志副本没有 run exit code，不能据最后 iteration 推断训练已结束或此后的进度。
+正式 matched PnP/K sweep 和 E40 结果在所获文件中均未生成。
