@@ -27,7 +27,8 @@ class GDRN_PCC(nn.Module):
         return self
 
     def forward(self, x, roi_classes=None, gt_xyz=None, gt_mask_visib=None,
-                do_loss: bool = False, return_pcc_debug: bool = False, **_unused):
+                do_loss: bool = False, return_pcc_debug: bool = False,
+                collect_pcc_diagnostics: bool = False, **_unused):
         if roi_classes is None:
             raise ValueError("EXP022 requires roi_classes")
         with torch.no_grad():
@@ -37,7 +38,7 @@ class GDRN_PCC(nn.Module):
         if do_loss:
             losses, stats = self.pcc_head(
                 backbone_feature, roi_classes, gt_xyz_norm=gt_xyz,
-                gt_mask=gt_mask_visib,
+                gt_mask=gt_mask_visib, collect_diagnostics=collect_pcc_diagnostics,
             )
             out = {"_train_stats": {
                 "pcc_symmetry_branch_mean": stats["selected_symmetry_branch_mean"],
@@ -46,7 +47,7 @@ class GDRN_PCC(nn.Module):
                 **{f"pcc_{name}_{index+1}": value
                    for name in ("fusion_update_ratio", "route_entropy", "top1_route_prob",
                                 "top2_route_prob_mass")
-                   for index, value in enumerate(stats[name])}
+                   for index, value in enumerate(stats.get(name, ()))}
             }}
             return out, losses
         output = self.pcc_head(backbone_feature, roi_classes)

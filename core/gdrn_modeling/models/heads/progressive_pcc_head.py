@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .pcc_blocks import PCCStage, SpatialRefinement
+from .pcc_blocks import PCCStage, StageTransition
 
 
 OBJECT_IDS = (1, 5, 6, 8, 9, 10, 11, 12)
@@ -83,7 +83,7 @@ class ProgressivePCCHead(nn.Module):
                                                   stage_attention)
         )
         self.refinements = nn.ModuleList(
-            SpatialRefinement(before, after) for before, after in ((512, 256), (256, 128), (128, 64))
+            StageTransition(before, after) for before, after in ((512, 256), (256, 128), (128, 64))
         )
         self.residual_head = nn.Sequential(
             nn.Linear(token_dim * 2, token_dim), nn.GELU(), nn.Linear(token_dim, 3)
@@ -159,25 +159,28 @@ class ProgressivePCCHead(nn.Module):
                      (entropy, top_two[..., 0], top_two.sum(-1)))
 
     def _stage1(self, backbone: torch.Tensor, inverse: torch.Tensor,
-                banks: list[tuple[torch.Tensor, torch.Tensor]], valid: torch.Tensor):
+                banks: list[tuple[torch.Tensor, torch.Tensor]], valid: torch.Tensor,
+                collect_diagnostics: bool):
         feature = self.input_adapter(backbone)
         batch = backbone.shape[0]
         stage = self.stages[0]
         query = stage.image_tokens(feature)
         logits, context = stage.matcher.match_root(query, inverse, banks[0])
-        feature, update_ratio = stage.fuse(feature, context, collect_stats=True)
-        diagnostics = (update_ratio, *self._route_diagnostics(logits, valid))
+        feature, update_ratio = stage.fuse(feature, context, collect_stats=collect_diagnostics)
+        diagnostics = ((update_ratio, *self._route_diagnostics(logits, valid))
+                       if collect_diagnostics else None)
         return self.refinements[0](feature), logits.view(batch, 64, 8), diagnostics
 
     def _train_branch(self, feature: torch.Tensor, stage1_logits: torch.Tensor,
                       paths, classes: torch.Tensor, inverse: torch.Tensor,
                       tokens: list[torch.Tensor], banks: list[tuple[torch.Tensor, torch.Tensor]],
-                      mask: torch.Tensor, stage1_diagnostics):
+                      mask: torch.Tensor, stage1_diagnostics,
+                      collect_diagnostics: bool):
         points, valid, _, child = paths[0]
         first_loss = F.cross_entropy(stage1_logits.float().transpose(1, 2),
                                      child.view(classes.shape[0], -1), reduction="none")
         stage_losses = [(first_loss * valid).sum(-1) / valid.sum(-1).clamp_min(1)]
-        stage_diagnostics = [stage1_diagnostics]
+        stage_diagnostics = [stage1_diagnostics] if collect_diagnostics else []
         final_query = final_parent = final_child = final_target = final_valid = None
         batch = classes.shape[0]
         for depth in range(2, 5):
@@ -193,9 +196,11 @@ class ProgressivePCCHead(nn.Module):
             stage_losses.append((pixel_loss * valid).sum(-1) / valid.sum(-1).clamp_min(1))
             logits = logits.view(batch, size * size, 8)
             feature, update_ratio = stage.fuse(
-                feature, context.view(batch, size * size, self.token_dim), collect_stats=True
+                feature, context.view(batch, size * size, self.token_dim),
+                collect_stats=collect_diagnostics
             )
-            stage_diagnostics.append((update_ratio, *self._route_diagnostics(logits, valid)))
+            if collect_diagnostics:
+                stage_diagnostics.append((update_ratio, *self._route_diagnostics(logits, valid)))
             if depth < 4:
                 feature = self.refinements[depth-1](feature)
             else:
@@ -218,11 +223,11 @@ class ProgressivePCCHead(nn.Module):
             mask_logit.float(), mask.float(), reduction="none"
         ).flatten(1).mean(-1)
         route_loss = torch.stack(stage_losses).mean(0)
-        diagnostics = {
+        diagnostics = ({
             name: torch.stack([stage_values[index] for stage_values in stage_diagnostics], dim=-1)
             for index, name in enumerate(("fusion_update_ratio", "route_entropy",
                                           "top1_route_prob", "top2_route_prob_mass"))
-        }
+        } if collect_diagnostics else {})
         return route_loss, residual_loss, mask_loss, diagnostics
 
     def _select_symmetry_losses(self, canonical: torch.Tensor,
@@ -339,7 +344,8 @@ class ProgressivePCCHead(nn.Module):
         }
 
     def forward(self, backbone: torch.Tensor, roi_classes: torch.Tensor,
-                gt_xyz_norm: torch.Tensor | None = None, gt_mask: torch.Tensor | None = None):
+                gt_xyz_norm: torch.Tensor | None = None, gt_mask: torch.Tensor | None = None,
+                collect_diagnostics: bool = False):
         if backbone.ndim != 4 or tuple(backbone.shape[1:]) != (1024, 8, 8):
             raise ValueError(f"EXP022 expects [B,1024,8,8], got {tuple(backbone.shape)}")
         unique, inverse, tokens = self._tokens(roi_classes)
@@ -363,11 +369,11 @@ class ProgressivePCCHead(nn.Module):
         canonical = self._transform_targets(target_pyramid, rotation, translation)
         canonical_paths = self._target_paths(canonical, inverse, level_anchors)
         stage1_feature, stage1_logits, stage1_diagnostics = self._stage1(
-            backbone, inverse, banks, canonical_paths[0][1]
+            backbone, inverse, banks, canonical_paths[0][1], collect_diagnostics
         )
         canonical_output = self._train_branch(
             stage1_feature, stage1_logits, canonical_paths, roi_classes, inverse,
-            tokens, banks, gt_mask, stage1_diagnostics
+            tokens, banks, gt_mask, stage1_diagnostics, collect_diagnostics
         )
         base = torch.stack(canonical_output[:3], dim=-1)
         diagnostics = canonical_output[3]
@@ -384,13 +390,14 @@ class ProgressivePCCHead(nn.Module):
                  for points, valid in target_pyramid], rotation, translation
             )
             alternate_paths = self._target_paths(alternate_targets, sym_inverse, level_anchors)
-            alternate_stage1 = tuple(value.index_select(0, symmetric)
-                                     for value in stage1_diagnostics)
+            alternate_stage1 = (tuple(value.index_select(0, symmetric)
+                                      for value in stage1_diagnostics)
+                                if collect_diagnostics else None)
             alternate_output = self._train_branch(
                 stage1_feature.index_select(0, symmetric),
                 stage1_logits.index_select(0, symmetric), alternate_paths,
                 sym_classes, sym_inverse, tokens, banks, gt_mask.index_select(0, symmetric),
-                alternate_stage1
+                alternate_stage1, collect_diagnostics
             )
             alternate = torch.stack(alternate_output[:3], dim=-1)
             replacement, use_alternate = self._select_symmetry_losses(
@@ -398,13 +405,14 @@ class ProgressivePCCHead(nn.Module):
             )
             base = base.index_copy(0, symmetric, replacement)
             selected = selected.index_copy(0, symmetric, use_alternate.long())
-            diagnostics = {
-                name: values.index_copy(
-                    0, symmetric,
-                    torch.where(use_alternate[:, None], alternate_output[3][name],
-                                values.index_select(0, symmetric))
-                ) for name, values in diagnostics.items()
-            }
+            if collect_diagnostics:
+                diagnostics = {
+                    name: values.index_copy(
+                        0, symmetric,
+                        torch.where(use_alternate[:, None], alternate_output[3][name],
+                                    values.index_select(0, symmetric))
+                    ) for name, values in diagnostics.items()
+                }
         chosen = base.mean(0)
         return {
             "loss_pcc_route": chosen[0] * self.route_weight,

@@ -1,9 +1,9 @@
 # EXP022 渐进式层级 CAD 对应与多尺度 PCC
 
 - `experiment_id`: `EXP-20260916-022-progressive-pcc`
-- 状态：`STAGE1_REFACTORED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING / FORMAL_NOT_STARTED`
+- 状态：`STAGE1_PERFORMANCE_REVISED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING / FORMAL_NOT_STARTED`
 - 日期：2026-09-17（2026-09-16 起）
-- 主训练 `run_id`：未分配；source commit：待本地提交后填写；seed：42
+- 主训练 `run_id`：未分配；修订源码 commit：以本次 Git 提交为准；seed：42
 
 ## 问题、变量与范围
 
@@ -58,3 +58,24 @@
 ## Decision
 
 第一阶段结构重构、本机 CPU 测试及 CUDA+CPP 工程对比完成；正式训练启动仍需服务器真实 batch CUDA/EGL smoke 和 batch48 时间/显存检查。未作机制通过或失败结论。
+
+## 2026-09-17 性能审查后的四项修订（Observed / Derived / Decision）
+
+- 依据 `EXP022_performance_review_and_modification.md` 的最终优先顺序，仅实施 Stage Transition、shifted-window mask、正式路径诊断开关和 matcher `out_proj` 移除。源码基准 `8b213e4fc384eece4d08609ba1842c1edf46cc34`；本节对应的最终源码 commit 以本次 Git 提交为准。运行 ID：`RUN-20260917-exp022-local-performance-review-s42`。正式训练 run ID、checkpoint 和 E5–E40 指标仍未生成。
+- Transition 将三处旧 residual CNN 改为双线性上采样加 1×1 Conv，减少 2,324,224 参数。这是 formal 前的架构修订，输出与旧 block **不数值等价**。Shifted-window 使用原 MHA Q/K/V/out 权重与广播布尔 mask 的 SDPA；FP64 CPU reference 检查输出、输入梯度和 MHA 参数梯度与旧 MHA 一致，wrap-around 隔离测试通过。调试诊断现在按需开启；正式训练默认不计算各 stage 的 entropy、top1/top2 或 fusion update 比率。Matcher 移除四个 256×256 `out_proj`，减少 262,144 参数；两个连续线性层可折叠的函数空间相同，但随机初始化和优化轨迹不同，未宣称旧 checkpoint 数值等价。
+- 同一台 RTX 4060 Laptop GPU、PyTorch 2.2.0、官方 340 个 backbone 张量、固定保存的真实 PBR batch48（类别直方图 `[4,4,13,6,9,1,3,8]`，对称实例 4/48）、seed 42、CUDA+CPP、FP16 AMP、12 步且排除前 2 步。每阶段重新以相同 seed 初始化 PCC；架构变化后不存在可共用的完整 PCC checkpoint。每步不计 DataLoader/renderer；各阶段原始日志及 batch 位于 ignored `.local/exp022-performance-review-20260917/` 和 `.local/exp022-refactor-benchmark-20260917/`。全部阶段训练及推理检查 PASS，AMP skipped steps 为 0。BASE 为本次固定 seed 重新测量，不能将旧记录的 710.912 ms 与本表各行当作同一次 A/B 对照。
+
+| 阶段 | PCC 参数 | forward 中位数 ms | backward 中位数 ms | 整步中位数 ms | 峰值 allocated GB | 峰值 reserved GB |
+|---|---:|---:|---:|---:|---:|---:|
+| BASE（诊断开） | 6,314,824 | 435.75 | 491.13 | 949.30 | 6.198546 | 6.977225 |
+| P0 Transition（诊断开） | 3,990,600 | 327.66 | 349.85 | 693.59 | 5.944746 | 6.614417 |
+| P0 Shift mask（诊断开） | 3,990,600 | 301.93 | 325.77 | 642.49 | 5.807121 | 6.360662 |
+| P0 Diagnostics off | 3,990,600 | 294.46 | 325.12 | 636.66 | 5.807111 | 6.360662 |
+| P1 Matcher out_proj removed | 3,728,456 | 294.07 | 322.43 | 633.88 | 5.669223 | 6.712984 |
+
+- Derived（最终−BASE）：PCC 参数 `−2,586,368`（`−40.96%`），整步中位数 `−315.42 ms`（`−33.23%`），forward `−141.68 ms`、backward `−168.70 ms`，allocated `−0.529323 GB`（`−8.54%`）。最终 reserved 虽低于 BASE，却高于上一阶段；单次 PyTorch 缓存保留峰值有波动，不将逐阶段 reserved 变化归因于单项代码。阶段间训练 loss 不直接作为科学质量比较，因为 PCC 架构和初始化函数已变。
+- 独立 shifted-window 微基准：batch48、256 维、8 heads、FP16 AMP、同 seed 权重/输入，7 次前反向排除前 2 次。Stage3 32×32 旧 MHA mask→广播 SDPA：forward `10.61→8.37 ms`、backward `16.57→13.48 ms`、peak allocated `0.575→0.498 GB`；Stage4 64×64：`39.15→32.68 ms`、`63.72→53.60 ms`、`2.242→1.934 GB`。该微基准只含一个 shifted block，不等于完整训练 stage 耗时。
+- `pytorch22` EXP022 测试 `27 passed`，完整 `pytest -q research` `215 passed`；CPU preflight PASS，官方 backbone 340 张量，最终 PCC 3,728,456 参数，loss finite。最终 batch48 CUDA+CPP/AMP 真实 batch smoke PASS，推理 XYZ finite、残差界通过、无 AMP 跳步。Hierarchy artifact 与生成器、geometry-adaptive partition、fragment adjacency 均未修改。
+- Review 文档的“Transition 不改变语义”只适用于研究流程，不适用于逐点函数值；旧重型 block 与 1×1 Conv 不等价。删除 `out_proj` 只保证线性层可折叠的表达能力，不保证相同随机初值/训练轨迹。后续 Stage4 token 复用将改变 residual head 的输入定义；双 LayerNorm 清理也改变归一化位置。两项不应描述为数值无损优化。本轮未实施 active-parent K/V、Stage4 token 复用、推理 Q 去重、block size 调优或 P2 修改，等待下一轮独立选择和验证。
+
+Decision：四项工程修订及本地检查完成。服务器 EGL profile、正式训练、完整 matched PnP/BOP 与机制 gate 仍待执行；本次固定 batch 的资源收益不外推至服务器吞吐或姿态精度。

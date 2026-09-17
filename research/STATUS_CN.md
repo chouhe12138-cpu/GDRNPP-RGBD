@@ -9,19 +9,28 @@ EXP022 渐进式层级 CAD 对应与多尺度 PCC：冻结官方 RGB ConvNeXt，
 经多尺度细化、球形有界残差和可见 mask 输出连续 XYZ，再交 explicit RANSAC-PnP。
 独立表面重采样 8⁴ 只做消融 smoke。第二阶段的全量 backbone 训练暂缓。
 
-当前状态：`STAGE1_REFACTORED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING /
-FORMAL_NOT_STARTED`。正式训练前按新结构加入 S1/S2 global、S3/S4 window+shifted-window
-image self-attention，以及独立 Q/K/V 的局部 8 路 CAD matcher；保留固定 hierarchy、GT
-parent、Top-2 beam、受限 residual、symmetry 和三项 loss。主层级与独立消融层级仍在
-ignored cache。EXP022 测试 `24 passed`、完整 research `212 passed`；官方 340 个
-backbone 张量加载的 CPU preflight PASS。模型总参数 `93.879M`，其中冻结 backbone
-`87.564M`、可训练 PCC `6.315M`。
+当前状态：`STAGE1_PERFORMANCE_REVISED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING /
+FORMAL_NOT_STARTED`。正式训练前已加入 S1/S2 global、S3/S4 window+shifted-window
+image self-attention，以及独立 Q/K/V 的局部 8 路 CAD matcher；随后按性能审查完成
+四项修订：stage transition 改为上采样+1×1 Conv、shift mask 改用广播 SDPA、正式
+路径关闭逐级诊断、删除 matcher `out_proj`。保留固定 hierarchy、GT parent、Top-2
+beam、受限 residual、symmetry 和三项 loss。主层级与独立消融层级仍在 ignored cache。
+EXP022 测试 `27 passed`、完整 research `215 passed`；官方 340 个 backbone 张量加载的
+CPU preflight PASS。模型总参数 `91.293M`，其中冻结 backbone `87.564M`、可训练 PCC
+`3.728M`。
 
 本机 RTX 4060/CUDA+CPP/FP16 AMP 对同一保存的真实 batch48 各运行 12 步、排除前
 2 步后，旧版→重构版固定 batch 整步中位数 `462.083→710.912 ms`，峰值 allocated
 `3.606→6.199 GB`、reserved `5.325→6.977 GB`；均无跳步。计时不含每步
 DataLoader/renderer，不等于服务器 EGL 吞吐。独立层级新结构 batch4 三步 smoke
 PASS。修改前的 14/202 项测试与 `3.684M` 参数等观察保留在 RECORD，属于旧结构。
+这组旧版→重构版耗时来自上一轮，与下述重新固定 seed 的性能审查不是同一次 A/B。
+本轮以相同保存 batch 和 seed 42 对当轮 BASE→四项修订各运行 12 步、排除前 2 步：
+PCC 参数 `6.315→3.728M`，整步中位数 `949.30→633.88 ms`，forward
+`435.75→294.07 ms`，backward `491.13→322.43 ms`，峰值 allocated
+`6.199→5.669 GB`，reserved `6.977→6.713 GB`；各阶段无 AMP 跳步。reserved
+逐阶段不单调，不能将单次波动直接归因于某项改动。Stage3/4 shifted block 的独立
+同权重微基准也显示广播 SDPA 降低 forward/backward 和 allocated；详见 RECORD。
 对称等价分支仍只按 route CE 与 residual loss 选择，选中后 mask loss 一起训练。
 LM-O 单目标随机 PCC 的 fixed-support evaluator 历史接线通过，随机数值不进入科学
 结论。服务器 EGL profile、正式 E5–E40、完整 matched PnP/BOP 尚未生成。EXP021 B/C

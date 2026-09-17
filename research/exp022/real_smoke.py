@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import statistics
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 from detectron2.data import MetadataCatalog
 from mmcv import Config
@@ -33,6 +35,8 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--warmup-steps", type=int)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--diagnostics", choices=("on", "off"), default="on")
     batch_files = parser.add_mutually_exclusive_group()
     batch_files.add_argument("--save-batch", type=Path)
     batch_files.add_argument("--load-batch", type=Path)
@@ -42,6 +46,10 @@ def main() -> int:
         raise RuntimeError("Real EXP022 smoke requires CUDA")
     if args.steps < 1 or args.batch_size < 1 or not 0 <= warmup_steps < args.steps:
         raise ValueError("Require positive steps/batch-size and 0 <= warmup-steps < steps")
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     cfg = Config.fromfile(str(CONFIG_ROOT / args.config))
     validate_research_run_config(cfg, mode="smoke",
                                  expected_experiment_id="EXP-20260916-022-progressive-pcc")
@@ -88,7 +96,8 @@ def main() -> int:
             started = time.perf_counter()
             with torch.cuda.amp.autocast(enabled=True):
                 output_stats, losses = model(image, roi_classes=classes, gt_xyz=batch["roi_xyz"],
-                                             gt_mask_visib=batch["roi_mask_visib"], do_loss=True)
+                                             gt_mask_visib=batch["roi_mask_visib"], do_loss=True,
+                                             collect_pcc_diagnostics=args.diagnostics == "on")
                 total = sum(losses.values())
             torch.cuda.synchronize()
             forward_end = time.perf_counter()
@@ -126,7 +135,8 @@ def main() -> int:
             raise RuntimeError("EXP022 residual bound violated")
         print(json.dumps({"status": "PASS", "config": args.config, "renderer": args.renderer,
                           "batch_source": "saved" if args.load_batch else "online",
-                          "batch_size": args.batch_size, "steps": args.steps,
+                          "batch_size": args.batch_size, "steps": args.steps, "seed": args.seed,
+                          "diagnostics": args.diagnostics,
                           "official_backbone_tensors": loaded,
                           "trainable_parameters": sum(p.numel() for p in model.pcc_head.parameters()),
                           "total_parameters": sum(p.numel() for p in model.parameters()),

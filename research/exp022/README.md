@@ -1,8 +1,8 @@
 # EXP022 — 渐进式层级 CAD 对应与多尺度 PCC（第一阶段）
 
-本阶段仅使用冻结的官方 RGB ConvNeXt 8×8 特征，训练四级 PCC、空间细化、局部残差和可见 mask。第二阶段全量 backbone 训练、ResNet-50 与部署不在当前范围。Geometry-adaptive partition 与 fragment adjacency 均为 **DEFERRED**。
+本阶段仅使用冻结的官方 RGB ConvNeXt 8×8 特征，训练四级 PCC、stage transition、局部残差和可见 mask。第二阶段全量 backbone 训练、ResNet-50 与部署不在当前范围。Geometry-adaptive partition 与 fragment adjacency 均为 **DEFERRED**。
 
-当前结构：`1024→512→256→128→64` CNN 通道阶梯；各级以 256 维 image token 做图像 self-attention，S1/S2 为全局 attention，S3/S4 各为 8×8 window + shift=4 window attention。每级仅匹配当前 parent 下 8 个 CAD child：独立 Q/K/V 投影得到 raw route logits 与 soft CAD context，前者训练 CE/更新 Top-2 beam，后者经小 gate 以残差方式回注 CNN feature。图像 attention 使用 `nn.MultiheadAttention(need_weights=False)`、Pre-Norm、8 heads、无 FFN；CAD 局部匹配保留显式 8-way logits 与 packed routes。最终 fused Stage-4 feature 经同一个 image projection 进入 leaf-local residual head；visible mask 来自 64 通道特征。
+当前结构：`1024→512→256→128→64` CNN 通道阶梯；stage 间为双线性上采样加 1×1 Conv。各级以 256 维 image token 做图像 self-attention，S1/S2 为全局 attention，S3/S4 各为 8×8 window + shift=4 window attention。每级仅匹配当前 parent 下 8 个 CAD child：独立 Q/K/V 投影得到 raw route logits 与 soft CAD context，前者训练 CE/更新 Top-2 beam，后者直接经 stage 的 `context_proj` 与小 gate 以残差方式回注 CNN feature。图像 attention 使用 Pre-Norm、8 heads、无 FFN；全局及普通 window 使用 `nn.MultiheadAttention(need_weights=False)`，shifted window 复用其 Q/K/V/out 权重并用广播 mask 的 SDPA。CAD 局部匹配保留显式 8-way logits 与 packed routes。最终 fused Stage-4 feature 经同一个 image projection 进入 leaf-local residual head；visible mask 来自 64 通道特征。
 
 ## 固定协议
 
@@ -12,7 +12,7 @@
 - 对称物体按完整 SE(3) 等价变换选择一个 instance-consistent 分支；选择分数仅为加权四级 CE 与加权 residual loss 之和，不含 mask loss。选定后该分支的四级 CE、residual 和 mask loss 一起训练。最终点为叶子 anchor 加不超过该叶子半径的 3D 残差。
 - PBR40、batch 48、40 epoch、16 workers、seed 42、AdamW `3e-4`、4% linear warmup + cosine、显式 FP16 AMP。正式配置每 5 epoch 做原有 direct-pose 评估，输出仍通过 explicit RANSAC-PnP。
 - V1 固定值：route/residual/mask 权重均为 `1.0`，residual Smooth L1 `beta=0.1`，`beam_k=2`，PCC token 维度 `256`，四级 fusion gate logit 初值均为 `-4.0`；AdamW `weight_decay=0.01`、`betas=(0.9,0.999)`，warmup ratio `0.04`，cosine 终点 LR factor `0.01`。warmup 结束即进入 cosine，不额外保持平坦学习率。
-- 训练统计增加每级 fusion update / feature 范数比、可见位置的条件 route entropy、top1 概率及剪枝前 8 路 top2 概率质量；这些量 detach，不增加 loss。
+- 调试模式可记录每级 fusion update / feature 范数比、可见位置的条件 route entropy、top1 概率及剪枝前 8 路 top2 概率质量；这些量 detach，不增加 loss。正式训练默认关闭逐级诊断，保留轻量的 fusion gate 与对称分支选择统计。
 - 主比较使用官方模型生成的固定 support、相同 2D 点与 RANSAC 设置；EXP021 B 或 C 的正式 comparator 在其结果完整后选择。EXP022 自身 mask 的 native-support pose 单独标为 supplemental，不与 fixed-support 主结果混用。
 
 ## 本地检查
@@ -36,7 +36,7 @@ python -m research.exp022.real_smoke --config smoke_reused.py --renderer cpp --d
 python -m research.exp022.real_smoke --config smoke_independent.py --renderer cpp --device cuda:0 --batch-size 4 --steps 2
 ```
 
-`real_smoke` 可用 `--save-batch` 将一次真实 batch 保存到 ignored `.local/`，再用 `--load-batch` 在修改前后重放同一批数据；`--warmup-steps` 指定不计入稳定时间中位数的前几步。输出包括 forward/backward、峰值 allocated/reserved 显存、参数量、loss、各级诊断和 AMP 跳步检查。固定 batch 计时不包含每步 DataLoader/renderer，也不是服务器 EGL 吞吐。
+`real_smoke` 可用 `--save-batch` 将一次真实 batch 保存到 ignored `.local/`，再用 `--load-batch` 在修改前后重放同一批数据；`--seed` 固定随机初始化，`--warmup-steps` 指定不计入稳定时间中位数的前几步。`--diagnostics on` 为 smoke 默认值，`off` 测正式训练路径。输出包括 forward/backward、峰值 allocated/reserved 显存、参数量、loss、所选诊断和 AMP 跳步检查。固定 batch 计时不包含每步 DataLoader/renderer，也不是服务器 EGL 吞吐。
 
 正式训练配置：`configs/gdrn/lmo_pbr/research/exp022_progressive_pcc/train_reused.py`。训练入口、bundle/release 与容器限制遵循 [RUNBOOK](../RUNBOOK_CN.md) 和 [服务器安全](../SERVER_SAFETY_CN.md)；Agent 不连接服务器，服务器运行由用户执行。`OUTPUT_DIR` 必须由唯一 run ID 覆盖，不能沿用占位目录。
 

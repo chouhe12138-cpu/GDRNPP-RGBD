@@ -11,7 +11,9 @@ from core.gdrn_modeling.models.heads.progressive_pcc_head import (
     ProgressivePCCHead,
     load_pcc_hierarchy,
 )
-from core.gdrn_modeling.models.heads.pcc_blocks import ImageAttentionBlock, HierarchicalCADMatcher
+from core.gdrn_modeling.models.heads.pcc_blocks import (
+    ImageAttentionBlock, HierarchicalCADMatcher, StageTransition,
+)
 from core.utils.solver_utils import build_lr_scheduler
 from research.exp022.build_hierarchy import SOURCE_DEFAULT, _reused_object
 from research.run_contract import validate_research_run_config
@@ -92,6 +94,25 @@ def test_shift_mask_blocks_cyclic_wraparound(resolution):
     assert leaked[0, -1, -1, 0] > 0
 
 
+def test_shifted_sdpa_matches_mha_output_and_gradients():
+    torch.manual_seed(73)
+    block = ImageAttentionBlock(32, 8, 32, 8, 4).double()
+    image = torch.randn(2, 32 * 32, 32, dtype=torch.float64, requires_grad=True)
+    normalized = block.norm(image)
+    grid = normalized.reshape(2, 32, 32, 32).roll(shifts=(-4, -4), dims=(1, 2))
+    windows = block._partition(grid, 8)
+    mask = block.shift_mask.repeat(2, 1, 1).repeat_interleave(8, dim=0)
+    reference, _ = block.attn(windows, windows, windows, attn_mask=mask, need_weights=False)
+    actual = block._shifted_attention(windows, 2)
+    torch.testing.assert_close(actual, reference, rtol=1e-10, atol=1e-10)
+    targets = (image, block.attn.in_proj_weight, block.attn.in_proj_bias,
+               block.attn.out_proj.weight, block.attn.out_proj.bias)
+    reference_grads = torch.autograd.grad(reference.square().mean(), targets, retain_graph=True)
+    actual_grads = torch.autograd.grad(actual.square().mean(), targets)
+    for actual_grad, reference_grad in zip(actual_grads, reference_grads):
+        torch.testing.assert_close(actual_grad, reference_grad, rtol=1e-8, atol=1e-10)
+
+
 def test_local_cad_qkv_logits_context_and_gradient():
     matcher = HierarchicalCADMatcher(32)
     query = torch.randn(3, 1, 32, requires_grad=True)
@@ -103,9 +124,26 @@ def test_local_cad_qkv_logits_context_and_gradient():
     torch.testing.assert_close(logits.float().softmax(-1).sum(-1), torch.ones(3, 1))
     (logits.square().mean() + context.square().mean()).backward()
     for parameter in (matcher.q_proj.weight, matcher.k_proj.weight,
-                      matcher.v_proj.weight, matcher.out_proj.weight):
+                      matcher.v_proj.weight):
         assert parameter.grad is not None and torch.isfinite(parameter.grad).all()
     assert torch.isfinite(query.grad).all() and torch.isfinite(bank.grad).all()
+
+
+def test_stage_transition_and_removed_matcher_projection():
+    transition = StageTransition(512, 256)
+    assert sum(parameter.numel() for parameter in transition.parameters()) == 131328
+    assert transition(torch.randn(2, 512, 8, 8)).shape == (2, 256, 16, 16)
+    matcher = HierarchicalCADMatcher(256)
+    assert sum(parameter.numel() for parameter in matcher.parameters()) == 3 * 256 * 256
+    # The old two consecutive linear maps can be folded exactly at inference.
+    old_projection = torch.nn.Linear(256, 256, bias=False)
+    context_projection = torch.nn.Linear(256, 512)
+    context = torch.randn(4, 256)
+    folded = torch.nn.functional.linear(
+        context, context_projection.weight @ old_projection.weight,
+        context_projection.bias,
+    )
+    torch.testing.assert_close(folded, context_projection(old_projection(context)))
 
 
 def test_beam_top2_matches_exhaustive_retained_candidates():
@@ -128,7 +166,7 @@ def test_head_train_infer_and_gradients(head):
     classes = torch.tensor([0, 1])
     xyz = torch.full((2, 3, 64, 64), 0.5)
     mask = torch.ones(2, 1, 64, 64)
-    losses, stats = head(feature, classes, xyz, mask)
+    losses, stats = head(feature, classes, xyz, mask, collect_diagnostics=True)
     assert set(losses) == {"loss_pcc_route", "loss_pcc_residual", "loss_pcc_mask"}
     assert all(torch.isfinite(value) for value in losses.values())
     sum(losses.values()).backward()
@@ -165,6 +203,20 @@ def test_symmetric_subset_branch_is_finite(head):
     losses, stats = head(feature, classes, xyz, visible)
     assert all(torch.isfinite(value) for value in losses.values())
     assert 0 <= stats["selected_symmetry_branch_mean"] <= 0.5
+
+
+def test_formal_training_skips_optional_diagnostics(head, monkeypatch):
+    def unexpected_diagnostics(*_args):
+        raise AssertionError("Formal training must not compute route diagnostics")
+
+    monkeypatch.setattr(head, "_route_diagnostics", unexpected_diagnostics)
+    feature = torch.randn(2, 1024, 8, 8)
+    classes = torch.tensor([0, 5])
+    xyz = torch.full((2, 3, 64, 64), 0.5)
+    mask = torch.ones(2, 1, 64, 64)
+    losses, stats = head(feature, classes, xyz, mask)
+    assert all(torch.isfinite(value) for value in losses.values())
+    assert set(stats) == {"selected_symmetry_branch_mean", "fusion_gates"}
 
 
 def test_symmetric_branch_shares_stage1_and_handles_empty_visibility(head):
@@ -224,7 +276,6 @@ def test_static_block_match_matches_original_packing_and_gradients(head, sparse_
         logits = torch.bmm(projected_query[:, None], child_keys.transpose(1, 2))[:, 0] / math.sqrt(32)
         probability = torch.softmax(logits.float(), -1)
         context = torch.bmm(probability[:, None], child_values)[:, 0]
-        context = matcher.out_proj(context)
         child_anchors = anchors.reshape(2, 8, 8, 3)[object_inverse, parent]
         labels = (target[:, None] - child_anchors).square().sum(-1).argmin(-1)
         return logits, context, labels

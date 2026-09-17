@@ -62,6 +62,24 @@ class ImageAttentionBlock(nn.Module):
         windows = cls._partition(regions, window_size).squeeze(-1)
         return windows[:, :, None] != windows[:, None, :]
 
+    def _shifted_attention(self, windows: torch.Tensor, batch: int) -> torch.Tensor:
+        """Broadcast one mask per spatial window instead of copying it for each ROI/head."""
+        window_count = self.shift_mask.shape[0]
+        length, channels = windows.shape[1:]
+        head_dim = channels // self.num_heads
+        projected = F.linear(windows, self.attn.in_proj_weight, self.attn.in_proj_bias)
+        q, k, v = (
+            part.reshape(batch, window_count, length, self.num_heads, head_dim)
+                .permute(0, 1, 3, 2, 4)
+            for part in projected.chunk(3, dim=-1)
+        )
+        attended = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=(~self.shift_mask)[None, :, None],
+            dropout_p=self.attn.dropout if self.training else 0.0,
+        )
+        attended = attended.permute(0, 1, 3, 2, 4).reshape(-1, length, channels)
+        return F.linear(attended, self.attn.out_proj.weight, self.attn.out_proj.bias)
+
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         batch, pixels, channels = tokens.shape
         if pixels != self.resolution ** 2:
@@ -74,10 +92,10 @@ class ImageAttentionBlock(nn.Module):
             if self.shift_size:
                 grid = torch.roll(grid, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
             windows = self._partition(grid, self.window_size)
-            mask = None
             if self.shift_mask is not None:
-                mask = self.shift_mask.repeat(batch, 1, 1).repeat_interleave(self.num_heads, dim=0)
-            attended, _ = self.attn(windows, windows, windows, attn_mask=mask, need_weights=False)
+                attended = self._shifted_attention(windows, batch)
+            else:
+                attended, _ = self.attn(windows, windows, windows, need_weights=False)
             grid = self._reverse(attended, batch, self.resolution, self.window_size)
             if self.shift_size:
                 grid = torch.roll(grid, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
@@ -94,7 +112,6 @@ class HierarchicalCADMatcher(nn.Module):
         self.q_proj = nn.Linear(token_dim, token_dim, bias=False)
         self.k_proj = nn.Linear(token_dim, token_dim, bias=False)
         self.v_proj = nn.Linear(token_dim, token_dim, bias=False)
-        self.out_proj = nn.Linear(token_dim, token_dim, bias=False)
 
     def project_bank(self, tokens: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         return self.k_proj(tokens), self.v_proj(tokens)
@@ -111,7 +128,7 @@ class HierarchicalCADMatcher(nn.Module):
         selected_keys = keys.index_select(0, object_inverse)
         selected_values = values.index_select(0, object_inverse)
         logits, context = self._attention(self.q_proj(image_tokens), selected_keys, selected_values)
-        return logits, self.out_proj(context)
+        return logits, context
 
     def match_packed(self, image_tokens: torch.Tensor, object_inverse: torch.Tensor,
                      parent: torch.Tensor, bank: tuple[torch.Tensor, torch.Tensor],
@@ -156,7 +173,6 @@ class HierarchicalCADMatcher(nn.Module):
                                   dtype=context.dtype).index_copy(
             0, positions, context.flatten(0, 1)
         )[:count]
-        out_context = self.out_proj(out_context)
         if target is None:
             return out_logits, out_context, None
         if anchors is None:
@@ -215,16 +231,11 @@ class PCCStage(nn.Module):
         return feature + update, ratio
 
 
-class SpatialRefinement(nn.Module):
+class StageTransition(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
-        self.main = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.GroupNorm(8, out_channels), nn.GELU(),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-        )
-        self.skip = nn.Conv2d(in_channels, out_channels, 1)
+        self.proj = nn.Conv2d(in_channels, out_channels, 1)
 
     def forward(self, feature: torch.Tensor) -> torch.Tensor:
         feature = F.interpolate(feature, scale_factor=2, mode="bilinear", align_corners=False)
-        return self.main(feature) + self.skip(feature)
+        return self.proj(feature)
