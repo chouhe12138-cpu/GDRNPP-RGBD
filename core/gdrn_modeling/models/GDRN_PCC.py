@@ -42,7 +42,11 @@ class GDRN_PCC(nn.Module):
             out = {"_train_stats": {
                 "pcc_symmetry_branch_mean": stats["selected_symmetry_branch_mean"],
                 **{f"pcc_fusion_gate_{index+1}": gate
-                   for index, gate in enumerate(stats["fusion_gates"])}
+                   for index, gate in enumerate(stats["fusion_gates"])},
+                **{f"pcc_{name}_{index+1}": value
+                   for name in ("fusion_update_ratio", "route_entropy", "top1_route_prob",
+                                "top2_route_prob_mass")
+                   for index, value in enumerate(stats[name])}
             }}
             return out, losses
         output = self.pcc_head(backbone_feature, roi_classes)

@@ -1,8 +1,8 @@
 # EXP022 渐进式层级 CAD 对应与多尺度 PCC
 
 - `experiment_id`: `EXP-20260916-022-progressive-pcc`
-- 状态：`STAGE1_IMPLEMENTED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING / FORMAL_NOT_STARTED`
-- 日期：2026-09-16
+- 状态：`STAGE1_REFACTORED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING / FORMAL_NOT_STARTED`
+- 日期：2026-09-17（2026-09-16 起）
 - 主训练 `run_id`：未分配；source commit：待本地提交后填写；seed：42
 
 ## 问题、变量与范围
@@ -35,6 +35,26 @@
 - LM-O 单目标 fixed-support evaluator 接线 smoke COMPLETE：官方 A 和随机初始化 PCC 均生成固定支持集 correspondence、原生分辨率四级路由、PnP、own-mask supplemental 与计时字段；随机 PCC 数值不进入科学结论。最终接线输出在 ignored `output/experiments/exp022-evaluator-random-wiring-smoke-3/`；第一次索引错误的失败产物和第二次旧口径输出均保留，不参与正式结果。
 - 服务器 CUDA/EGL 真 batch、稳定 batch48 profile、正式训练、完整 matched PnP/BOP：未运行或未生成。所有 E5–E40 指标：未生成。正式 checkpoint/运行目录：未生成。
 
+## 2026-09-17 第一阶段网络结构重构（Observed / Derived）
+
+- 在首次 formal 之前，将四级 image token 改为 S1/S2 全局 self-attention、S3/S4 的 8×8 window + shift=4 self-attention；均为 PyTorch `nn.MultiheadAttention`、8 heads、Pre-Norm、`need_weights=False`、无 FFN。各级 CAD matcher 增加独立 Q/K/V/out 投影，保持局部 8 路 raw logits、packed route、soft context fusion、GT-parent 监督和 Top-2 beam。S1 使用无分组 root fast path；S4 residual 使用融合后特征的同一 image projection。hierarchy 生成器、`reused_v1.npz`、symmetry、loss、optimizer、PnP 未改。旧 PCC head checkpoint 与新层参数不兼容；无正式 EXP022 checkpoint 需要迁移。
+- 方案原文要求固定宽度 beam 的 Top-2 与全部路径穷举 Top-2 一致，但这在一般条件下不成立：上一层剪掉的较低概率 parent 若有集中的 child，仍可能产生全局最高的完整路径。按用户选择保留原 beam，测试精确性仅针对每一步已保留 parent 的 16 个候选。新增 top2 概率质量取剪枝前局部 8 路条件分布，不使用重归一化后恒为 1 的 beam 质量。
+- 本地 `pytorch22`：EXP022 测试 `24 passed`，完整 research `212 passed`；官方权重 CPU preflight PASS，加载 340 个 backbone 张量，6,314,824 个 PCC 参数可训练，三项 loss finite、梯度与推理合同通过。`reused_v1` 的源叶子一一对应测试仍通过。新增测试覆盖 shifted-window wrap-around 隔离、Q/K/V 梯度、packed 与简单 gather 参考的 logits/context/labels/梯度、beam 保留候选精确性和 symmetry Stage-1 共享。
+- 同一本机 RTX 4060 Laptop 8 GB、PyTorch 2.2.0、CUDA+CPP、FP16 AMP、同一保存的真实 PBR batch48（类别直方图 `[4,4,13,6,9,1,3,8]`，对称实例 4/48）、各 12 步并排除前 2 步，旧版 HEAD `15c5cbc` 与本次未提交重构版均 PASS，无 AMP 跳步。测量只覆盖重复固定 batch 的模型前后向、梯度检查和优化步；生成该 batch 的 DataLoader/renderer 不计入逐步耗时。ignored 原始日志和 batch 在 `.local/exp022-refactor-benchmark-20260917/`，不进入 Git。
+
+| 本地固定 batch48 工程量 | 旧版 | 重构版 | 新−旧（Derived） |
+|---|---:|---:|---:|
+| 稳定整步中位数 | 462.083 ms | 710.912 ms | +248.829 ms（+53.85%） |
+| forward 中位数 | 240.101 ms | 327.006 ms | +86.905 ms |
+| backward 中位数 | 210.856 ms | 365.757 ms | +154.901 ms |
+| 峰值 allocated | 3.605723 GB | 6.198546 GB | +2.592823 GB（+71.91%） |
+| 峰值 reserved | 5.324669 GB | 6.977225 GB | +1.652556 GB（+31.04%） |
+| 可训练 PCC 参数 | 3,684,168 | 6,314,824 | +2,630,656（+71.40%） |
+| 模型总参数 | 91,248,584 | 93,879,240 | +2,630,656（+2.88%） |
+
+- 独立层级 `independent_v2.npz` 的新结构本机 CUDA+CPP 真实 batch4、3 步 AMP smoke PASS、无跳步；排除首步后的两步中位数 `148.422 ms`，峰值 allocated/reserved `1.382921/1.522532 GB`。它仍只作实现 smoke，不进入正式 40 epoch。
+- Interpretation：新增 image self-attention 与 Q/K/V 投影使本机固定 batch 资源明显上升；以上数值不外推为服务器 EGL 吞吐、正式训练资源 gate 或姿态精度。服务器真实 batch EGL、正式训练和完整 matched PnP/BOP 均未生成。
+
 ## Decision
 
-当前只完成第一阶段实现与本地 CPU 工程验证；正式训练启动需真实 batch CUDA/EGL smoke 和 batch48 时间/显存检查。未作机制通过或失败结论。
+第一阶段结构重构、本机 CPU 测试及 CUDA+CPP 工程对比完成；正式训练启动仍需服务器真实 batch CUDA/EGL smoke 和 batch48 时间/显存检查。未作机制通过或失败结论。

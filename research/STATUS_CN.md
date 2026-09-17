@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-16。
+最后核对：2026-09-17。
 
 ## EXP022 第一阶段（2026-09-16 起）
 
@@ -9,26 +9,25 @@ EXP022 渐进式层级 CAD 对应与多尺度 PCC：冻结官方 RGB ConvNeXt，
 经多尺度细化、球形有界残差和可见 mask 输出连续 XYZ，再交 explicit RANSAC-PnP。
 独立表面重采样 8⁴ 只做消融 smoke。第二阶段的全量 backbone 训练暂缓。
 
-当前状态：`STAGE1_IMPLEMENTED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING /
-FORMAL_NOT_STARTED`。主层级及独立消融层级已生成至 ignored cache；EXP022 单元/配置
-14 项和完整 research 202 项通过；官方 340 个 backbone 张量加载和仅 3,684,168 个 PCC
-参数可训练的 CPU 前后向通过。本机 CUDA+CPP batch4/batch48 两步 AMP 均无跳步，固定
-batch 的第二步模型优化耗时约 `0.168/0.670 s`；另一次固定真实 batch48 十步诊断中，第
-2–10 步耗时中位数 `0.640 s`（forward `0.350 s`、backward `0.282 s`），峰值 allocated
-`3.635 GB`；模型共 `91.249M` 参数，其中 frozen backbone `87.564M`、trainable PCC
-`3.684M`。上述固定 batch 计时不含每步 DataLoader/renderer，不等于服务器 EGL 吞吐。
-随后同机同 seed、同类别分布、同一固定 batch48 的 6 步工程对照中，原实现第 2–6 步
-整步中位数 `664.30 ms`、峰值 `3.6429 GB`；共享 Stage-1/token 编码、集中准备标签及
-16 像素静态分组匹配后为 `490.38 ms`、`3.6065 GB`，无 AMP 跳步。该对照仍不含逐步
-DataLoader/renderer；服务器 EGL 结果未生成。
-正式训练前已将对称等价分支的选择分数限定为 route CE 与 residual loss；选定分支的
-mask loss 仍参与训练。正式 V1 其他权重与优化器参数保持原配置。修正后本机
-CUDA+CPP batch4 含 `2/4` 个对称实例的两步 AMP smoke PASS，无跳步；服务器验证未做。
-LM-O 单目标随机 PCC 的 fixed-support
-evaluator 接线通过，随机数值不进入科学结论。服务器 EGL profile、正式 E5–E40、完整
-matched PnP/BOP 尚未生成。EXP021 B/C comparator 待现有实验完成后确定；不能用当前 E15 direct-pose
-指标代替 matched correspondence 判断。协议和入口见 [EXP022 README](exp022/README.md)，
-原始工程观察见 [EXP022 RECORD](experiments/EXP-20260916-022-progressive-pcc/RECORD.md)。
+当前状态：`STAGE1_REFACTORED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING /
+FORMAL_NOT_STARTED`。正式训练前按新结构加入 S1/S2 global、S3/S4 window+shifted-window
+image self-attention，以及独立 Q/K/V 的局部 8 路 CAD matcher；保留固定 hierarchy、GT
+parent、Top-2 beam、受限 residual、symmetry 和三项 loss。主层级与独立消融层级仍在
+ignored cache。EXP022 测试 `24 passed`、完整 research `212 passed`；官方 340 个
+backbone 张量加载的 CPU preflight PASS。模型总参数 `93.879M`，其中冻结 backbone
+`87.564M`、可训练 PCC `6.315M`。
+
+本机 RTX 4060/CUDA+CPP/FP16 AMP 对同一保存的真实 batch48 各运行 12 步、排除前
+2 步后，旧版→重构版固定 batch 整步中位数 `462.083→710.912 ms`，峰值 allocated
+`3.606→6.199 GB`、reserved `5.325→6.977 GB`；均无跳步。计时不含每步
+DataLoader/renderer，不等于服务器 EGL 吞吐。独立层级新结构 batch4 三步 smoke
+PASS。修改前的 14/202 项测试与 `3.684M` 参数等观察保留在 RECORD，属于旧结构。
+对称等价分支仍只按 route CE 与 residual loss 选择，选中后 mask loss 一起训练。
+LM-O 单目标随机 PCC 的 fixed-support evaluator 历史接线通过，随机数值不进入科学
+结论。服务器 EGL profile、正式 E5–E40、完整 matched PnP/BOP 尚未生成。EXP021 B/C
+comparator 待现有实验完成后确定；不能用当前 E15 direct-pose 指标代替 matched
+correspondence 判断。协议和入口见 [EXP022 README](exp022/README.md)，原始工程观察见
+[EXP022 RECORD](experiments/EXP-20260916-022-progressive-pcc/RECORD.md)。
 
 ## Active mainline（2026-09-14 起）
 
@@ -192,7 +191,7 @@ matched PnP 缺口作为已结束实验的未生成证据保留；不启动 EPro
 ## 当前代码边界
 
 - 保留上游 GDRNPP、EXP012、EXP013 A–F、暂停的 D、EXP017、已收口 EXP018、EXP019、
-  EXP020（实现 + review-fix）和 EXP021 V1。
+  EXP020（实现 + review-fix）、EXP021 V1 和 EXP022 第一阶段重构版。
 - EXP020 review-fix 只改 shared 层的 loss stats/guard 与 exp020 目录；EXP019
   历史 evaluator/结果未改动。
 - 本地 `.git` 历史是恢复兜底，禁止删除或重写；删除内容用普通提交表达。
@@ -209,3 +208,5 @@ matched PnP 缺口作为已结束实验的未生成证据保留；不启动 EPro
 4. EXP020 后续补证已结束；B E15/E20/E25 score 归属、A/B exit code 与正式 matched
    PnP 未核实或未生成，保留缺口，不安排追加执行。
 5. 暂不恢复 EXP014-D；不启动 EPro（Historical/Deferred）；不自动加 seed。
+6. EXP022 在本机结构重构后仍须先过服务器 EGL 真 batch smoke、batch48 资源检查，
+   再考虑正式训练；geometry-adaptive partition 与 fragment adjacency 延后。

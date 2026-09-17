@@ -32,11 +32,16 @@ def main() -> int:
     parser.add_argument("--renderer", choices=("cpp", "egl"), default="cpp")
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--steps", type=int, default=2)
+    parser.add_argument("--warmup-steps", type=int)
+    batch_files = parser.add_mutually_exclusive_group()
+    batch_files.add_argument("--save-batch", type=Path)
+    batch_files.add_argument("--load-batch", type=Path)
     args = parser.parse_args()
+    warmup_steps = min(1, args.steps - 1) if args.warmup_steps is None else args.warmup_steps
     if not torch.cuda.is_available() or not args.device.startswith("cuda"):
         raise RuntimeError("Real EXP022 smoke requires CUDA")
-    if args.steps < 1 or args.batch_size < 1:
-        raise ValueError("--steps and --batch-size must be positive")
+    if args.steps < 1 or args.batch_size < 1 or not 0 <= warmup_steps < args.steps:
+        raise ValueError("Require positive steps/batch-size and 0 <= warmup-steps < steps")
     cfg = Config.fromfile(str(CONFIG_ROOT / args.config))
     validate_research_run_config(cfg, mode="smoke",
                                  expected_experiment_id="EXP-20260916-022-progressive-pcc")
@@ -47,19 +52,33 @@ def main() -> int:
     cfg.SOLVER.IMS_PER_BATCH = args.batch_size
     cfg.SOLVER.REFERENCE_BS = args.batch_size
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
-    register_datasets_in_cfg(cfg)
     model, optimizer = build_model_optimizer(cfg)
     loaded = load_official_backbone(model, args.weights)
     model.train()
-    metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
-    data_ref = ref.__dict__[metadata.ref_key]
-    renderer = get_renderer(cfg, data_ref, obj_names=metadata.objs,
-                            gpu_id=torch.device(args.device).index or 0)
+    renderer = None
     timings, history, phases = [], [], []
     try:
-        iterator = iter(build_gdrn_train_loader(cfg, cfg.DATASETS.TRAIN))
-        raw = next(iterator)
-        batch = batch_data(cfg, raw, renderer=renderer, device=args.device, phase="train")
+        if args.load_batch is not None:
+            saved = torch.load(args.load_batch, map_location="cpu")
+            required = {"roi_img", "roi_cls", "roi_xyz", "roi_mask_visib"}
+            if set(saved) != required or saved["roi_img"].shape[0] != args.batch_size:
+                raise ValueError("Saved EXP022 batch keys or batch size mismatch")
+            batch = {key: value.to(args.device) for key, value in saved.items()}
+        else:
+            register_datasets_in_cfg(cfg)
+            metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
+            data_ref = ref.__dict__[metadata.ref_key]
+            renderer = get_renderer(cfg, data_ref, obj_names=metadata.objs,
+                                    gpu_id=torch.device(args.device).index or 0)
+            iterator = iter(build_gdrn_train_loader(cfg, cfg.DATASETS.TRAIN))
+            raw = next(iterator)
+            batch = batch_data(cfg, raw, renderer=renderer, device=args.device, phase="train")
+            if args.save_batch is not None:
+                if args.save_batch.exists():
+                    raise FileExistsError(args.save_batch)
+                args.save_batch.parent.mkdir(parents=True, exist_ok=True)
+                torch.save({key: batch[key].detach().cpu() for key in
+                            ("roi_img", "roi_cls", "roi_xyz", "roi_mask_visib")}, args.save_batch)
         image, classes = batch["roi_img"], batch["roi_cls"]
         scaler = torch.cuda.amp.GradScaler(enabled=True)
         torch.cuda.reset_peak_memory_stats()
@@ -68,8 +87,8 @@ def main() -> int:
             torch.cuda.synchronize()
             started = time.perf_counter()
             with torch.cuda.amp.autocast(enabled=True):
-                _, losses = model(image, roi_classes=classes, gt_xyz=batch["roi_xyz"],
-                                  gt_mask_visib=batch["roi_mask_visib"], do_loss=True)
+                output_stats, losses = model(image, roi_classes=classes, gt_xyz=batch["roi_xyz"],
+                                             gt_mask_visib=batch["roi_mask_visib"], do_loss=True)
                 total = sum(losses.values())
             torch.cuda.synchronize()
             forward_end = time.perf_counter()
@@ -106,6 +125,7 @@ def main() -> int:
         if output["residual_norm"].max() > 1.00001:
             raise RuntimeError("EXP022 residual bound violated")
         print(json.dumps({"status": "PASS", "config": args.config, "renderer": args.renderer,
+                          "batch_source": "saved" if args.load_batch else "online",
                           "batch_size": args.batch_size, "steps": args.steps,
                           "official_backbone_tensors": loaded,
                           "trainable_parameters": sum(p.numel() for p in model.pcc_head.parameters()),
@@ -114,13 +134,19 @@ def main() -> int:
                           "class_histogram": torch.bincount(classes, minlength=8).cpu().tolist(),
                           "symmetric_instances": int((model.pcc_head.symmetry_counts[classes] > 1).sum()),
                           "losses": history, "step_median_ms": statistics.median(timings),
+                          "warmup_steps": warmup_steps,
+                          "measured_step_median_ms": statistics.median(timings[warmup_steps:]),
                           "step_times_ms": timings,
                           "phase_times_ms": phases,
-                          "post_first_step_phase_medians_ms": {
-                              key: statistics.median(row[key] for row in phases[1:])
+                          "measured_phase_medians_ms": {
+                              key: statistics.median(row[key] for row in phases[warmup_steps:])
                               for key in phases[0]
-                          } if len(phases) > 1 else None,
-                          "peak_allocated_gb": torch.cuda.max_memory_allocated() / 1e9}, indent=2))
+                          },
+                          "amp_skipped_steps": 0,
+                          "train_stats_last": {name: float(value.detach())
+                                               for name, value in output_stats["_train_stats"].items()},
+                          "peak_allocated_gb": torch.cuda.max_memory_allocated() / 1e9,
+                          "peak_reserved_gb": torch.cuda.max_memory_reserved() / 1e9}, indent=2))
     finally:
         if hasattr(renderer, "close"):
             renderer.close()

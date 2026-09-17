@@ -12,6 +12,11 @@
 官方 backbone/decoder/mask/Patch-PnP。EXP020 已于 2026-09-16 按用户决定结束后续
 补证；正式 matched PnP 未运行，作为前序证据缺口保留，不由 EXP021 替代。
 
+2026-09-16 起的 EXP022 第一阶段以相同官方冻结 RGB backbone 和固定 8⁴ CAD hierarchy
+研究四级条件对应与多尺度 PCC；2026-09-17 完成 image self-attention / 局部 Q/K/V
+结构重构和本地工程对比。服务器 EGL、正式训练和 matched PnP 尚未运行，不能据本地
+smoke 判断精度或机制。geometry-adaptive partition 与 fragment adjacency 延后。
+
 ## 已建立的证据
 
 - Oracle/RANSAC 表明预测 correspondence 中存在可用于姿态的信息。
@@ -49,6 +54,8 @@
    source `effc99b` 的 E5/E10/E15 评估已记录。待完整 formal 训练结束后执行
    固定 support 的 K=1/2/4/8 matched evaluator。
    不启动原设计中的 backbone 联合微调；是否进入下一轮由预注册机制和资源 gate 决定。
+   EXP022 第一阶段在本机重构后仍须先过服务器 EGL 真 batch 资源检查；与 EXP021
+   的正式 matched comparator 待其结果完整后确定。
 5. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。
 6. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。

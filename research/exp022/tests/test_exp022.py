@@ -11,9 +11,7 @@ from core.gdrn_modeling.models.heads.progressive_pcc_head import (
     ProgressivePCCHead,
     load_pcc_hierarchy,
 )
-from core.gdrn_modeling.models.heads.global_hierarchical_cad_head import (
-    GlobalGuidedHierarchicalCADHead,
-)
+from core.gdrn_modeling.models.heads.pcc_blocks import ImageAttentionBlock, HierarchicalCADMatcher
 from core.utils.solver_utils import build_lr_scheduler
 from research.exp022.build_hierarchy import SOURCE_DEFAULT, _reused_object
 from research.run_contract import validate_research_run_config
@@ -53,6 +51,78 @@ def test_sparse_resize_probability_and_path_identity():
     assert torch.allclose(log_new.exp().sum(-1), torch.ones(1, 4, 4), atol=1e-6)
 
 
+@pytest.mark.parametrize("resolution,window,shift", [(8, None, 0), (16, None, 0),
+                                                      (32, 8, 0), (32, 8, 4),
+                                                      (64, 8, 0), (64, 8, 4)])
+def test_image_attention_shape_finite_and_gradient(resolution, window, shift):
+    torch.manual_seed(31)
+    block = ImageAttentionBlock(32, 8, resolution, window, shift)
+    image = torch.randn(1, resolution * resolution, 32, requires_grad=True)
+    output = block(image)
+    assert output.shape == image.shape
+    assert torch.isfinite(output).all()
+    output.square().mean().backward()
+    assert image.grad is not None and torch.isfinite(image.grad).all()
+    assert torch.isfinite(block.attn.in_proj_weight.grad).all()
+    if window is not None:
+        grid = image.detach().reshape(1, resolution, resolution, 32)
+        restored = block._reverse(block._partition(grid, window), 1, resolution, window)
+        torch.testing.assert_close(restored, grid)
+
+
+@pytest.mark.parametrize("resolution", [32, 64])
+def test_shift_mask_blocks_cyclic_wraparound(resolution):
+    block = ImageAttentionBlock(8, 2, resolution, 8, 4)
+    block.norm = torch.nn.Identity()
+    with torch.no_grad():
+        block.attn.in_proj_weight.zero_()
+        block.attn.in_proj_weight[16:] = torch.eye(8)
+        block.attn.in_proj_bias.zero_()
+        block.attn.out_proj.weight.copy_(torch.eye(8))
+        block.attn.out_proj.bias.zero_()
+    image = torch.zeros(1, resolution, resolution, 8)
+    image[0, 0, 0, 0] = 1
+    input_tokens = image.reshape(1, resolution * resolution, 8)
+    blocked = block(input_tokens).reshape(1, resolution, resolution, 8)
+    assert blocked[0, -1, -1, 0].abs() < 1e-7
+    mask = block.shift_mask
+    block.shift_mask = None
+    leaked = block(input_tokens).reshape(1, resolution, resolution, 8)
+    block.shift_mask = mask
+    assert leaked[0, -1, -1, 0] > 0
+
+
+def test_local_cad_qkv_logits_context_and_gradient():
+    matcher = HierarchicalCADMatcher(32)
+    query = torch.randn(3, 1, 32, requires_grad=True)
+    bank = torch.randn(3, 8, 32, requires_grad=True)
+    keys, values = matcher.project_bank(bank)
+    logits, context = matcher.match_root(query, torch.arange(3), (keys, values))
+    assert logits.shape == (3, 1, 8)
+    assert context.shape == (3, 1, 32)
+    torch.testing.assert_close(logits.float().softmax(-1).sum(-1), torch.ones(3, 1))
+    (logits.square().mean() + context.square().mean()).backward()
+    for parameter in (matcher.q_proj.weight, matcher.k_proj.weight,
+                      matcher.v_proj.weight, matcher.out_proj.weight):
+        assert parameter.grad is not None and torch.isfinite(parameter.grad).all()
+    assert torch.isfinite(query.grad).all() and torch.isfinite(bank.grad).all()
+
+
+def test_beam_top2_matches_exhaustive_retained_candidates():
+    parent = torch.tensor([[1, 3]])
+    prior = torch.tensor([[-0.8, -1.0]])
+    conditional = torch.full((1, 2, 8), -5.0)
+    conditional[0, 0, 2] = -0.1
+    conditional[0, 1, 4] = -0.05
+    scores, ids = ProgressivePCCHead._advance_beam(parent, prior, conditional)
+    exhaustive = sorted((float(prior[0, p] + conditional[0, p, child]),
+                         int(parent[0, p]) * 8 + child)
+                        for p in range(2) for child in range(8))[-2:][::-1]
+    torch.testing.assert_close(scores[0], torch.tensor([item[0] for item in exhaustive]))
+    torch.testing.assert_close(ids[0], torch.tensor([item[1] for item in exhaustive]))
+    assert ids[0, 0] // 8 != ids[0, 1] // 8
+
+
 def test_head_train_infer_and_gradients(head):
     feature = torch.randn(2, 1024, 8, 8)
     classes = torch.tensor([0, 1])
@@ -62,10 +132,20 @@ def test_head_train_infer_and_gradients(head):
     assert set(losses) == {"loss_pcc_route", "loss_pcc_residual", "loss_pcc_mask"}
     assert all(torch.isfinite(value) for value in losses.values())
     sum(losses.values()).backward()
-    assert head.stages[0].query.weight.grad is not None
-    assert head.token_encoder[0].weight.grad is not None
-    assert torch.isfinite(head.stages[0].query.weight.grad).all()
+    parameters = (head.stages[0].image_proj.weight,
+                  head.stages[0].image_attention[0].attn.in_proj_weight,
+                  head.stages[0].matcher.q_proj.weight,
+                  head.stages[0].matcher.k_proj.weight,
+                  head.stages[0].matcher.v_proj.weight,
+                  head.cad_token_encoder[0].weight,
+                  head.residual_head[0].weight)
+    assert all(parameter.grad is not None and torch.isfinite(parameter.grad).all()
+               for parameter in parameters)
     assert torch.isfinite(stats["selected_symmetry_branch_mean"])
+    assert all(torch.isfinite(stats[name]).all() for name in
+               ("fusion_update_ratio", "route_entropy", "top1_route_prob",
+                "top2_route_prob_mass"))
+    assert (stats["top2_route_prob_mass"] < 1).all()
     with torch.no_grad():
         output = head(feature[:1], classes[:1])
     assert tuple(output["xyz_norm"].shape) == (1, 3, 64, 64)
@@ -89,7 +169,9 @@ def test_symmetric_subset_branch_is_finite(head):
 
 def test_symmetric_branch_shares_stage1_and_handles_empty_visibility(head):
     calls = []
-    handle = head.stages[0].query.register_forward_hook(lambda *_: calls.append(1))
+    handle = head.stages[0].image_attention[0].attn.register_forward_hook(
+        lambda *_: calls.append(1)
+    )
     try:
         feature = torch.randn(2, 1024, 8, 8)
         classes = torch.tensor([0, 5])
@@ -102,7 +184,7 @@ def test_symmetric_branch_shares_stage1_and_handles_empty_visibility(head):
         assert losses["loss_pcc_residual"] == 0
         assert torch.isfinite(stats["selected_symmetry_branch_mean"])
         sum(losses.values()).backward()
-        assert torch.isfinite(head.stages[0].query.weight.grad).all()
+        assert torch.isfinite(head.stages[0].image_proj.weight.grad).all()
     finally:
         handle.remove()
 
@@ -122,7 +204,9 @@ def test_symmetry_selection_ignores_mask_but_trains_selected_mask(head):
 def test_static_block_match_matches_original_packing_and_gradients(head, sparse_routes):
     torch.manual_seed(19)
     query = torch.randn(257, 32, requires_grad=True)
-    bank = torch.randn(2, 64, 32, requires_grad=True)
+    raw_bank = torch.randn(2, 64, 32, requires_grad=True)
+    matcher = head.stages[1].matcher
+    bank = matcher.project_bank(raw_bank)
     object_inverse = torch.randint(0, 2, (257,))
     parent = torch.randint(0, 8, (257,))
     if sparse_routes:
@@ -133,39 +217,30 @@ def test_static_block_match_matches_original_packing_and_gradients(head, sparse_
     target = torch.randn(257, 3)
     anchors = head.level2_anchors[:2]
 
-    def original_match(q, tokens):
-        keys = object_inverse * 8 + parent
-        order, packed, valid, block_keys = GlobalGuidedHierarchicalCADHead._pack_route_blocks(keys, 64)
-        safe = packed.clamp_min(0)
-        block_query = q.index_select(0, order)[safe]
-        child_tokens = tokens.reshape(2, 8, 8, 32)[block_keys // 8, block_keys % 8]
-        logits = torch.bmm(block_query, child_tokens.transpose(1, 2)) / math.sqrt(32)
-        context = torch.bmm(torch.softmax(logits.float(), -1), child_tokens)
-        valid_flat = valid.flatten()
-        positions = safe.flatten()[valid_flat]
-        sorted_logits = torch.zeros(257, 8).index_copy(0, positions, logits.flatten(0, 1)[valid_flat])
-        sorted_context = torch.zeros(257, 32).index_copy(0, positions, context.flatten(0, 1)[valid_flat])
-        output_logits = torch.zeros_like(sorted_logits).index_copy(0, order, sorted_logits)
-        output_context = torch.zeros_like(sorted_context).index_copy(0, order, sorted_context)
-        block_target = target.index_select(0, order)[safe]
-        child_anchors = anchors.reshape(2, 8, 8, 3)[block_keys // 8, block_keys % 8]
-        labels = (block_target[:, :, None, :] - child_anchors[:, None]).square().sum(-1).argmin(-1)
-        sorted_labels = torch.zeros(257, dtype=torch.long)
-        sorted_labels[positions] = labels.flatten()[valid_flat]
-        output_labels = torch.zeros_like(sorted_labels).index_copy(0, order, sorted_labels)
-        return output_logits, output_context, output_labels
+    def simple_match(q, projected_bank):
+        child_keys = projected_bank[0].reshape(2, 8, 8, 32)[object_inverse, parent]
+        child_values = projected_bank[1].reshape(2, 8, 8, 32)[object_inverse, parent]
+        projected_query = matcher.q_proj(q)
+        logits = torch.bmm(projected_query[:, None], child_keys.transpose(1, 2))[:, 0] / math.sqrt(32)
+        probability = torch.softmax(logits.float(), -1)
+        context = torch.bmm(probability[:, None], child_values)[:, 0]
+        context = matcher.out_proj(context)
+        child_anchors = anchors.reshape(2, 8, 8, 3)[object_inverse, parent]
+        labels = (target[:, None] - child_anchors).square().sum(-1).argmin(-1)
+        return logits, context, labels
 
-    old_logits, old_context, old_labels = original_match(query, bank)
-    new_logits, new_context, new_labels = head._match(
+    old_logits, old_context, old_labels = simple_match(query, bank)
+    new_logits, new_context, new_labels = matcher.match_packed(
         query, object_inverse, parent, bank, target, anchors
     )
     torch.testing.assert_close(new_logits, old_logits, rtol=1e-5, atol=1e-6)
     torch.testing.assert_close(new_context, old_context, rtol=1e-5, atol=1e-6)
     torch.testing.assert_close(new_labels, old_labels)
+    grad_targets = (query, raw_bank, *matcher.parameters())
     old_grads = torch.autograd.grad(old_logits.square().mean() + old_context.square().mean(),
-                                    (query, bank), retain_graph=True)
+                                    grad_targets, retain_graph=True)
     new_grads = torch.autograd.grad(new_logits.square().mean() + new_context.square().mean(),
-                                    (query, bank))
+                                    grad_targets)
     for new, old in zip(new_grads, old_grads):
         torch.testing.assert_close(new, old, rtol=1e-4, atol=1e-6)
 
@@ -177,6 +252,11 @@ def test_config_contract(name):
     validate_research_run_config(cfg, mode="formal" if name == "train_reused.py" else "smoke",
                                  expected_experiment_id="EXP-20260916-022-progressive-pcc")
     assert cfg.SOLVER.AMP.ENABLED
+    init = cfg.MODEL.POSE_NET.PCC_HEAD.INIT_CFG
+    assert (init.num_heads, tuple(init.stage_attention), init.window_size,
+            init.shift_size, init.attention_dropout) == (
+                8, ("global", "global", "window", "window"), 8, 4, 0.0
+            )
 
 
 def test_warmup_transitions_directly_to_cosine():
@@ -194,6 +274,10 @@ def test_formal_v1_parameters_are_explicit(head):
     init = cfg.MODEL.POSE_NET.PCC_HEAD.INIT_CFG
     assert (init.route_weight, init.residual_weight, init.mask_weight) == (1.0, 1.0, 1.0)
     assert (init.residual_beta, init.beam_k, init.token_dim) == (0.1, 2, 256)
+    assert (init.num_heads, tuple(init.stage_attention), init.window_size,
+            init.shift_size, init.attention_dropout) == (
+                8, ("global", "global", "window", "window"), 8, 4, 0.0
+            )
     assert all(stage.gate_logit.item() == -4.0 for stage in head.stages)
     optimizer = cfg.SOLVER.OPTIMIZER_CFG
     assert (optimizer.type, optimizer.lr, optimizer.weight_decay, optimizer.betas) == (

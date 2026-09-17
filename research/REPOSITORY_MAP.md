@@ -12,7 +12,7 @@
 | 已集成研究扩展 | `core/gdrn_modeling/models/heads/` | hierarchical、EXP013、GLM、EXP017/B、GCR、official random 等 head；保留原 registry 和 checkpoint 路径 |
 | EXP020 几何重投影监督 | `core/gdrn_modeling/losses/correspondence_reprojection_loss.py` | EXP020 纯 Tensor loss；经 `GDRN_double_mask.gdrn_loss`/`engine` 透传在线 `roi_zoom_K`；不新增模型参数。stats 区分 loss 值与真实 `mean_reproj_px`；`valid_ratio` 以 GT foreground 为分母；`REPROJ_LW>0 && USE_MTL=True` fail-fast |
 | EXP021 层级 CAD 对应 | `core/gdrn_modeling/models/heads/global_hierarchical_cad_head.py` | 固定 64×64 CAD 层级、共享几何 token、GT-parent 细路由、Top-K 联合解码、受限残差及可选 8×8 全局引导；训练走单次 feature-only decoder，AMP 下几何标签保持 FP32；CAD 几何为外部非持久 buffer |
-| EXP022 多尺度 PCC | `core/gdrn_modeling/models/GDRN_PCC.py`、`heads/progressive_pcc_head.py` | 冻结官方 backbone，四级 8 路局部匹配与 Top-2 路由、多尺度细化、有界残差和可见 mask；独立于旧 decoder/Patch-PnP |
+| EXP022 多尺度 PCC | `core/gdrn_modeling/models/GDRN_PCC.py`、`heads/progressive_pcc_head.py`、`heads/pcc_blocks.py` | 冻结官方 backbone，四级 image attention 与局部 8 路 Q/K/V 匹配、Top-2 路由、多尺度细化、有界残差和可见 mask；独立于旧 decoder/Patch-PnP |
 | 研究集成点 | `core/gdrn_modeling/models/`、`datasets/`、`engine/` | 模型工厂和 GDRN_double_mask 接线；F 深度统计、GCR image_hw/pose/loss 传递；早期 CPM/quality 接线仍存在 |
 | 实验专用验证 | `research/next_pose_head/`、`exp013/`、`exp014/`、`exp017/`、`exp017b/`、`exp018/`、`exp019/`、`exp020/`、`exp021/`、`exp022/` | preflight、测试和说明；EXP020 含 matched PnP 与 loss 标定；EXP021 含 hierarchy 生成、B/C preflight、FP32/AMP CUDA smoke/标定/profile 及 K-sweep matched evaluator；EXP022 含层级生成、CPU/CUDA smoke 与 fixed-support evaluator |
 | 公共研究工程检查 | `research/run_contract.py`、`research/tests/` | 当前 smoke/formal/eval 配置约束、launcher/cache 等回归；训练协议约束不适用于所有诊断 |

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from pathlib import Path
 
 import numpy as np
@@ -10,12 +9,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .global_hierarchical_cad_head import GlobalGuidedHierarchicalCADHead
+from .pcc_blocks import PCCStage, SpatialRefinement
 
 
 OBJECT_IDS = (1, 5, 6, 8, 9, 10, 11, 12)
 LEVEL_SIZES = (8, 64, 512, 4096)
-MATCH_BLOCK_SIZE = 16
 
 
 def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
@@ -50,45 +48,21 @@ def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
     return arrays
 
 
-class SpatialRefinement(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int):
-        super().__init__()
-        self.main = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, 3, padding=1),
-            nn.GroupNorm(8, out_channels), nn.GELU(),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-        )
-        self.skip = nn.Conv2d(in_channels, out_channels, 1)
-
-    def forward(self, feature: torch.Tensor) -> torch.Tensor:
-        feature = F.interpolate(feature, scale_factor=2, mode="bilinear", align_corners=False)
-        return self.main(feature) + self.skip(feature)
-
-
-class PCCStage(nn.Module):
-    def __init__(self, channels: int, token_dim: int):
-        super().__init__()
-        self.query = nn.Conv2d(channels, token_dim, 1)
-        self.query_norm = nn.LayerNorm(token_dim)
-        self.context = nn.Linear(token_dim, channels)
-        self.gate_logit = nn.Parameter(torch.tensor(-4.0))
-
-    def queries(self, feature: torch.Tensor) -> torch.Tensor:
-        return self.query_norm(self.query(feature).flatten(2).transpose(1, 2))
-
-    def fuse(self, feature: torch.Tensor, context: torch.Tensor) -> torch.Tensor:
-        batch, channels, height, width = feature.shape
-        update = self.context(context).transpose(1, 2).reshape(batch, channels, height, width)
-        return feature + torch.sigmoid(self.gate_logit) * update
-
-
 class ProgressivePCCHead(nn.Module):
     def __init__(self, hierarchy_path: str, token_dim: int = 256, beam_k: int = 2,
                  route_weight: float = 1.0, residual_weight: float = 1.0,
-                 mask_weight: float = 1.0, residual_beta: float = 0.1):
+                 mask_weight: float = 1.0, residual_beta: float = 0.1,
+                 num_heads: int = 8,
+                 stage_attention: tuple[str, ...] = ("global", "global", "window", "window"),
+                 window_size: int = 8, shift_size: int = 4,
+                 attention_dropout: float = 0.0):
         super().__init__()
         if beam_k != 2:
             raise ValueError("EXP022 V1 uses beam K=2")
+        if tuple(stage_attention) != ("global", "global", "window", "window"):
+            raise ValueError("EXP022 V1 requires global/global/window/window image attention")
+        if token_dim % num_heads:
+            raise ValueError("EXP022 token_dim must be divisible by num_heads")
         self.token_dim = token_dim
         self.beam_k = beam_k
         self.route_weight = float(route_weight)
@@ -99,10 +73,15 @@ class ProgressivePCCHead(nn.Module):
         for name, value in hierarchy.items():
             self.register_buffer(name, value, persistent=False)
         self.input_adapter = nn.Conv2d(1024, 512, 1)
-        self.token_encoder = nn.Sequential(
+        self.cad_token_encoder = nn.Sequential(
             nn.Linear(10, 128), nn.GELU(), nn.Linear(128, token_dim), nn.LayerNorm(token_dim)
         )
-        self.stages = nn.ModuleList(PCCStage(ch, token_dim) for ch in (512, 256, 128, 64))
+        self.stages = nn.ModuleList(
+            PCCStage(ch, token_dim, resolution, attention, num_heads, window_size,
+                     shift_size, attention_dropout)
+            for ch, resolution, attention in zip((512, 256, 128, 64), (8, 16, 32, 64),
+                                                  stage_attention)
+        )
         self.refinements = nn.ModuleList(
             SpatialRefinement(before, after) for before, after in ((512, 256), (256, 128), (128, 64))
         )
@@ -128,67 +107,8 @@ class ProgressivePCCHead(nn.Module):
             descriptor = torch.cat((anchors / extent[:, None], normals,
                                     relative / extent[:, None],
                                     radii[..., None] / diameter[:, None, None]), dim=-1)
-            encoded.append(self.token_encoder(descriptor))
+            encoded.append(self.cad_token_encoder(descriptor))
         return unique, inverse, encoded
-
-    @staticmethod
-    def _squared_distances(points: torch.Tensor, anchors: torch.Tensor):
-        return GlobalGuidedHierarchicalCADHead._squared_distances(points, anchors)
-
-    def _match(self, query: torch.Tensor, object_inverse: torch.Tensor,
-               parent: torch.Tensor, token_bank: torch.Tensor,
-               target: torch.Tensor | None = None, anchors: torch.Tensor | None = None):
-        """Pack equal routes into statically bounded blocks without a CUDA scalar read."""
-        num_parents = token_bank.shape[1] // 8
-        keys = object_inverse.long() * num_parents + parent.long()
-        count = query.shape[0]
-        num_keys = token_bank.shape[0] * num_parents
-        # Sum(ceil(group_count / block)) is bounded by ceil(count / block) + num_keys.
-        max_blocks = (count + MATCH_BLOCK_SIZE - 1) // MATCH_BLOCK_SIZE + num_keys
-        order = torch.argsort(keys)
-        sorted_keys = keys.index_select(0, order)
-        group_counts = torch.bincount(keys, minlength=num_keys)
-        group_starts = group_counts.cumsum(0) - group_counts
-        blocks_per_group = torch.div(group_counts + MATCH_BLOCK_SIZE - 1,
-                                     MATCH_BLOCK_SIZE, rounding_mode="floor")
-        block_starts = blocks_per_group.cumsum(0) - blocks_per_group
-        within = torch.arange(count, device=query.device) - group_starts[sorted_keys]
-        block_ids = block_starts[sorted_keys] + torch.div(
-            within, MATCH_BLOCK_SIZE, rounding_mode="floor"
-        )
-        slots = within.remainder(MATCH_BLOCK_SIZE)
-        packed = torch.full((max_blocks, MATCH_BLOCK_SIZE), -1,
-                            device=query.device, dtype=torch.long)
-        packed[block_ids, slots] = torch.arange(count, device=query.device)
-        valid = packed >= 0
-        safe = packed.clamp_min(0)
-        block_keys = torch.searchsorted(block_starts.contiguous(),
-                                         torch.arange(max_blocks, device=query.device),
-                                         right=True).sub(1).clamp_(0, num_keys - 1)
-        token = token_bank.reshape(-1, 8, self.token_dim).index_select(0, block_keys)
-        block_query = query.index_select(0, order)[safe]
-        logits = torch.bmm(block_query, token.transpose(1, 2)) / math.sqrt(self.token_dim)
-        probability = torch.softmax(logits.float(), dim=-1).to(token.dtype)
-        context = torch.bmm(probability, token)
-        # All padded slots write to a discarded sentinel, leaving one scatter per output.
-        positions = torch.where(valid.flatten(), order[safe.flatten()], count)
-        out_logits = torch.zeros((count + 1, 8), device=query.device, dtype=logits.dtype).index_copy(
-            0, positions, logits.flatten(0, 1)
-        )[:count]
-        out_context = torch.zeros((count + 1, self.token_dim), device=query.device,
-                                  dtype=context.dtype).index_copy(
-            0, positions, context.flatten(0, 1)
-        )[:count]
-        if target is None:
-            return out_logits, out_context, None
-        block_target = target.index_select(0, order)[safe].float()
-        block_anchors = anchors.reshape(-1, 8, 3).index_select(0, block_keys).float()
-        with torch.no_grad(), torch.autocast(device_type=query.device.type, enabled=False):
-            label = self._squared_distances(block_target, block_anchors).argmin(-1)
-        out_label = torch.zeros(count + 1, device=query.device, dtype=torch.long).index_copy(
-            0, positions, label.flatten()
-        )[:count]
-        return out_logits, out_context, out_label
 
     @staticmethod
     def _targets_at_resolution(xyz: torch.Tensor, mask: torch.Tensor, size: int):
@@ -229,42 +149,57 @@ class ProgressivePCCHead(nn.Module):
         return [(torch.bmm(points - translation[:, None], rotation), valid)
                 for points, valid in targets]
 
+    @staticmethod
+    def _route_diagnostics(logits: torch.Tensor, valid: torch.Tensor):
+        probability = F.softmax(logits.detach().float(), dim=-1)
+        entropy = -(probability * probability.clamp_min(1e-12).log()).sum(-1)
+        top_two = probability.topk(2, dim=-1).values
+        denominator = valid.sum(-1).clamp_min(1)
+        return tuple((value * valid).sum(-1) / denominator for value in
+                     (entropy, top_two[..., 0], top_two.sum(-1)))
+
     def _stage1(self, backbone: torch.Tensor, inverse: torch.Tensor,
-                tokens: list[torch.Tensor]):
+                banks: list[tuple[torch.Tensor, torch.Tensor]], valid: torch.Tensor):
         feature = self.input_adapter(backbone)
         batch = backbone.shape[0]
-        query = self.stages[0].queries(feature)
-        object_index = inverse[:, None].expand(-1, 64).reshape(-1)
-        parent = torch.zeros(batch * 64, device=inverse.device, dtype=torch.long)
-        logits, context, _ = self._match(query.reshape(-1, self.token_dim), object_index,
-                                         parent, tokens[0])
-        feature = self.stages[0].fuse(feature, context.view(batch, 64, self.token_dim))
-        return self.refinements[0](feature), logits.view(batch, 64, 8)
+        stage = self.stages[0]
+        query = stage.image_tokens(feature)
+        logits, context = stage.matcher.match_root(query, inverse, banks[0])
+        feature, update_ratio = stage.fuse(feature, context, collect_stats=True)
+        diagnostics = (update_ratio, *self._route_diagnostics(logits, valid))
+        return self.refinements[0](feature), logits.view(batch, 64, 8), diagnostics
 
     def _train_branch(self, feature: torch.Tensor, stage1_logits: torch.Tensor,
                       paths, classes: torch.Tensor, inverse: torch.Tensor,
-                      tokens: list[torch.Tensor], mask: torch.Tensor):
+                      tokens: list[torch.Tensor], banks: list[tuple[torch.Tensor, torch.Tensor]],
+                      mask: torch.Tensor, stage1_diagnostics):
         points, valid, _, child = paths[0]
         first_loss = F.cross_entropy(stage1_logits.float().transpose(1, 2),
                                      child.view(classes.shape[0], -1), reduction="none")
         stage_losses = [(first_loss * valid).sum(-1) / valid.sum(-1).clamp_min(1)]
+        stage_diagnostics = [stage1_diagnostics]
         final_query = final_parent = final_child = final_target = final_valid = None
         batch = classes.shape[0]
         for depth in range(2, 5):
             stage = self.stages[depth - 1]
             size = 4 * (2 ** depth)
-            query = stage.queries(feature)
+            query = stage.image_tokens(feature)
             points, valid, parent, child = paths[depth - 1]
             point_classes = inverse[:, None].expand(-1, size * size).reshape(-1)
-            logits, context, _ = self._match(query.reshape(-1, self.token_dim),
-                                             point_classes, parent, tokens[depth - 1])
+            logits, context, _ = stage.matcher.match_packed(
+                query.reshape(-1, self.token_dim), point_classes, parent, banks[depth - 1]
+            )
             pixel_loss = F.cross_entropy(logits.float(), child, reduction="none").view(batch, -1)
             stage_losses.append((pixel_loss * valid).sum(-1) / valid.sum(-1).clamp_min(1))
-            feature = stage.fuse(feature, context.view(batch, size * size, self.token_dim))
+            logits = logits.view(batch, size * size, 8)
+            feature, update_ratio = stage.fuse(
+                feature, context.view(batch, size * size, self.token_dim), collect_stats=True
+            )
+            stage_diagnostics.append((update_ratio, *self._route_diagnostics(logits, valid)))
             if depth < 4:
                 feature = self.refinements[depth-1](feature)
             else:
-                final_query, final_parent, final_child = stage.queries(feature), parent, child
+                final_query, final_parent, final_child = stage.project_image(feature), parent, child
                 final_target, final_valid = points, valid
         leaf = final_parent * 8 + final_child
         leaf_anchor = self.level4_anchors[classes[:, None], leaf.view(batch, -1)]
@@ -283,7 +218,12 @@ class ProgressivePCCHead(nn.Module):
             mask_logit.float(), mask.float(), reduction="none"
         ).flatten(1).mean(-1)
         route_loss = torch.stack(stage_losses).mean(0)
-        return route_loss, residual_loss, mask_loss, mask_logit
+        diagnostics = {
+            name: torch.stack([stage_values[index] for stage_values in stage_diagnostics], dim=-1)
+            for index, name in enumerate(("fusion_update_ratio", "route_entropy",
+                                          "top1_route_prob", "top2_route_prob_mass"))
+        }
+        return route_loss, residual_loss, mask_loss, diagnostics
 
     def _select_symmetry_losses(self, canonical: torch.Tensor,
                                 alternate: torch.Tensor):
@@ -329,8 +269,19 @@ class ProgressivePCCHead(nn.Module):
         scores = (values / values.sum(-1, keepdim=True).clamp_min(1e-12)).clamp_min(1e-12).log()
         return result_ids, scores.reshape(batch, new_h, new_w, k)
 
+    @staticmethod
+    def _advance_beam(parent: torch.Tensor, prior: torch.Tensor,
+                      conditional: torch.Tensor):
+        """Select the best two of the retained parents' sixteen child paths."""
+        scores = (prior[..., None] + conditional).reshape(-1, 16)
+        best_scores, best_slot = scores.topk(2, dim=-1)
+        source_parent = parent.gather(1, torch.div(best_slot, 8, rounding_mode="floor"))
+        best_ids = source_parent * 8 + best_slot.remainder(8)
+        return best_scores, best_ids
+
     def _infer(self, backbone: torch.Tensor, classes: torch.Tensor,
-               inverse: torch.Tensor, tokens: list[torch.Tensor]):
+               inverse: torch.Tensor, tokens: list[torch.Tensor],
+               banks: list[tuple[torch.Tensor, torch.Tensor]]):
         batch = classes.shape[0]
         feature = self.input_adapter(backbone)
         beam_ids = beam_scores = None
@@ -338,28 +289,24 @@ class ProgressivePCCHead(nn.Module):
         level_beams = []
         for depth, stage in enumerate(self.stages, start=1):
             size = 4 * (2 ** depth)
-            query = stage.queries(feature)
+            query = stage.image_tokens(feature)
             pixels = size * size
             object_index = inverse[:, None].expand(-1, pixels).reshape(-1)
             if depth == 1:
-                parent = torch.zeros(batch * pixels, device=classes.device, dtype=torch.long)
-                logits, context, _ = self._match(query.reshape(-1, self.token_dim), object_index,
-                                                  parent, tokens[0])
+                logits, context = stage.matcher.match_root(query, inverse, banks[0])
                 all_scores = F.log_softmax(logits.float(), dim=-1)
-                best_scores, best_ids = all_scores.topk(2, dim=-1)
-                context = context.view(batch, pixels, self.token_dim)
+                best_scores, best_ids = all_scores.reshape(-1, 8).topk(2, dim=-1)
             else:
                 beam_ids, beam_scores = self._resize_sparse_paths(beam_ids, beam_scores)
                 parent = beam_ids.reshape(batch * pixels, 2)
                 prior = beam_scores.reshape(batch * pixels, 2)
                 q = query.reshape(-1, self.token_dim).repeat_interleave(2, dim=0)
                 object_twice = object_index.repeat_interleave(2)
-                logits, local_context, _ = self._match(q, object_twice, parent.reshape(-1), tokens[depth-1])
+                logits, local_context, _ = stage.matcher.match_packed(
+                    q, object_twice, parent.reshape(-1), banks[depth-1]
+                )
                 conditional = F.log_softmax(logits.float().reshape(-1, 2, 8), dim=-1)
-                all_scores = (prior[..., None] + conditional).reshape(-1, 16)
-                best_scores, best_slot = all_scores.topk(2, dim=-1)
-                source_parent = parent.gather(1, torch.div(best_slot, 8, rounding_mode="floor"))
-                best_ids = source_parent * 8 + best_slot.remainder(8)
+                best_scores, best_ids = self._advance_beam(parent, prior, conditional)
                 parent_prob = torch.softmax(prior.float(), dim=-1).to(local_context.dtype)
                 context = (local_context.reshape(-1, 2, self.token_dim) * parent_prob[..., None]).sum(1)
                 context = context.reshape(batch, pixels, self.token_dim)
@@ -369,14 +316,14 @@ class ProgressivePCCHead(nn.Module):
             )
             level_predictions.append(beam_ids[..., 0])
             level_beams.append(beam_ids)
-            feature = stage.fuse(feature, context)
+            feature, _ = stage.fuse(feature, context)
             if depth < 4:
                 feature = self.refinements[depth-1](feature)
         leaf = beam_ids[..., 0].reshape(batch, 4096)
         anchor = self.level4_anchors[classes[:, None], leaf]
         radius = self.level4_radii[classes[:, None], leaf]
         leaf_token = tokens[3][inverse[:, None], leaf]
-        final_query = self.stages[3].queries(feature)
+        final_query = self.stages[3].project_image(feature)
         raw = torch.tanh(self.residual_head(torch.cat((final_query, leaf_token), dim=-1)))
         residual = raw / raw.norm(dim=-1, keepdim=True).clamp_min(1.0)
         xyz_metric = anchor + radius[..., None] * residual
@@ -396,8 +343,10 @@ class ProgressivePCCHead(nn.Module):
         if backbone.ndim != 4 or tuple(backbone.shape[1:]) != (1024, 8, 8):
             raise ValueError(f"EXP022 expects [B,1024,8,8], got {tuple(backbone.shape)}")
         unique, inverse, tokens = self._tokens(roi_classes)
+        banks = [stage.matcher.project_bank(token)
+                 for stage, token in zip(self.stages, tokens)]
         if gt_xyz_norm is None:
-            return self._infer(backbone, roi_classes, inverse, tokens)
+            return self._infer(backbone, roi_classes, inverse, tokens, banks)
         if gt_mask is None:
             raise ValueError("EXP022 requires visible mask with XYZ targets")
         if gt_mask.ndim == 3:
@@ -413,10 +362,15 @@ class ProgressivePCCHead(nn.Module):
         translation = transforms[:, 0, :3, 3]
         canonical = self._transform_targets(target_pyramid, rotation, translation)
         canonical_paths = self._target_paths(canonical, inverse, level_anchors)
-        stage1_feature, stage1_logits = self._stage1(backbone, inverse, tokens)
-        base = torch.stack(self._train_branch(
-            stage1_feature, stage1_logits, canonical_paths, roi_classes, inverse, tokens, gt_mask
-        )[:3], dim=-1)
+        stage1_feature, stage1_logits, stage1_diagnostics = self._stage1(
+            backbone, inverse, banks, canonical_paths[0][1]
+        )
+        canonical_output = self._train_branch(
+            stage1_feature, stage1_logits, canonical_paths, roi_classes, inverse,
+            tokens, banks, gt_mask, stage1_diagnostics
+        )
+        base = torch.stack(canonical_output[:3], dim=-1)
+        diagnostics = canonical_output[3]
         selected = torch.zeros(len(roi_classes), device=roi_classes.device, dtype=torch.long)
         symmetric = torch.nonzero(counts > 1, as_tuple=False).flatten()
         if symmetric.numel():
@@ -430,20 +384,32 @@ class ProgressivePCCHead(nn.Module):
                  for points, valid in target_pyramid], rotation, translation
             )
             alternate_paths = self._target_paths(alternate_targets, sym_inverse, level_anchors)
-            alternate = torch.stack(self._train_branch(
+            alternate_stage1 = tuple(value.index_select(0, symmetric)
+                                     for value in stage1_diagnostics)
+            alternate_output = self._train_branch(
                 stage1_feature.index_select(0, symmetric),
                 stage1_logits.index_select(0, symmetric), alternate_paths,
-                sym_classes, sym_inverse, tokens, gt_mask.index_select(0, symmetric)
-            )[:3], dim=-1)
+                sym_classes, sym_inverse, tokens, banks, gt_mask.index_select(0, symmetric),
+                alternate_stage1
+            )
+            alternate = torch.stack(alternate_output[:3], dim=-1)
             replacement, use_alternate = self._select_symmetry_losses(
                 base.index_select(0, symmetric), alternate
             )
             base = base.index_copy(0, symmetric, replacement)
             selected = selected.index_copy(0, symmetric, use_alternate.long())
+            diagnostics = {
+                name: values.index_copy(
+                    0, symmetric,
+                    torch.where(use_alternate[:, None], alternate_output[3][name],
+                                values.index_select(0, symmetric))
+                ) for name, values in diagnostics.items()
+            }
         chosen = base.mean(0)
         return {
             "loss_pcc_route": chosen[0] * self.route_weight,
             "loss_pcc_residual": chosen[1] * self.residual_weight,
             "loss_pcc_mask": chosen[2] * self.mask_weight,
         }, {"selected_symmetry_branch_mean": selected.float().mean(),
-            "fusion_gates": torch.stack([torch.sigmoid(stage.gate_logit) for stage in self.stages]).detach()}
+            "fusion_gates": torch.stack([torch.sigmoid(stage.gate_logit) for stage in self.stages]).detach(),
+            **{name: values.detach().mean(0) for name, values in diagnostics.items()}}
