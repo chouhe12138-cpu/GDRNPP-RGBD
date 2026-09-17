@@ -42,6 +42,17 @@ def test_hierarchy_schema():
     arrays = load_pcc_hierarchy(HIERARCHY)
     assert tuple(arrays["level4_anchors"].shape) == (8, 4096, 3)
     assert tuple(arrays["symmetry_counts"].shape) == (8,)
+    assert arrays["symmetry_counts"].tolist() == [1, 1, 1, 1, 1, 2, 2, 1]
+
+
+def test_hierarchy_rejects_more_than_two_symmetries(tmp_path):
+    with np.load(HIERARCHY, allow_pickle=False) as source:
+        arrays = {name: np.asarray(source[name]).copy() for name in source.files}
+    arrays["symmetry_counts"][0] = 3
+    path = tmp_path / "too_many_symmetries.npz"
+    np.savez(path, **arrays)
+    with pytest.raises(RuntimeError, match="supports at most 2 equivalents, got 3"):
+        load_pcc_hierarchy(path)
 
 
 def test_sparse_resize_probability_and_path_identity():

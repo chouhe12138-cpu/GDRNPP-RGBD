@@ -79,3 +79,9 @@
 - Review 文档的“Transition 不改变语义”只适用于研究流程，不适用于逐点函数值；旧重型 block 与 1×1 Conv 不等价。删除 `out_proj` 只保证线性层可折叠的表达能力，不保证相同随机初值/训练轨迹。后续 Stage4 token 复用将改变 residual head 的输入定义；双 LayerNorm 清理也改变归一化位置。两项不应描述为数值无损优化。本轮未实施 active-parent K/V、Stage4 token 复用、推理 Q 去重、block size 调优或 P2 修改，等待下一轮独立选择和验证。
 
 Decision：四项工程修订及本地检查完成。服务器 EGL profile、正式训练、完整 matched PnP/BOP 与机制 gate 仍待执行；本次固定 batch 的资源收益不外推至服务器吞吐或姿态精度。
+
+## 2026-09-17 正式冻结前 symmetry 数量检查
+
+- Observed：EXP022 V1 训练只计算 canonical 与固定的第二个 equivalent 分支；原 loader 虽读取 `symmetry_counts`，却未拒绝计数超过 2 的层级。当前本地主层级 `reused_v1.npz` 和消融层级 `independent_v2.npz` 的计数均为 `[1,1,1,1,1,2,2,1]`，最大值 2；对象顺序为 `(1,5,6,8,9,10,11,12)`。这证明当前两份本地 artifact 满足 V1 边界，不证明未来数据集也满足。
+- 修改：loader 检查计数和变换数组形状、计数范围，并在最大计数 `>2` 时以明确错误拒绝；preflight JSON 输出完整计数与最大值。构造 `count=3` 的层级文件，单测确认 loader 报错。未改对称分支算法、层级生成器或 artifact。
+- 验证：`pytorch22` 下 EXP022 `28 passed`、完整 research `216 passed`；主臂 `train_reused.py` 与独立消融 `smoke_independent.py` 的 CPU preflight 均 PASS，报告最大计数 2、官方 backbone 340 张量、PCC 参数 3,728,456。未运行服务器或正式训练。本次是数据适用性检查，不是多对称分支支持；T-LESS 等有更多等价姿态的数据仍需独立设计与验证。

@@ -10,6 +10,7 @@
 - 四级分辨率 8/16/32/64，每级 8 路；训练按当前分辨率的 GT 父路径 teacher forcing，推理保留 Top-2 完整路径 ID 和归一化累计 log score。8 路条件概率仅用于 soft CAD context。跨尺度路由状态按双线性权重合并同 ID 路径后再取 Top-2。
 - 固定宽度 Top-2 beam 每步精确选择当前保留父路径的最多 16 个 child 候选，但一般不等于对全部 8⁴ 路径的全局穷举 Top-2；本阶段不改变 beam 协议。
 - 对称物体按完整 SE(3) 等价变换选择一个 instance-consistent 分支；选择分数仅为加权四级 CE 与加权 residual loss 之和，不含 mask loss。选定后该分支的四级 CE、residual 和 mask loss 一起训练。最终点为叶子 anchor 加不超过该叶子半径的 3D 残差。
+- EXP022 V1 的训练分支只比较 canonical 与一个 alternate；层级 loader 要求每个物体有 1–2 个等价变换，超过 2 个时明确报错。preflight 输出各物体 `symmetry_counts`；将来扩展到更多对称变换需另行设计分支选择。
 - PBR40、batch 48、40 epoch、16 workers、seed 42、AdamW `3e-4`、4% linear warmup + cosine、显式 FP16 AMP。正式配置每 5 epoch 做原有 direct-pose 评估，输出仍通过 explicit RANSAC-PnP。
 - V1 固定值：route/residual/mask 权重均为 `1.0`，residual Smooth L1 `beta=0.1`，`beam_k=2`，PCC token 维度 `256`，四级 fusion gate logit 初值均为 `-4.0`；AdamW `weight_decay=0.01`、`betas=(0.9,0.999)`，warmup ratio `0.04`，cosine 终点 LR factor `0.01`。warmup 结束即进入 cosine，不额外保持平坦学习率。
 - 调试模式可记录每级 fusion update / feature 范数比、可见位置的条件 route entropy、top1 概率及剪枝前 8 路 top2 概率质量；这些量 detach，不增加 loss。正式训练默认关闭逐级诊断，保留轻量的 fusion gate 与对称分支选择统计。

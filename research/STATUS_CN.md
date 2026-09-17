@@ -15,9 +15,12 @@ image self-attention，以及独立 Q/K/V 的局部 8 路 CAD matcher；随后�
 四项修订：stage transition 改为上采样+1×1 Conv、shift mask 改用广播 SDPA、正式
 路径关闭逐级诊断、删除 matcher `out_proj`。保留固定 hierarchy、GT parent、Top-2
 beam、受限 residual、symmetry 和三项 loss。主层级与独立消融层级仍在 ignored cache。
-EXP022 测试 `27 passed`、完整 research `215 passed`；官方 340 个 backbone 张量加载的
+EXP022 测试 `28 passed`、完整 research `216 passed`；官方 340 个 backbone 张量加载的
 CPU preflight PASS。模型总参数 `91.293M`，其中冻结 backbone `87.564M`、可训练 PCC
 `3.728M`。
+正式冻结前增加 symmetry 数量检查：当前主层级和独立层级均为
+`[1,1,1,1,1,2,2,1]`，V1 loader 拒绝 `>2`，preflight 公开打印计数；两种层级
+CPU preflight PASS。
 
 本机 RTX 4060/CUDA+CPP/FP16 AMP 对同一保存的真实 batch48 各运行 12 步、排除前
 2 步后，旧版→重构版固定 batch 整步中位数 `462.083→710.912 ms`，峰值 allocated

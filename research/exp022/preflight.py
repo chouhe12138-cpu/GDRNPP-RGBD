@@ -77,6 +77,8 @@ def main() -> int:
     print(json.dumps({"status": "PASS", "config": args.config, "formal_training": False,
                       "official_backbone_tensors": loaded,
                       "trainable_parameters": sum(p.numel() for p in trainable.values()),
+                      "symmetry_counts": model.pcc_head.symmetry_counts.tolist(),
+                      "max_symmetry_count": int(model.pcc_head.symmetry_counts.max().item()),
                       "losses": {name: float(value.detach()) for name, value in losses.items()}}, indent=2))
     return 0
 

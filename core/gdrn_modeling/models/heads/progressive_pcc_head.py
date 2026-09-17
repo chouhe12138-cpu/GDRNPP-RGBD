@@ -35,6 +35,19 @@ def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
                   if name not in {"generator_version", "mode"}}
     if tuple(arrays["object_ids"].tolist()) != OBJECT_IDS:
         raise ValueError("EXP022 object order mismatch")
+    counts = arrays["symmetry_counts"]
+    transforms = arrays["symmetry_transforms"]
+    if tuple(counts.shape) != (8,) or counts.dtype not in (torch.int32, torch.int64):
+        raise ValueError("EXP022 symmetry_counts must contain eight integer counts")
+    if transforms.ndim != 4 or transforms.shape[0] != 8 or tuple(transforms.shape[2:]) != (4, 4):
+        raise ValueError("EXP022 symmetry_transforms must have shape [8,S,4,4]")
+    max_sym = int(counts.max().item())
+    if max_sym > 2:
+        raise RuntimeError(
+            f"EXP022 V1 symmetry branch supports at most 2 equivalents, got {max_sym}"
+        )
+    if torch.any(counts < 1) or max_sym > transforms.shape[1]:
+        raise ValueError("EXP022 symmetry_counts are outside stored transform bounds")
     for depth, count in enumerate(LEVEL_SIZES, start=1):
         for field, shape in (("anchors", (8, count, 3)), ("normals", (8, count, 3)),
                              ("radii", (8, count))):
