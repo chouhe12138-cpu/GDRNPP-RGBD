@@ -294,12 +294,11 @@ docker exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp gdrnpp_chx_lab0
 新增非空 `TRAIN_PROTOCOL.NAME` 时必须同时更新 launcher 的映射表：未列出的名字会被拒绝，
 不会静默套用旧 LMO 的资源清单。
 
-EXP024 的 `train_lmo_full_imagenet.py` 在 lab1 使用独立实验 ID，正式配置初始
-`FORMAL_READY=False`。先按本节 bundle/release 与受控容器替换流程准备 lab1，再在容器里
-运行 `research.exp022.preflight` 和 `real_smoke` 的 EGL/AMP 真实 batch4；核对 340 个
-ImageNet 张量、有限 loss/梯度、无 AMP 跳步、显存和步骤时间。之后回本地开启
-`FORMAL_READY=True`，提交并创建第二段 release，再由 launcher 的 `run ... formal`
-启动。40 epoch 的 E5–E40 checkpoint 与评估口径见 EXP024 RECORD。不要在服务器
+EXP024 的 `train_lmo_full_imagenet.py` 在 lab1 使用独立实验 ID。准备版 `a357017`
+保持 `FORMAL_READY=False`，其容器内 CPU preflight 和 EGL/AMP 真实 batch4 smoke
+已通过；本地随后开启 `FORMAL_READY=True`。正式训练须用第二段 clean commit/release，
+由 launcher 的 `run ... formal` 启动。40 epoch 的 E5–E40 checkpoint 与评估口径见
+EXP024 RECORD。不要在服务器
 release 中直接修改配置，也不要把 EXP024 的运行目录放进 EXP022。
 
 `check_host()` 只保留 user/Docker/GPU 与 `${root}` 基础路径；`${root}` 下的

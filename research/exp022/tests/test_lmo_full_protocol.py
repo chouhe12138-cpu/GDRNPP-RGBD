@@ -18,12 +18,13 @@ def test_full_training_protocol_and_formal_lock():
     assert protocol["accumulation_steps"] == 12
     assert cfg.EXPERIMENT_ID == EXPERIMENT_ID
     assert cfg.MODEL.POSE_NET.PCC_HEAD.INIT_CFG.beam_k == 2
-    with pytest.raises(ValueError, match="not ready"):
-        validate_research_run_config(cfg, mode="formal", expected_experiment_id=EXPERIMENT_ID)
-    cfg.RESEARCH_PROTOCOL.FORMAL_READY = True
+    assert cfg.RESEARCH_PROTOCOL.FORMAL_READY is True
     summary = validate_research_run_config(cfg, mode="formal", expected_experiment_id=EXPERIMENT_ID)
     assert summary["amp_enabled"] is True
     assert summary["training_renderer"] == "egl"
+    cfg.RESEARCH_PROTOCOL.FORMAL_READY = False
+    with pytest.raises(ValueError, match="not ready"):
+        validate_research_run_config(cfg, mode="formal", expected_experiment_id=EXPERIMENT_ID)
 
 
 def test_full_training_rejects_protocol_drift():

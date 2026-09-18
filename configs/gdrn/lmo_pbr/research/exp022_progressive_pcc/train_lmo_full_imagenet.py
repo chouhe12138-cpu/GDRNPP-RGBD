@@ -24,4 +24,4 @@ MODEL = dict(
 # batch of four uses the engine's existing 12-step gradient accumulation.
 SOLVER = dict(IMS_PER_BATCH=4, REFERENCE_BS=48)
 TRAIN_PROTOCOL = dict(NAME="lmo_full_imagenet", DATA_DOMAIN="syn_pbr")
-RESEARCH_PROTOCOL = dict(SCHEDULE="configurable", FORMAL_READY=False)
+RESEARCH_PROTOCOL = dict(SCHEDULE="configurable", FORMAL_READY=True)

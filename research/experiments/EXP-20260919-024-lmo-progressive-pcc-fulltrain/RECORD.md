@@ -1,8 +1,8 @@
 # EXP024 LM-O Progressive PCC ImageNet 全主干训练
 
 - `experiment_id`: `EXP-20260919-024-lmo-progressive-pcc-fulltrain`
-- 状态：`LOCAL_CPU_PREFLIGHT_PASS / SERVER_READONLY_RESOURCES_PASS /
-  SERVER_EGL_PENDING / FORMAL_NOT_STARTED`
+- 状态：`LOCAL_CPU_PREFLIGHT_PASS / SERVER_EGL_SMOKE_PASS /
+  FORMAL_UNLOCKED / FORMAL_NOT_STARTED`
 - 正式 `run_id`、checkpoint、评估指标：未生成。
 - 源码 commit：待本地提交后填写；不以未提交工作树作为服务器 source。
 
@@ -57,9 +57,28 @@ EXP022 冻结臂从官方 LM-O checkpoint 取 backbone，而本实验从 ImageNe
   同一 `set -Eeuo pipefail` 检查块的 ImageNet 权重、LM PBR、LM-O test、VOC 与
   `reused_v1.npz` 读取检查均通过。尚未创建新 release、运行 EGL 或训练。
 
+## 2026-09-19 lab1 EGL smoke 与 formal 解锁（Observed / Decision）
+
+- 用户从准备版 source `a3570178799cbda943805344645e658f93b774fe` 建立唯一 release，
+  将项目 lab1 容器切到该 release，并执行 EXP024 的 CPU preflight 与 EGL 真实数据
+  batch4、8 步 FP16 AMP smoke。回传截图两项均为 `status=PASS`，smoke 报告
+  `renderer=egl`、`dataset=lmo`、`amp_skipped_steps=0`，有限 loss/梯度与
+  optimizer step 由该工具的 PASS 路径保证。截图未包含完整 loss 序列，具体数值未留存。
+- 固定批次、排除前 2 步后的分段中位数：forward `37.10 ms`、backward `47.06 ms`、
+  unscale/gradient audit `25.29 ms`、optimizer `15.47 ms`；峰值 GPU allocated
+  `2.826 GB`、reserved `3.012 GB`。这些计时不含逐步 DataLoader/EGL 渲染，
+  不能外推为正式端到端吞吐。
+- Decision：Integrity 中的服务器模型/数据/EGL/AMP/资源检查通过，按用户明确确认
+  开启 formal 配置 `RESEARCH_PROTOCOL.FORMAL_READY=True`。正式训练仍须在新的
+  clean commit/release 上经 launcher runtime gate 启动；formal run_id、checkpoint、
+  退出状态和 E5–E40 指标尚未生成。
+- 本地解锁后复核：定向配置/launcher 测试 `56 passed`；`research.run_contract --mode formal`
+  返回 AMP 开启、物理 batch4、40 epoch、每 5 epoch checkpoint/evaluation、训练 EGL、
+  评价 CPP、seed 42；`git diff --check` 通过。未重新运行完整 research 回归，
+  准备版已记录的三个只读数据缓存失败仍是同一环境限制。
+
 ## 待完成 / Decision
 
-lab1 必须先由用户执行只读 GPU/容器/数据/权重检查，再用新的确定 commit 建立唯一
-release。此时正式配置的 `FORMAL_READY=False`；在服务器容器中运行真实 EGL + AMP
-smoke、记录显存/步骤时间、确认 optimizer step 后，回本地开启 formal gate、提交并
-生成第二段 release，最后启动正式训练。EXP023 LM13 仍按用户顺序在 EXP022 结束后进行。
+下一步是提交已解锁的 formal 配置、生成第二段 bundle/release，替换同一项目容器并
+启动正式训练；记录 launcher 生成的 run_id 与 source commit。EXP023 LM13 仍按用户
+顺序在 EXP022 结束后进行。

@@ -54,7 +54,8 @@ EXP024 是单独的 LM-O 全主干训练：保持 EXP022 的 PBR40、GT-box、`r
 PCC 方法与 E5–E40 评估点，改为 ImageNet ConvNeXt-Base 初始化并解冻 backbone。
 `train_lmo_full_imagenet.py` 使用物理 batch 4、梯度累积 12 次、effective batch 48，
 backbone 学习率为 PCC 的 0.1 倍。`smoke_lmo_full_imagenet.py` 用于短步 EGL smoke；
-正式配置 `FORMAL_READY=False`，待 lab1 EGL/AMP 训练与资源检查通过后才开启。
+lab1 EGL/AMP 真实 batch4 smoke 通过后，正式配置已开启 `FORMAL_READY=True`，
+正式训练仍须从解锁版的独立 release 启动。
 这同时改变 backbone 初始化来源与冻结状态，因此与 EXP022 冻结臂的性能差不能
 单独归因于“解冻”。事实和 gate 见 EXP024 RECORD。
 
