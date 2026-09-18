@@ -1,5 +1,9 @@
 # EXP022 渐进式层级 CAD 对应与多尺度 PCC
 
+## 2026-09-18 多数据集抽象回归（Observed）
+
+统一 Dataset Context 与动态对象数接入后，旧 LM-O `train_reused.py` 的有效配置相对修改前只增加 `DATASET_CONTEXT`，其余字段逐项相同；原 `reused_v1.npz` 保持不变，8 个 BOP ID 顺序仍为 `[1,5,6,8,9,10,11,12]`。CPU preflight PASS：官方 backbone 340 个张量、可训练 PCC `3,728,456` 参数及有限 loss/梯度。使用旧保存的真实 PBR batch48（类别直方图 `[4,4,13,6,9,1,3,8]`）、seed 42、本机 CUDA+CPP、FP16 AMP 运行一步 PASS，无跳步；route/residual/mask loss `2.089756/0.458948/0.725601`，峰值 allocated/reserved `5.631780/6.494880 GB`。仅一步且含预热，不作为稳定耗时或正式结果。旧 LM-O 评价链只做配置/target 协议检查，正式 matched PnP 仍未生成。LM13 新协议另见 [EXP023 RECORD](../EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md)。
+
 - `experiment_id`: `EXP-20260916-022-progressive-pcc`
 - 状态：`STAGE1_PERFORMANCE_REVISED / LOCAL_CPP_SMOKE_PASS / SERVER_EGL_PENDING / FORMAL_NOT_STARTED`
 - 日期：2026-09-17（2026-09-16 起）

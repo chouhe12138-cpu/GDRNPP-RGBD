@@ -12,11 +12,11 @@ import torch.nn.functional as F
 from .pcc_blocks import PCCStage, StageTransition
 
 
-OBJECT_IDS = (1, 5, 6, 8, 9, 10, 11, 12)
 LEVEL_SIZES = (8, 64, 512, 4096)
 
 
-def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
+def load_pcc_hierarchy(path: str | Path, *, expected_object_ids=None,
+                       dataset_key: str | None = None) -> dict[str, torch.Tensor]:
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"EXP022 hierarchy missing: {path}")
@@ -33,14 +33,24 @@ def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
             raise ValueError("EXP022 hierarchy version or mode mismatch")
         arrays = {name: torch.from_numpy(np.asarray(data[name]).copy()) for name in expected
                   if name not in {"generator_version", "mode"}}
-    if tuple(arrays["object_ids"].tolist()) != OBJECT_IDS:
+        stored_dataset = str(data["dataset_key"]) if "dataset_key" in data else None
+    object_ids = tuple(int(value) for value in arrays["object_ids"].tolist())
+    num_objects = len(object_ids)
+    if not object_ids or len(set(object_ids)) != num_objects:
+        raise ValueError("EXP022 object IDs must be nonempty and unique")
+    if expected_object_ids is not None and object_ids != tuple(expected_object_ids):
         raise ValueError("EXP022 object order mismatch")
+    if dataset_key is not None and stored_dataset != dataset_key:
+        if not (dataset_key == "lmo" and stored_dataset is None):
+            raise ValueError("EXP022 hierarchy dataset mismatch")
+    if tuple(arrays["extents"].shape) != (num_objects, 3) or tuple(arrays["diameters"].shape) != (num_objects,):
+        raise ValueError("EXP022 extent/diameter shape mismatch")
     counts = arrays["symmetry_counts"]
     transforms = arrays["symmetry_transforms"]
-    if tuple(counts.shape) != (8,) or counts.dtype not in (torch.int32, torch.int64):
-        raise ValueError("EXP022 symmetry_counts must contain eight integer counts")
-    if transforms.ndim != 4 or transforms.shape[0] != 8 or tuple(transforms.shape[2:]) != (4, 4):
-        raise ValueError("EXP022 symmetry_transforms must have shape [8,S,4,4]")
+    if tuple(counts.shape) != (num_objects,) or counts.dtype not in (torch.int32, torch.int64):
+        raise ValueError("EXP022 symmetry_counts must contain N integer counts")
+    if transforms.ndim != 4 or transforms.shape[0] != num_objects or tuple(transforms.shape[2:]) != (4, 4):
+        raise ValueError("EXP022 symmetry_transforms must have shape [N,S,4,4]")
     max_sym = int(counts.max().item())
     if max_sym > 2:
         raise RuntimeError(
@@ -49,14 +59,15 @@ def load_pcc_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
     if torch.any(counts < 1) or max_sym > transforms.shape[1]:
         raise ValueError("EXP022 symmetry_counts are outside stored transform bounds")
     for depth, count in enumerate(LEVEL_SIZES, start=1):
-        for field, shape in (("anchors", (8, count, 3)), ("normals", (8, count, 3)),
-                             ("radii", (8, count))):
+        for field, shape in (("anchors", (num_objects, count, 3)),
+                             ("normals", (num_objects, count, 3)),
+                             ("radii", (num_objects, count))):
             value = arrays[f"level{depth}_{field}"]
             if tuple(value.shape) != shape or not torch.isfinite(value).all():
                 raise ValueError(f"Invalid EXP022 level{depth}_{field}: {tuple(value.shape)}")
             if field == "radii" and torch.any(value <= 0):
                 raise ValueError(f"Non-positive EXP022 level{depth} radius")
-    if tuple(arrays["source_leaf_indices"].shape) != (8, 4096):
+    if tuple(arrays["source_leaf_indices"].shape) != (num_objects, 4096):
         raise ValueError("EXP022 source_leaf_indices shape mismatch")
     return arrays
 
@@ -68,7 +79,8 @@ class ProgressivePCCHead(nn.Module):
                  num_heads: int = 8,
                  stage_attention: tuple[str, ...] = ("global", "global", "window", "window"),
                  window_size: int = 8, shift_size: int = 4,
-                 attention_dropout: float = 0.0):
+                 attention_dropout: float = 0.0,
+                 expected_object_ids=None, dataset_key: str | None = None):
         super().__init__()
         if beam_k != 2:
             raise ValueError("EXP022 V1 uses beam K=2")
@@ -82,7 +94,10 @@ class ProgressivePCCHead(nn.Module):
         self.residual_weight = float(residual_weight)
         self.mask_weight = float(mask_weight)
         self.residual_beta = float(residual_beta)
-        hierarchy = load_pcc_hierarchy(hierarchy_path)
+        hierarchy = load_pcc_hierarchy(
+            hierarchy_path, expected_object_ids=expected_object_ids, dataset_key=dataset_key
+        )
+        self.num_objects = len(hierarchy["object_ids"])
         for name, value in hierarchy.items():
             self.register_buffer(name, value, persistent=False)
         self.input_adapter = nn.Conv2d(1024, 512, 1)
@@ -361,6 +376,10 @@ class ProgressivePCCHead(nn.Module):
                 collect_diagnostics: bool = False):
         if backbone.ndim != 4 or tuple(backbone.shape[1:]) != (1024, 8, 8):
             raise ValueError(f"EXP022 expects [B,1024,8,8], got {tuple(backbone.shape)}")
+        if roi_classes is None or roi_classes.ndim != 1 or roi_classes.shape[0] != backbone.shape[0]:
+            raise ValueError("EXP022 roi_classes must have one entry per image")
+        if torch.any((roi_classes < 0) | (roi_classes >= self.num_objects)):
+            raise ValueError(f"EXP022 roi_class outside [0,{self.num_objects})")
         unique, inverse, tokens = self._tokens(roi_classes)
         banks = [stage.matcher.project_bank(token)
                  for stage, token in zip(self.stages, tokens)]

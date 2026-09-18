@@ -1,10 +1,17 @@
 import os
+from configs.gdrn.research.exp022_progressive_pcc.method import PCC_INIT_CFG
 
 _base_ = ["../_base_/pbr40_screening.py"]
 
 EXPERIMENT_ID = "EXP-20260916-022-progressive-pcc"
 OUTPUT_DIR = "output/experiments/EXP-20260916-022-progressive-pcc/RUN-SET-BY-LAUNCHER"
 SEED = 42
+DATASET_CONTEXT = dict(
+    KEY="lmo", CAD_REF_KEY="lm_full", BOP_DATASET="lmo",
+    BOP_TARGETS_FILENAME="test_targets_bop19.json",
+    REFERENCE_CONFIG="configs/gdrn/lmo_pbr/research/exp021_global_hierarchical_cad/a_official_eval.py",
+    REFERENCE_CHECKPOINT="pretrained_models/lmo_pbr/model_final_wo_optim.pth",
+)
 
 DATALOADER = dict(NUM_WORKERS=16)
 MODEL = dict(
@@ -20,13 +27,7 @@ MODEL = dict(
                 os.environ.get("GDRN_DATASET_CACHE_DIR", ".local/dataset_cache"),
                 "exp022", "reused_v1.npz",
             ),
-            INIT_CFG=dict(
-                token_dim=256, beam_k=2, num_heads=8,
-                stage_attention=("global", "global", "window", "window"),
-                window_size=8, shift_size=4, attention_dropout=0.0,
-                route_weight=1.0, residual_weight=1.0,
-                mask_weight=1.0, residual_beta=0.1,
-            ),
+            INIT_CFG=PCC_INIT_CFG,
         ),
         LOSS_CFG=dict(MASK_LOSS_TYPE="BCE"),
     ),
@@ -45,3 +46,4 @@ SOLVER = dict(
     BEST_CHECKPOINT=dict(ENABLED=False),
 )
 TEST = dict(TEST_BBOX_TYPE="gt", USE_PNP=True, PNP_TYPE="ransac_pnp")
+del PCC_INIT_CFG

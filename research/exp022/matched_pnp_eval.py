@@ -19,7 +19,6 @@ from detectron2.data import MetadataCatalog
 from detectron2.evaluation.evaluator import inference_context
 from mmcv import Config
 
-import ref
 from core.gdrn_modeling.datasets.data_loader import build_gdrn_test_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
 from core.gdrn_modeling.engine.engine_utils import batch_data, get_out_coor, get_out_mask
@@ -28,7 +27,7 @@ from core.utils.my_checkpoint import MyCheckpointer
 from lib.utils.mask_utils import cocosegm2mask
 from research.diagnostics.exp019_epro.correspondence import historical_gt_reprojection_errors, roi2d_norm_to_pixels
 from research.diagnostics.exp019_epro.repo_adapter import (
-    _dataset_lookups, _depth_to_object, _prediction_valid_mask, _sample_nearest, _target_counts,
+    _dataset_lookups, _depth_to_object, _prediction_valid_mask, _sample_nearest,
 )
 from research.exp020.matched_pnp_eval import (
     SEED_BASE, _full_target_total, _load_model, build_fixed_plan, solve_arm_fixed,
@@ -37,21 +36,17 @@ from research.exp021.matched_pnp_eval import (
     _configured, _forward as exp021_forward, _git_state, _surface_lookups,
     _symmetry_diagnostics, aggregate, export_bop,
 )
-from research.exp022.preflight import CONFIG_ROOT, EXPERIMENT_ID
+from research.exp022.preflight import CONFIG_ROOT
+from research.exp022.dataset_context import resolve_dataset_context
 
 
 ROOT = Path(__file__).resolve().parents[2]
-OFFICIAL_CONFIG = ROOT / "configs/gdrn/lmo_pbr/research/exp021_global_hierarchical_cad/a_official_eval.py"
-OFFICIAL_WEIGHTS = ROOT / "pretrained_models/lmo_pbr/model_final_wo_optim.pth"
-
-
-def _pcc_config(checkpoint: Path, device: str):
-    cfg = Config.fromfile(str(CONFIG_ROOT / "train_reused.py"))
+def _pcc_config(config: Path, checkpoint: Path, device: str):
+    cfg = Config.fromfile(str(config))
     cfg.MODEL.WEIGHTS = str(checkpoint)
     cfg.MODEL.DEVICE = device
     cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.pretrained = False
-    cfg.DATASETS.TRAIN = ("lmo_bop_test",)
-    cfg.DATASETS.TEST = ("lmo_bop_test",)
+    cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.pop("checkpoint_path", None)
     cfg.DATASETS.DET_FILES_TEST = ()
     cfg.MODEL.LOAD_DETS_TEST = False
     cfg.TEST.TEST_BBOX_TYPE = "gt"
@@ -61,6 +56,35 @@ def _pcc_config(checkpoint: Path, device: str):
     cfg.OUTPUT_DIR = str(ROOT / "output/experiments/EXP022-config-only")
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
     return cfg
+
+
+def _reference_config(path: Path, checkpoint: Path, device: str, dataset: str):
+    cfg = Config.fromfile(str(path))
+    cfg.MODEL.WEIGHTS = str(checkpoint)
+    cfg.MODEL.DEVICE = device
+    cfg.MODEL.LOAD_DETS_TEST = False
+    cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.pretrained = False
+    cfg.DATASETS.TRAIN = (dataset,)
+    cfg.DATASETS.TEST = (dataset,)
+    cfg.DATASETS.DET_FILES_TEST = ()
+    cfg.TEST.TEST_BBOX_TYPE = "gt"
+    cfg.TEST.USE_PNP = False
+    cfg.TEST.SAVE_RESULTS_ONLY = True
+    cfg.DATALOADER.NUM_WORKERS = 0
+    cfg.DATALOADER.PERSISTENT_WORKERS = False
+    cfg.OUTPUT_DIR = str(ROOT / "output/experiments/EXP022-reference-config-only")
+    return cfg
+
+
+def _target_counts_for(path: Path):
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    targets = json.loads(path.read_text(encoding="utf-8"))
+    counts = {}
+    for item in targets:
+        key = (f"{int(item['scene_id'])}/{int(item['im_id'])}", int(item["obj_id"]))
+        counts[key] = counts.get(key, 0) + int(item.get("inst_count", 1))
+    return counts
 
 
 def _pcc_model(cfg, checkpoint: Path):
@@ -131,29 +155,40 @@ def _summary(rows, variants):
     return summary
 
 
-def run_evaluation(official: Path, pcc_checkpoint: Path, output: Path, device: str,
+def run_evaluation(reference_config: Path, official: Path, pcc_config: Path,
+                   pcc_checkpoint: Path, output: Path, device: str,
                    limit: int | None, max_correspondences: int, exp021_config: Path | None = None,
                    exp021_checkpoint: Path | None = None):
     if bool(exp021_config) != bool(exp021_checkpoint):
         raise ValueError("EXP021 comparator config and checkpoint must be provided together")
+    cfg_p = _pcc_config(pcc_config, pcc_checkpoint, device)
+    context = resolve_dataset_context(cfg_p)
+    if context.test_dataset is None:
+        raise ValueError("EXP022 matched evaluation requires a test split")
+    if exp021_config and context.key != "lmo":
+        raise ValueError("EXP021 comparator is only defined for LM-O")
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    cfg_a = _configured(OFFICIAL_CONFIG, official, device)
-    cfg_p = _pcc_config(pcc_checkpoint, device)
+    cfg_a = _reference_config(reference_config, official, device, context.test_dataset)
     cfg_e = _configured(exp021_config, exp021_checkpoint, device) if exp021_config else None
     register_datasets_in_cfg(cfg_a)
-    metadata = MetadataCatalog.get("lmo_bop_test")
-    data_ref = ref.__dict__[metadata.ref_key]
-    object_ids = [int(data_ref.obj2id[name]) for name in metadata.objs]
+    metadata = MetadataCatalog.get(context.test_dataset)
+    object_ids = list(context.object_ids)
     official_model = _load_model(cfg_a, official, device)
     pcc_model = _pcc_model(cfg_p, pcc_checkpoint)
     exp021_model = _load_model(cfg_e, exp021_checkpoint, device) if cfg_e else None
-    images, annotations = _dataset_lookups("lmo_bop_test")
-    target_counts = _target_counts()
-    surfaces = _surface_lookups(object_ids)
-    loader = build_gdrn_test_loader(cfg_a, "lmo_bop_test", train_objs=metadata.objs, batch_size=1)
+    images, annotations = _dataset_lookups(context.test_dataset)
+    target_counts = _target_counts_for(context.bop_targets)
+    if set(object_ids) != {obj_id for _, obj_id in target_counts}:
+        raise ValueError("EXP022 target object IDs do not match dataset context")
+    surfaces = _surface_lookups(object_ids, context.cad_model_dir, context.cad_vertex_scale)
+    loader = build_gdrn_test_loader(cfg_a, context.test_dataset,
+                                    train_objs=metadata.objs, batch_size=1)
     commit, branch, dirty = _git_state()
-    meta = {"status": "RUNNING", "experiment_id": EXPERIMENT_ID,
+    meta = {"status": "RUNNING", "experiment_id": str(cfg_p.EXPERIMENT_ID),
+            "dataset": context.key, "test_dataset": context.test_dataset,
+            "object_ids": object_ids, "bop_targets": str(context.bop_targets),
+            "pcc_config": str(pcc_config), "reference_config": str(reference_config),
             "evaluation": "fixed_support_matched_ransac_pnp",
             "fixed_support_source": "official_pred_visible INTERSECT gt_visible INTERSECT valid_depth",
             "official_checkpoint": str(official), "pcc_checkpoint": str(pcc_checkpoint),
@@ -293,11 +328,11 @@ def run_evaluation(official: Path, pcc_checkpoint: Path, output: Path, device: s
     return summary
 
 
-def bop_evaluate(output: Path):
+def bop_evaluate(output: Path, dataset: str, targets_filename: str):
     rows = [json.loads(line) for line in (output / "poses.jsonl").read_text().splitlines() if line]
     variants = [key for key in ("a", "pcc", "exp021_k4") if key in rows[0]]
     result_dir, eval_dir = output / "bop_results", output / "bop_eval"
-    names = export_bop(rows, variants, result_dir)
+    names = export_bop(rows, variants, result_dir, dataset=dataset)
     environment = os.environ.copy()
     toolkit, renderer = ROOT / ".local/bop_toolkit", ROOT / ".local/bop_renderer/build"
     environment.update(
@@ -310,13 +345,13 @@ def bop_evaluate(output: Path):
         sys.executable, str(ROOT / "lib/pysixd/scripts/eval_pose_results_more.py"),
         f"--results_path={result_dir}", f"--eval_path={eval_dir}",
         f"--result_filenames={','.join(names)}", "--renderer_type=cpp",
-        "--error_types=mspd,mssd,vsd,ad,reS,teS", "--targets_filename=test_targets_bop19.json",
-        "--n_top=1", "--dataset=lmo",
+        "--error_types=mspd,mssd,vsd,ad,reS,teS", f"--targets_filename={targets_filename}",
+        "--n_top=1", f"--dataset={dataset}",
     ]
     subprocess.run(command, check=True, cwd=ROOT, env=environment)
     metrics = {}
     for variant in variants:
-        root = eval_dir / f"{variant}_lmo-test"
+        root = eval_dir / f"{variant}_{dataset}-test"
         bop = json.loads((root / "scores_bop19.json").read_text())
         add_files = list(root.glob("error=ad_ntop=*/scores_th=0.100_min-visib=-1.000.json"))
         add_files += list(root.glob("error:ad_ntop:*/scores_th:0.100_min-visib:-1.000.json"))
@@ -334,24 +369,51 @@ def bop_evaluate(output: Path):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--official-checkpoint", type=Path, default=OFFICIAL_WEIGHTS)
-    parser.add_argument("--pcc-checkpoint", type=Path, required=True)
+    parser.add_argument("--config", type=Path, default=CONFIG_ROOT / "train_reused.py")
+    parser.add_argument("--reference-config", type=Path)
+    parser.add_argument("--reference-checkpoint", "--official-checkpoint", type=Path)
+    parser.add_argument("--pcc-checkpoint", type=Path)
     parser.add_argument("--exp021-config", type=Path)
     parser.add_argument("--exp021-checkpoint", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--max-correspondences", type=int, default=0)
     parser.add_argument("--bop-eval", action="store_true")
+    parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
+    config_path = args.config if args.config.is_absolute() or args.config.exists() else CONFIG_ROOT / args.config
+    cfg = Config.fromfile(str(config_path))
+    context = resolve_dataset_context(cfg)
+    if context.test_dataset is None:
+        raise ValueError("EXP022 matched evaluator requires a test split")
+    target_counts = _target_counts_for(context.bop_targets)
+    if args.validate_only:
+        print(json.dumps({"status": "PASS", "dataset": context.key,
+                          "test_dataset": context.test_dataset,
+                          "object_ids": context.object_ids,
+                          "num_targets": _full_target_total(target_counts),
+                          "bop_targets": str(context.bop_targets)}, indent=2))
+        return 0
+    if args.pcc_checkpoint is None or args.output is None:
+        raise ValueError("--pcc-checkpoint and --output are required")
+    settings = cfg.DATASET_CONTEXT
+    reference_config = args.reference_config or (Path(settings.REFERENCE_CONFIG)
+                                                 if settings.get("REFERENCE_CONFIG") else None)
+    reference_checkpoint = args.reference_checkpoint or (Path(settings.REFERENCE_CHECKPOINT)
+                                                         if settings.get("REFERENCE_CHECKPOINT") else None)
+    if reference_config is None or reference_checkpoint is None:
+        raise ValueError("Dataset-specific reference config and checkpoint are required")
     if args.device.startswith("cuda") and not torch.cuda.is_available():
         raise RuntimeError(f"{args.device} requested but CUDA is unavailable")
     if args.bop_eval and args.limit is not None:
         raise ValueError("--bop-eval requires a complete matched evaluation")
-    result = run_evaluation(args.official_checkpoint, args.pcc_checkpoint, args.output, args.device,
+    result = run_evaluation(reference_config, reference_checkpoint, config_path,
+                            args.pcc_checkpoint, args.output, args.device,
                             args.limit, args.max_correspondences, args.exp021_config, args.exp021_checkpoint)
     if args.bop_eval:
-        result["bop"] = bop_evaluate(args.output.resolve())
+        result["bop"] = bop_evaluate(args.output.resolve(), context.bop_dataset,
+                                      context.bop_targets.name)
     print(json.dumps({"status": "COMPLETE", "summary": result}, indent=2))
     return 0
 

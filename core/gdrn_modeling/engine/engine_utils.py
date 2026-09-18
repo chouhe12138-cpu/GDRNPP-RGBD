@@ -132,8 +132,8 @@ def geometry_supervision_enabled(cfg):
     net_cfg = cfg.MODEL.POSE_NET
     pcc_cfg = net_cfg.get("PCC_HEAD", {})
     if pcc_cfg.get("ENABLED", False):
-        if net_cfg.NAME != "GDRN_PCC" or not net_cfg.BACKBONE.FREEZE:
-            raise ValueError("EXP022 requires GDRN_PCC with a frozen backbone")
+        if net_cfg.NAME != "GDRN_PCC":
+            raise ValueError("EXP022 requires GDRN_PCC")
         if training_geometry_renderer_type(cfg) is None:
             raise ValueError("EXP022 requires online geometry renderer")
         return True

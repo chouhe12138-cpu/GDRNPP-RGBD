@@ -83,7 +83,8 @@ class LM_PBR_Dataset:
         ##################################################
 
         # NOTE: careful! Only the selected objects
-        self.cat_ids = [cat_id for cat_id, obj_name in ref.lm_full.id2obj.items() if obj_name in self.objs]
+        data_ref = ref.__dict__[data_cfg["ref_key"]]
+        self.cat_ids = [int(data_ref.obj2id[name]) for name in self.objs]
         # map selected objs to [0, num_objs-1]
         self.cat2label = {v: i for i, v in enumerate(self.cat_ids)}  # id_map
         self.label2cat = {label: cat for cat, label in self.cat2label.items()}
@@ -517,6 +518,17 @@ for obj in ref.lmo_full.objects:
                 filter_invalid=True,
                 ref_key="lmo_full",
             )
+
+
+SPLITS_LM_PBR["lm_pbr_13_online_train"] = dict(
+    SPLITS_LM_PBR["lm_pbr_13_train"],
+    name="lm_pbr_13_online_train", require_xyz=False,
+)
+SPLITS_LM_PBR["lm_pbr_13_online_smoke"] = dict(
+    SPLITS_LM_PBR["lm_pbr_13_online_train"],
+    name="lm_pbr_13_online_smoke", scene_ids=(0,),
+    max_instances_per_object=2, use_cache=False,
+)
 
 
 def register_with_name_cfg(name, data_cfg=None):

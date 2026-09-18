@@ -7,10 +7,12 @@ import os
 from pathlib import Path
 
 import numpy as np
+from mmcv import Config
 from scipy.optimize import linear_sum_assignment
 
 import ref
-from lib.pysixd import inout
+from lib.pysixd import inout, misc
+from research.exp022.dataset_context import resolve_dataset_context
 from research.exp021.build_cad_hierarchy import (
     DEFAULT_SAMPLES,
     _fps,
@@ -25,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DATASET_CACHE = Path(os.environ.get("GDRN_DATASET_CACHE_DIR", ROOT / ".local/dataset_cache"))
 SOURCE_DEFAULT = DATASET_CACHE / "exp021/hierarchy_v1.npz"
 CACHE_DEFAULT = DATASET_CACHE / "exp022"
-OBJECT_IDS = (1, 5, 6, 8, 9, 10, 11, 12)
+LMO_CONFIG = ROOT / "configs/gdrn/lmo_pbr/research/exp022_progressive_pcc/train_reused.py"
 GENERATOR_VERSION = 1
 INDEPENDENT_GENERATOR_VERSION = 2
 SEED = 20260916
@@ -88,12 +90,13 @@ def _reused_object(src: dict, index: int):
     return levels, source_leaf_indices.reshape(4096)
 
 
-def _independent_object(obj_id: int, seed: int, sample_count: int):
+def _independent_object(obj_id: int, seed: int, sample_count: int,
+                        model_dir: Path, vertex_scale: float):
     if sample_count < 4096:
         raise ValueError("Independent 8^4 tree needs at least 4096 surface samples")
     model = inout.load_ply(
-        str(Path(ref.lm_full.model_dir) / f"obj_{obj_id:06d}.ply"),
-        vertex_scale=ref.lm_full.vertex_scale,
+        str(model_dir / f"obj_{obj_id:06d}.ply"),
+        vertex_scale=vertex_scale,
     )
     points, normals = _sample_surface(model, sample_count, np.random.default_rng(seed + obj_id))
     groups = [(points, normals)]
@@ -140,24 +143,62 @@ def _independent_object(obj_id: int, seed: int, sample_count: int):
             np.concatenate(radii_out).astype(np.float32),
         ))
         groups = children
-    return levels, np.full(4096, -1, dtype=np.int64)
+    return levels, np.full(4096, -1, dtype=np.int64), np.ptp(model["pts"], axis=0).astype(np.float32)
 
 
-def build(mode: str, source: Path = SOURCE_DEFAULT, seed: int = SEED, sample_count: int = DEFAULT_SAMPLES):
+def _symmetry_arrays(models_info: dict, object_ids: tuple[int, ...], vertex_scale: float):
+    groups = []
+    for obj_id in object_ids:
+        transforms = misc.get_symmetry_transformations(
+            models_info[str(obj_id)], max_sym_disc_step=0.01
+        )
+        matrices = []
+        for item in transforms:
+            matrix = np.eye(4, dtype=np.float32)
+            matrix[:3, :3] = item["R"]
+            matrix[:3, 3] = np.asarray(item["t"]).reshape(3) * vertex_scale
+            matrices.append(matrix)
+        groups.append(np.stack(matrices))
+    counts = np.asarray([len(item) for item in groups], dtype=np.int64)
+    padded = np.tile(np.eye(4, dtype=np.float32), (len(groups), int(counts.max()), 1, 1))
+    for index, group in enumerate(groups):
+        padded[index, :len(group)] = group
+    return counts, padded
+
+
+def build(mode: str, source: Path = SOURCE_DEFAULT, seed: int = SEED,
+          sample_count: int = DEFAULT_SAMPLES, context=None):
     if mode not in {"reused", "independent"}:
         raise ValueError(f"Unknown EXP022 hierarchy mode: {mode}")
-    with np.load(source, allow_pickle=False) as original:
-        src = {name: np.asarray(original[name]).copy() for name in original.files}
-    if tuple(src["object_ids"].tolist()) != OBJECT_IDS:
-        raise ValueError("EXP021 object order does not match EXP022")
-    output = {name: src[name] for name in ("object_ids", "extents", "diameters", "symmetry_counts", "symmetry_transforms")}
+    if context is None:
+        context = resolve_dataset_context(Config.fromfile(str(LMO_CONFIG)), require_hierarchy=False)
+    object_ids = context.object_ids
+    if mode == "reused":
+        with np.load(source, allow_pickle=False) as original:
+            src = {name: np.asarray(original[name]).copy() for name in original.files}
+        if tuple(src["object_ids"].tolist()) != object_ids:
+            raise ValueError("EXP021 object order does not match EXP022")
+        output = {name: src[name] for name in
+                  ("object_ids", "extents", "diameters", "symmetry_counts", "symmetry_transforms")}
+    else:
+        cad_ref = ref.__dict__[context.cad_ref_key]
+        models_info = cad_ref.get_models_info()
+        counts, transforms = _symmetry_arrays(models_info, object_ids, context.cad_vertex_scale)
+        output = dict(object_ids=np.asarray(object_ids, dtype=np.int64),
+                      extents=[], diameters=np.asarray([
+                          models_info[str(obj_id)]["diameter"] * context.cad_vertex_scale
+                          for obj_id in object_ids], dtype=np.float32),
+                      symmetry_counts=counts, symmetry_transforms=transforms)
     per_level = [[], [], [], []]
     source_indices = []
-    for index, obj_id in enumerate(OBJECT_IDS):
-        levels, indices = (
-            _reused_object(src, index) if mode == "reused"
-            else _independent_object(obj_id, seed, sample_count)
-        )
+    for index, obj_id in enumerate(object_ids):
+        if mode == "reused":
+            levels, indices = _reused_object(src, index)
+        else:
+            levels, indices, extent = _independent_object(
+                obj_id, seed, sample_count, context.cad_model_dir, context.cad_vertex_scale
+            )
+            output["extents"].append(extent)
         for depth, level in enumerate(levels):
             per_level[depth].append(level)
         source_indices.append(indices)
@@ -165,6 +206,10 @@ def build(mode: str, source: Path = SOURCE_DEFAULT, seed: int = SEED, sample_cou
         for field, component in (("anchors", 0), ("normals", 1), ("radii", 2)):
             output[f"level{depth}_{field}"] = np.stack([obj[component] for obj in objects])
     output["source_leaf_indices"] = np.stack(source_indices)
+    if mode == "independent":
+        output["extents"] = np.stack(output["extents"])
+        output["dataset_key"] = np.asarray(context.key)
+        output["cad_ref_key"] = np.asarray(context.cad_ref_key)
     output["generator_version"] = np.asarray(
         GENERATOR_VERSION if mode == "reused" else INDEPENDENT_GENERATOR_VERSION, dtype=np.int64
     )
@@ -178,15 +223,20 @@ def build(mode: str, source: Path = SOURCE_DEFAULT, seed: int = SEED, sample_cou
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("reused", "independent"), required=True)
+    parser.add_argument("--config", type=Path, default=LMO_CONFIG)
     parser.add_argument("--source", type=Path, default=SOURCE_DEFAULT)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--sample-count", type=int, default=DEFAULT_SAMPLES)
     args = parser.parse_args()
+    context = resolve_dataset_context(Config.fromfile(str(args.config)), require_hierarchy=False)
+    if args.mode == "reused" and context.key != "lmo":
+        raise ValueError("EXP022 reused hierarchy is defined only for LM-O EXP021 source")
     filename = "reused_v1.npz" if args.mode == "reused" else "independent_v2.npz"
-    output = args.output or CACHE_DEFAULT / filename
+    default_dir = CACHE_DEFAULT if context.key == "lmo" else CACHE_DEFAULT / context.key
+    output = args.output or default_dir / filename
     if output.exists():
         raise FileExistsError(output)
-    hierarchy = build(args.mode, args.source, sample_count=args.sample_count)
+    hierarchy = build(args.mode, args.source, sample_count=args.sample_count, context=context)
     output.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output, **hierarchy)
     print(f"EXP022 hierarchy {args.mode}: {output}")

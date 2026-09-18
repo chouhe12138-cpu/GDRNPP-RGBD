@@ -17,6 +17,7 @@ PROJ_ROOT = osp.normpath(osp.join(cur_dir, "../../.."))
 sys.path.insert(0, PROJ_ROOT)
 
 import ref
+from .lm_pbr import LM_13_OBJECTS
 
 from lib.pysixd import inout, misc
 from lib.utils.mask_utils import binary_mask_to_rle, cocosegm2mask
@@ -77,7 +78,8 @@ class LMO_BOP_TEST_Dataset(object):
         ##################################################
 
         # NOTE: careful! Only the selected objects
-        self.cat_ids = [cat_id for cat_id, obj_name in ref.lmo_full.id2obj.items() if obj_name in self.objs]
+        self.data_ref = ref.__dict__[data_cfg["ref_key"]]
+        self.cat_ids = [int(self.data_ref.obj2id[name]) for name in self.objs]
         # map selected objs to [0, num_objs-1]
         self.cat2label = {v: i for i, v in enumerate(self.cat_ids)}  # id_map
         self.label2cat = {label: cat for cat, label in self.cat2label.items()}
@@ -280,7 +282,7 @@ class LMO_BOP_TEST_Dataset(object):
             model = inout.load_ply(
                 osp.join(
                     self.models_root,
-                    f"obj_{ref.lmo_full.obj2id[obj_name]:06d}.ply",
+                    f"obj_{self.data_ref.obj2id[obj_name]:06d}.ply",
                 ),
                 vertex_scale=self.scale_to_meter,
             )
@@ -348,6 +350,16 @@ SPLITS_LMO = dict(
     ),
 )
 
+SPLITS_LMO["lm_bop_test_13"] = dict(
+    SPLITS_LMO["lmo_bop_test"],
+    name="lm_bop_test_13",
+    dataset_root=osp.join(DATASETS_ROOT, "BOP_DATASETS/lm/test"),
+    models_root=ref.lm_full.model_dir,
+    objs=LM_13_OBJECTS,
+    ann_file=osp.join(DATASETS_ROOT, "BOP_DATASETS/lm/test_targets_bop19.json"),
+    ref_key="lm_full",
+)
+
 # single obj splits for lmo bop test
 for obj in ref.lmo_full.objects:
     for split in [
@@ -398,7 +410,7 @@ def register_with_name_cfg(name, data_cfg=None):
     DatasetCatalog.register(name, LMO_BOP_TEST_Dataset(used_cfg))
     # something like eval_types
     MetadataCatalog.get(name).set(
-        id="lmo",  # NOTE: for pvnet to determine module
+        id="lm" if used_cfg["ref_key"] == "lm_full" else "lmo",
         ref_key=used_cfg["ref_key"],
         objs=used_cfg["objs"],
         eval_error_types=["ad", "rete", "proj"],

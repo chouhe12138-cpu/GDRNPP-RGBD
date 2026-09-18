@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One genuine LM-O online-geometry CUDA batch; optional short timing sample."""
+"""One genuine EXP022 online-geometry CUDA batch; optional short timing sample."""
 
 from __future__ import annotations
 
@@ -21,15 +21,14 @@ from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
 from core.gdrn_modeling.engine.engine_utils import batch_data, get_renderer
 from core.gdrn_modeling.models.GDRN_PCC import build_model_optimizer
 from research.exp022.preflight import CONFIG_ROOT, load_official_backbone
+from research.exp022.dataset_context import resolve_dataset_context
 from research.run_contract import validate_research_run_config
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", choices=("smoke_reused.py", "smoke_independent.py"),
-                        default="smoke_reused.py")
-    parser.add_argument("--weights", type=Path,
-                        default=Path("pretrained_models/lmo_pbr/model_final_wo_optim.pth"))
+    parser.add_argument("--config", type=Path, default=CONFIG_ROOT / "smoke_reused.py")
+    parser.add_argument("--weights", type=Path)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--renderer", choices=("cpp", "egl"), default="cpp")
     parser.add_argument("--batch-size", type=int, default=4)
@@ -50,9 +49,11 @@ def main() -> int:
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    cfg = Config.fromfile(str(CONFIG_ROOT / args.config))
+    config_path = args.config if args.config.is_absolute() or args.config.exists() else CONFIG_ROOT / args.config
+    cfg = Config.fromfile(str(config_path))
     validate_research_run_config(cfg, mode="smoke",
-                                 expected_experiment_id="EXP-20260916-022-progressive-pcc")
+                                 expected_experiment_id=cfg.EXPERIMENT_ID)
+    context = resolve_dataset_context(cfg)
     cfg.MODEL.DEVICE = args.device
     cfg.MODEL.POSE_NET.XYZ_RENDERER = args.renderer
     cfg.DATALOADER.NUM_WORKERS = 0
@@ -61,7 +62,9 @@ def main() -> int:
     cfg.SOLVER.REFERENCE_BS = args.batch_size
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
     model, optimizer = build_model_optimizer(cfg)
-    loaded = load_official_backbone(model, args.weights)
+    loaded = (load_official_backbone(model, args.weights or Path(cfg.MODEL.WEIGHTS))
+              if cfg.MODEL.POSE_NET.BACKBONE.FREEZE else
+              sum(1 for _ in model.backbone.state_dict()))
     model.train()
     renderer = None
     timings, history, phases = [], [], []
@@ -69,9 +72,12 @@ def main() -> int:
         if args.load_batch is not None:
             saved = torch.load(args.load_batch, map_location="cpu")
             required = {"roi_img", "roi_cls", "roi_xyz", "roi_mask_visib"}
-            if set(saved) != required or saved["roi_img"].shape[0] != args.batch_size:
+            if not required.issubset(saved) or saved["roi_img"].shape[0] != args.batch_size:
                 raise ValueError("Saved EXP022 batch keys or batch size mismatch")
-            batch = {key: value.to(args.device) for key, value in saved.items()}
+            if saved.get("dataset_key") != context.key or tuple(saved.get("object_ids", ())) != context.object_ids:
+                if context.key != "lmo" or "dataset_key" in saved:
+                    raise ValueError("Saved EXP022 batch dataset/object order mismatch")
+            batch = {key: saved[key].to(args.device) for key in required}
         else:
             register_datasets_in_cfg(cfg)
             metadata = MetadataCatalog.get(cfg.DATASETS.TRAIN[0])
@@ -85,8 +91,10 @@ def main() -> int:
                 if args.save_batch.exists():
                     raise FileExistsError(args.save_batch)
                 args.save_batch.parent.mkdir(parents=True, exist_ok=True)
-                torch.save({key: batch[key].detach().cpu() for key in
-                            ("roi_img", "roi_cls", "roi_xyz", "roi_mask_visib")}, args.save_batch)
+                serializable = {key: batch[key].detach().cpu() for key in
+                                ("roi_img", "roi_cls", "roi_xyz", "roi_mask_visib")}
+                serializable.update(dataset_key=context.key, object_ids=context.object_ids)
+                torch.save(serializable, args.save_batch)
         image, classes = batch["roi_img"], batch["roi_cls"]
         scaler = torch.cuda.amp.GradScaler(enabled=True)
         torch.cuda.reset_peak_memory_stats()
@@ -108,7 +116,7 @@ def main() -> int:
             backward_end = time.perf_counter()
             scaler.unscale_(optimizer)
             if any(p.grad is not None and not torch.isfinite(p.grad).all()
-                   for p in model.pcc_head.parameters()):
+                   for p in model.parameters() if p.requires_grad):
                 raise RuntimeError("Non-finite EXP022 smoke gradient")
             torch.cuda.synchronize()
             audit_end = time.perf_counter()
@@ -133,15 +141,18 @@ def main() -> int:
             raise RuntimeError("Non-finite EXP022 inference XYZ")
         if output["residual_norm"].max() > 1.00001:
             raise RuntimeError("EXP022 residual bound violated")
-        print(json.dumps({"status": "PASS", "config": args.config, "renderer": args.renderer,
+        print(json.dumps({"status": "PASS", "config": str(config_path), "renderer": args.renderer,
+                          "dataset": context.key, "num_objects": context.num_objects,
+                          "object_ids": context.object_ids,
+                          "hierarchy_path": str(context.hierarchy_path),
                           "batch_source": "saved" if args.load_batch else "online",
                           "batch_size": args.batch_size, "steps": args.steps, "seed": args.seed,
                           "diagnostics": args.diagnostics,
-                          "official_backbone_tensors": loaded,
-                          "trainable_parameters": sum(p.numel() for p in model.pcc_head.parameters()),
+                          "backbone_tensors": loaded,
+                          "trainable_parameters": sum(p.numel() for p in model.parameters() if p.requires_grad),
                           "total_parameters": sum(p.numel() for p in model.parameters()),
                           "backbone_parameters": sum(p.numel() for p in model.backbone.parameters()),
-                          "class_histogram": torch.bincount(classes, minlength=8).cpu().tolist(),
+                          "class_histogram": torch.bincount(classes, minlength=context.num_objects).cpu().tolist(),
                           "symmetric_instances": int((model.pcc_head.symmetry_counts[classes] > 1).sum()),
                           "losses": history, "step_median_ms": statistics.median(timings),
                           "warmup_steps": warmup_steps,

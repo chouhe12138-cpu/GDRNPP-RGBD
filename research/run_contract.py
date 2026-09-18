@@ -32,7 +32,7 @@ def validate_research_run_config(
     expected_experiment_id: Optional[str] = None,
 ) -> dict[str, object]:
     """Validate the effective config before a managed run creates output."""
-    if mode not in {"smoke", "formal", "eval"}:
+    if mode not in {"smoke", "formal", "eval", "prepare"}:
         raise ValueError(f"Unsupported run mode: {mode}")
     if expected_experiment_id is not None and cfg.EXPERIMENT_ID != expected_experiment_id:
         raise ValueError(
@@ -43,7 +43,21 @@ def validate_research_run_config(
     training_supervision = geometry_supervision_enabled(cfg)
     evaluation_renderer = _evaluation_renderer(cfg)
 
-    if int(cfg.SEED) != 42:
+    protocol = cfg.get("RESEARCH_PROTOCOL", {})
+    configurable = protocol.get("SCHEDULE") == "configurable"
+    if configurable:
+        if int(cfg.SEED) < 0:
+            raise ValueError("Configurable research runs require a fixed nonnegative seed")
+        for key in ("TOTAL_EPOCHS", "IMS_PER_BATCH", "REFERENCE_BS", "CHECKPOINT_PERIOD"):
+            if int(cfg.SOLVER[key]) <= 0:
+                raise ValueError(f"SOLVER.{key} must be positive")
+        if int(cfg.SOLVER.REFERENCE_BS) % int(cfg.SOLVER.IMS_PER_BATCH):
+            raise ValueError("REFERENCE_BS must be divisible by IMS_PER_BATCH")
+        if int(cfg.TEST.EVAL_PERIOD) < 0:
+            raise ValueError("TEST.EVAL_PERIOD must be nonnegative")
+        if not bool(cfg.SOLVER.AMP.ENABLED):
+            raise ValueError("New formal research configurations require AMP")
+    elif int(cfg.SEED) != 42:
         raise ValueError(f"Research runs require seed 42, got {cfg.SEED}")
 
     if mode == "smoke":
@@ -59,6 +73,20 @@ def validate_research_run_config(
             raise ValueError("smoke must disable best-checkpoint selection")
 
     if mode == "formal":
+        if configurable:
+            if not bool(protocol.get("FORMAL_READY", False)):
+                raise ValueError("Configurable formal protocol is not ready")
+            if not cfg.DATASETS.TRAIN or not cfg.DATASETS.TEST:
+                raise ValueError("Formal protocol requires train and test splits")
+            if int(cfg.TEST.EVAL_PERIOD) <= 0:
+                raise ValueError("Formal protocol requires periodic evaluation")
+            if int(cfg.SOLVER.CHECKPOINT_PERIOD) > int(cfg.SOLVER.TOTAL_EPOCHS):
+                raise ValueError("Checkpoint period exceeds total epochs")
+            if int(cfg.TEST.EVAL_PERIOD) > int(cfg.SOLVER.TOTAL_EPOCHS):
+                raise ValueError("Evaluation period exceeds total epochs")
+            if str(cfg.TEST.TEST_BBOX_TYPE).lower() != "gt" or evaluation_renderer is None:
+                raise ValueError("Formal protocol requires GT box and evaluation renderer")
+            return _summary(cfg, mode, training_supervision, evaluation_renderer)
         expected = {
             "TOTAL_EPOCHS": 40,
             "IMS_PER_BATCH": 48,
@@ -90,6 +118,10 @@ def validate_research_run_config(
         if evaluation_renderer is None:
             raise ValueError("independent BOP evaluation renderer must be cpp or egl")
 
+    return _summary(cfg, mode, training_supervision, evaluation_renderer)
+
+
+def _summary(cfg, mode, training_supervision, evaluation_renderer):
     return {
         "mode": mode,
         "experiment_id": str(cfg.EXPERIMENT_ID),
@@ -108,7 +140,7 @@ def validate_research_run_config(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
-    parser.add_argument("--mode", required=True, choices=("smoke", "formal", "eval"))
+    parser.add_argument("--mode", required=True, choices=("smoke", "formal", "eval", "prepare"))
     parser.add_argument("--experiment-id", required=True)
     args = parser.parse_args()
 

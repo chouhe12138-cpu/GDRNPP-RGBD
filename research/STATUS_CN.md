@@ -1,6 +1,10 @@
 # 当前研究状态
 
-最后核对：2026-09-17。
+最后核对：2026-09-18。
+
+## EXP022 多数据集接入 / EXP023 LM13 准备（2026-09-18）
+
+EXP022 方法、层级 loader/builder、CPU preflight、真实 CUDA smoke 与 matched evaluator 已接入统一 Dataset Context。LM-O 旧配置只增加上下文字段，仍用原始层级与冻结官方 backbone；LM-O 本机保存真实 batch48 的 AMP smoke PASS，340 个官方 backbone 张量加载，PCC 可训练参数 `3,728,456`，无 AMP 跳步。LM13 训练/测试对象顺序为标准非连续 13 个 BOP ID，独立层级已生成；ImageNet ConvNeXt 340 个张量 CPU 验证与本机 CUDA+CPP 在线 batch1 两步 AMP smoke PASS，完整模型 `91,292,872` 参数可训练。LM13 测试集实读 2600 个实例、类别覆盖 0..12；matched evaluator 对 2600 个 BOP target 的协议验证通过。research 回归 `223 passed`，后加的对象顺序测试单独通过。尚无 LM13 reference/PCC 正式 checkpoint，也无正式训练或评价。T-LESS 当前只有配置预留，数据与 variable-S 对称监督待后续处理。详见 [EXP023 RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md) 和 [EXP022 README](exp022/README.md)。
 
 ## EXP022 第一阶段（2026-09-16 起）
 

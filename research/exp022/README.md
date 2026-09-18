@@ -1,6 +1,28 @@
-# EXP022 — 渐进式层级 CAD 对应与多尺度 PCC（第一阶段）
+# EXP022 — 渐进式层级 CAD 对应与多尺度 PCC
 
-本阶段仅使用冻结的官方 RGB ConvNeXt 8×8 特征，训练四级 PCC、stage transition、局部残差和可见 mask。第二阶段全量 backbone 训练、ResNet-50 与部署不在当前范围。Geometry-adaptive partition 与 fragment adjacency 均为 **DEFERRED**。
+## 多数据集配置（2026-09-18）
+
+旧 LM-O 训练配置仍在 `configs/gdrn/lmo_pbr/research/exp022_progressive_pcc/`，使用原始 `reused_v1.npz` 和冻结的官方 ConvNeXt。其方法参数现在引用 `configs/gdrn/research/exp022_progressive_pcc/method.py`；有效配置仅增加 `DATASET_CONTEXT`，不更改 PCC 数学结构。
+
+新实验从 `configs/gdrn/research/exp022_progressive_pcc/common.py` 继承公共模型，从 `configs/gdrn/research/_base_/research_runtime.py` 继承可调整的训练协议。`train_lm13.py` 使用标准 LM 13 类、独立表面层级和 ImageNet ConvNeXt 初始化，完整训练 backbone 与 PCC；这是新的实验协议，不与旧 LM-O 冻结 backbone 的结果直接当作单变量比较。`smoke_lm13.py` 仅取 PBR 场景 0 的少量实例。`tless_reserved.py` 只保留配置接口，待数据和 variable-S 对称监督就绪后再检查或训练。
+
+`DATASET_CONTEXT` 集中定义数据集身份、CAD ref、BOP 名称和目标文件；`resolve_dataset_context` 从注册的 train/test metadata 取得对象顺序和真实 BOP ID，并校验 hierarchy 行顺序。新增数据集需注册 split、配置 CAD ref、生成 hierarchy 并指定对应 reference 模型。LM13 当前没有 matched reference checkpoint，因此 matched evaluator 仅完成协议验证，尚未产生正式指标。
+
+在仓库根目录激活 Conda `pytorch22` 后，LM13 本地检查入口为：
+
+```bash
+export GDRN_CONVNEXT_BASE_WEIGHTS=/path/to/convnext_base_1k_224_ema.pth
+python -m research.exp022.build_hierarchy --config configs/gdrn/research/exp022_progressive_pcc/train_lm13.py --mode independent
+python -m research.exp022.preflight --config configs/gdrn/research/exp022_progressive_pcc/train_lm13.py
+python -m research.exp022.real_smoke --config configs/gdrn/research/exp022_progressive_pcc/smoke_lm13.py --renderer cpp --device cuda:0 --batch-size 1 --steps 2
+python -m research.exp022.matched_pnp_eval --config configs/gdrn/research/exp022_progressive_pcc/train_lm13.py --validate-only
+```
+
+层级生成器拒绝覆盖已有文件；首次生成后，保持配置中的 hierarchy 路径与产物一致。LM13 正式训练配置仍标记 `FORMAL_READY=False`，需要在确定完整训练、评估和对照协议后再启用。
+
+## LM-O 第一阶段固定协议
+
+旧 LM-O 第一阶段使用冻结的官方 RGB ConvNeXt 8×8 特征，训练四级 PCC、stage transition、局部残差和可见 mask。新 LM13 配置允许全量 backbone 训练；ResNet-50、部署、Geometry-adaptive partition 与 fragment adjacency 仍为 **DEFERRED**。
 
 当前结构：`1024→512→256→128→64` CNN 通道阶梯；stage 间为双线性上采样加 1×1 Conv。各级以 256 维 image token 做图像 self-attention，S1/S2 为全局 attention，S3/S4 各为 8×8 window + shift=4 window attention。每级仅匹配当前 parent 下 8 个 CAD child：独立 Q/K/V 投影得到 raw route logits 与 soft CAD context，前者训练 CE/更新 Top-2 beam，后者直接经 stage 的 `context_proj` 与小 gate 以残差方式回注 CNN feature。图像 attention 使用 Pre-Norm、8 heads、无 FFN；全局及普通 window 使用 `nn.MultiheadAttention(need_weights=False)`，shifted window 复用其 Q/K/V/out 权重并用广播 mask 的 SDPA。CAD 局部匹配保留显式 8-way logits 与 packed routes。最终 fused Stage-4 feature 经同一个 image projection 进入 leaf-local residual head；visible mask 来自 64 通道特征。
 

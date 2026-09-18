@@ -105,12 +105,14 @@ def _forward(model, cfg: Config, batch: dict, beam_ks=DEFAULT_KS) -> dict:
     }
 
 
-def _surface_lookups(object_ids: list[int]) -> dict[int, tuple[cKDTree, np.ndarray]]:
+def _surface_lookups(object_ids: list[int], model_dir: Path | None = None,
+                     vertex_scale: float | None = None) -> dict[int, tuple[cKDTree, np.ndarray]]:
     lookups = {}
-    model_dir = Path(ref.lm_full.model_dir)
+    model_dir = Path(ref.lm_full.model_dir) if model_dir is None else Path(model_dir)
+    vertex_scale = ref.lm_full.vertex_scale if vertex_scale is None else vertex_scale
     for obj_id in object_ids:
         model = inout.load_ply(
-            str(model_dir / f"obj_{obj_id:06d}.ply"), vertex_scale=ref.lm_full.vertex_scale
+            str(model_dir / f"obj_{obj_id:06d}.ply"), vertex_scale=vertex_scale
         )
         points, normals = _sample_surface(
             model, DEFAULT_SAMPLES, np.random.default_rng(DEFAULT_SEED + obj_id)
@@ -484,11 +486,12 @@ def run_evaluation(
     return summary
 
 
-def export_bop(rows: list[dict], variants: list[str], directory: Path) -> list[str]:
+def export_bop(rows: list[dict], variants: list[str], directory: Path,
+               dataset: str = "lmo") -> list[str]:
     directory.mkdir(parents=True, exist_ok=False)
     names = []
     for variant in variants:
-        name = f"{variant}_lmo-test.csv"
+        name = f"{variant}_{dataset}-test.csv"
         names.append(name)
         with (directory / name).open("w", encoding="utf-8", newline="") as stream:
             writer = csv.DictWriter(stream, fieldnames=("scene_id", "im_id", "obj_id", "score", "R", "t", "time"))
