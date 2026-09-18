@@ -5,11 +5,128 @@ import shlex
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from core.utils.default_args_setup import my_default_argument_parser
 
 
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "docker/l40/experiment.sh"
+
+LM13_OBJECTS = (
+    "ape", "benchvise", "camera", "can", "cat", "driller", "duck",
+    "eggbox", "glue", "holepuncher", "iron", "lamp", "phone",
+)
+LM13_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz"
+CONVNEXT_CHECKPOINT = (
+    "/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth"
+)
+LM13_CONTAINER_PATHS = (
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/test",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/image_set",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/models",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/train_pbr",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/train_pbr/000000/scene_gt.json",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/image_set/ape_train.txt",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/image_set/ape_test.txt",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/test/000001/scene_gt.json",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/test/000001/scene_gt_info.json",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/test/000001/scene_camera.json",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/obj_000001.ply",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/models_info.json",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lm/test_targets_bop19.json",
+    "/workspace/gdrnpp/datasets/BOP_DATASETS/lmo/test",
+    "/workspace/gdrnpp/datasets/lm_imgn/image_set",
+    "/workspace/gdrnpp/datasets/lm_imgn/imgn",
+    "/workspace/gdrnpp/datasets/lm_imgn/imgn/ape",
+    "/workspace/gdrnpp/datasets/lm_imgn/imgn/ape/000000_0-color.png",
+    "/workspace/gdrnpp/datasets/lm_imgn/imgn/ape/000000_0-depth.png",
+    "/workspace/gdrnpp/datasets/lm_imgn/imgn/ape/000000_0-pose.txt",
+    "/workspace/gdrnpp/datasets/VOCdevkit/VOC2012/JPEGImages",
+    "/workspace/gdrnpp/datasets/VOCdevkit/VOC2012/JPEGImages/2007_000027.jpg",
+    CONVNEXT_CHECKPOINT,
+    "/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth",
+    LM13_HIERARCHY,
+) + tuple(
+    f"/workspace/gdrnpp/datasets/lm_imgn/image_set/train_{obj}.txt" for obj in LM13_OBJECTS
+)
+
+# A stand-in for the container: `present` lists the paths that "exist", and the
+# three python entry points the launcher calls are answered from variables.
+FAKE_DOCKER = r'''
+container=test-container
+docker_bin=fake_docker
+present=(
+{paths}
+)
+fake_has() {{
+  local candidate
+  for candidate in "${{present[@]}}"; do
+    [[ "${{candidate}}" == "$1" ]] && return 0
+  done
+  return 1
+}}
+fake_has_glob() {{
+  local prefix="${{1%%\**}}" suffix="${{1##*\*}}" candidate
+  for candidate in "${{present[@]}}"; do
+    [[ "${{candidate}}" == "${{prefix}}"*"${{suffix}}" ]] && return 0
+  done
+  return 1
+}}
+fake_docker() {{
+  local verb="$1"; shift
+  [[ "${{verb}}" == "exec" ]] || return 1
+  while [[ $# -gt 0 && "$1" == -* ]]; do
+    case "$1" in
+      -w|-e) shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  shift
+  case "$1" in
+    test) fake_has "$3" ;;
+    bash) fake_has_glob "$5" ;;
+    printenv)
+      [[ -n "${{fake_convnext:-}}" ]] || return 1
+      printf '%s\n' "${{fake_convnext}}"
+      ;;
+    python)
+      if [[ "$2" == "-c" ]]; then
+        case "$5" in
+          TRAIN_PROTOCOL.NAME) printf '%s\n' "${{fake_train_protocol:-}}" ;;
+          MODEL.POSE_NET.PCC_HEAD.HIERARCHY_PATH) printf '%s\n' "${{fake_hierarchy:-}}" ;;
+          *) return 1 ;;
+        esac
+        return 0
+      fi
+      return "${{fake_server_preflight:-0}}"
+      ;;
+    *) return 1 ;;
+  esac
+}}
+'''
+
+
+def _resource_gate(
+    body: str,
+    *,
+    missing: tuple[str, ...] = (),
+    train_protocol: str = "lm13_gdrn",
+    convnext: str = CONVNEXT_CHECKPOINT,
+    hierarchy: str = LM13_HIERARCHY,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    present = [path for path in LM13_CONTAINER_PATHS if path not in missing]
+    preamble = FAKE_DOCKER.format(
+        paths="\n".join(f"    {shlex.quote(path)}" for path in present)
+    )
+    preamble += (
+        f"fake_train_protocol={shlex.quote(train_protocol)}\n"
+        f"fake_convnext={shlex.quote(convnext)}\n"
+        f"fake_hierarchy={shlex.quote(hierarchy)}\n"
+    )
+    return _source_and_run(preamble + body, check=check)
+
 
 
 def _source_and_run(body: str, *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -160,6 +277,8 @@ def test_runtime_gate_calls_every_lightweight_check():
         "verify_environment() { echo environment; }\n"
         "verify_native() { echo native; }\n"
         "load_runtime_config() { echo config:$1; }\n"
+        "resolve_resource_profile() { echo lm13; }\n"
+        "require_profile_resources() { echo resources:$1:$2; }\n"
         "validate_run_config() { echo contract:$1:$2; }\n"
         "runtime_gate formal configs/research/train.py"
     )
@@ -174,6 +293,7 @@ def test_runtime_gate_calls_every_lightweight_check():
         "environment",
         "native",
         "config:configs/research/train.py",
+        "resources:lm13:configs/research/train.py",
         "contract:formal:configs/research/train.py",
         "RUNTIME_GATE PASS container=test-container mode=formal config=configs/research/train.py",
     ]
@@ -187,8 +307,10 @@ def test_gate_precedes_run_directory_creation_and_nested_targets_are_created():
     for target in (
         '${repo_root}/datasets/BOP_DATASETS',
         '${repo_root}/datasets/VOCdevkit',
+        '${repo_root}/datasets/lm_imgn',
         '${repo_root}/pretrained_models',
         '${repo_root}/output',
+        '${root}/datasets/lm_imgn',
         '${root}/cache/gdrnpp_datasets',
         '${root}/home/.cache',
     ):
@@ -358,3 +480,201 @@ def test_native_hydration_contract_covers_required_artifacts(tmp_path):
     assert source.index('require_image_source_compatibility "${image_ref}"') < source.index(
         'hydrate_native_artifacts "${image_ref}"'
     ) < source.index('"${docker_bin}" run -d')
+
+
+def test_launcher_mounts_lm_imgn_read_only_and_injects_the_convnext_path():
+    source = LAUNCHER.read_text(encoding="utf-8")
+
+    assert (
+        '--mount "type=bind,src=${root}/datasets/lm_imgn,'
+        'dst=/workspace/gdrnpp/datasets/lm_imgn,readonly"' in source
+    )
+    assert (
+        'require_mount "${root}/datasets/lm_imgn" '
+        '/workspace/gdrnpp/datasets/lm_imgn false' in source
+    )
+    assert (
+        f"--env GDRN_CONVNEXT_BASE_WEIGHTS={CONVNEXT_CHECKPOINT}" in source
+    )
+    # the host path stays a launcher concern; no config may pin it
+    for config in sorted((ROOT / "configs/gdrn/research").rglob("*.py")):
+        assert "/data/labs/" not in config.read_text(encoding="utf-8"), config
+
+
+def test_lm_imgn_mount_is_required_read_only(tmp_path):
+    source = tmp_path / "datasets/lm_imgn"
+    source.mkdir(parents=True)
+    row = f"{source}\t/workspace/gdrnpp/datasets/lm_imgn\t{{}}\n"
+
+    def body(rw: str) -> str:
+        return (
+            "container=test-container\n"
+            "docker_bin=fake_docker\n"
+            f"root={shlex.quote(str(tmp_path))}\n"
+            "fake_docker() {\n"
+            f"  printf '%s\\n' {shlex.quote(row.format(rw))}\n"
+            "}\n"
+            'require_mount "${root}/datasets/lm_imgn" /workspace/gdrnpp/datasets/lm_imgn false'
+        )
+
+    assert _source_and_run(body("false")).returncode == 0
+    rejected = _source_and_run(body("true"), check=False)
+    assert rejected.returncode != 0
+    assert "expected false" in rejected.stderr
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("lm13_gdrn", "lm13"),
+    ("lm13_real_only", "lm13"),
+    ("lm13_pbr", "lm13_pbr"),
+    ("", "legacy_lmo"),
+    ("some_future_protocol", "legacy_lmo"),
+])
+def test_resource_profile_mapping(name, expected):
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        f"train_protocol={shlex.quote(name)}\n"
+        "container_config_value() { printf '%s\\n' \"${train_protocol}\"; }\n"
+        f"resolve_resource_profile configs/research/{name or 'legacy_lmo'}.py"
+    )
+    assert result.stdout.strip() == expected
+
+
+def test_resource_profile_ignores_noise_before_the_config_value():
+    """An import warning on stdout must not demote an LM13 config to legacy."""
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        "container_config_value() { printf 'some import warning\\nlm13_gdrn\\n'; }\n"
+        "resolve_resource_profile configs/research/train_lm13_gdrn.py"
+    )
+    assert result.stdout.strip() == "lm13"
+
+
+def test_resource_profile_comes_from_the_loaded_config():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert 'container_config_value "${config}" TRAIN_PROTOCOL.NAME' in source
+    assert 'container_config_value "${config}" MODEL.POSE_NET.PCC_HEAD.HIERARCHY_PATH' in source
+
+
+def test_resolve_resource_profile_reads_the_train_protocol_in_the_container():
+    result = _resource_gate(
+        "resolve_resource_profile configs/research/train_lm13_gdrn.py",
+        train_protocol="lm13_real_only",
+    )
+    assert result.stdout.strip() == "lm13"
+
+
+def test_require_profile_resources_dispatches_on_the_profile():
+    result = _source_and_run(
+        "require_lm13_resources() { echo lm13:$1; }\n"
+        "require_lm13_pbr_resources() { echo lm13-pbr:$1; }\n"
+        "require_legacy_lmo_resources() { echo legacy; }\n"
+        "require_profile_resources lm13 configs/a.py\n"
+        "require_profile_resources lm13_pbr configs/a.py\n"
+        "require_profile_resources legacy_lmo configs/a.py"
+    )
+    assert result.stdout.splitlines() == [
+        "lm13:configs/a.py",
+        "RESOURCE_PROFILE lm13",
+        "lm13-pbr:configs/a.py",
+        "RESOURCE_PROFILE lm13_pbr",
+        "legacy",
+        "RESOURCE_PROFILE legacy_lmo",
+    ]
+
+
+def test_lm13_resource_gate_accepts_a_complete_container():
+    result = _resource_gate("require_lm13_resources configs/research/train_lm13_gdrn.py")
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [f"LM13_HIERARCHY {LM13_HIERARCHY}"]
+
+
+@pytest.mark.parametrize("missing,expected", [
+    (("/workspace/gdrnpp/datasets/lm_imgn/imgn",), "lm_imgn/imgn"),
+    (("/workspace/gdrnpp/datasets/lm_imgn/image_set/train_phone.txt",), "train_phone.txt"),
+    (("/workspace/gdrnpp/datasets/lm_imgn/imgn/ape/000000_0-pose.txt",), "*-pose.txt"),
+    (("/workspace/gdrnpp/datasets/VOCdevkit/VOC2012/JPEGImages",), "JPEGImages"),
+    (("/workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/models_info.json",), "models_info.json"),
+    ((LM13_HIERARCHY,), "independent_v2.npz"),
+])
+def test_lm13_resource_gate_rejects_missing_resources(missing, expected):
+    result = _resource_gate(
+        "require_lm13_resources configs/research/train_lm13_gdrn.py",
+        missing=missing,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert expected in result.stderr
+
+
+def test_lm13_resource_gate_rejects_a_missing_convnext_checkpoint():
+    result = _resource_gate(
+        "require_lm13_resources configs/research/train_lm13_gdrn.py",
+        missing=(CONVNEXT_CHECKPOINT,),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert CONVNEXT_CHECKPOINT in result.stderr
+
+
+def test_lm13_resource_gate_rejects_an_unset_convnext_variable():
+    result = _resource_gate(
+        "require_lm13_resources configs/research/train_lm13_gdrn.py",
+        convnext="",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "GDRN_CONVNEXT_BASE_WEIGHTS is not set" in result.stderr
+
+
+def test_lm13_gate_surfaces_a_server_preflight_failure():
+    result = _resource_gate(
+        "fake_server_preflight=1\n"
+        "require_lm13_resources configs/research/train_lm13_gdrn.py",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "LM13 server preflight failed" in result.stderr
+
+
+def test_lm13_pbr_gate_does_not_require_the_deepim_renders():
+    imgn = tuple(path for path in LM13_CONTAINER_PATHS if "/lm_imgn/" in path)
+    assert imgn
+    result = _resource_gate(
+        "require_lm13_pbr_resources configs/research/train_lm13_pbr.py",
+        missing=imgn,
+    )
+    assert result.returncode == 0
+    # the PBR arm still needs its own renders
+    rejected = _resource_gate(
+        "require_lm13_pbr_resources configs/research/train_lm13_pbr.py",
+        missing=("/workspace/gdrnpp/datasets/BOP_DATASETS/lm/train_pbr",),
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "train_pbr" in rejected.stderr
+
+
+def test_legacy_lmo_gate_keeps_the_original_requirements():
+    result = _resource_gate("require_legacy_lmo_resources")
+    assert result.returncode == 0
+
+    result = _resource_gate(
+        "require_legacy_lmo_resources",
+        missing=("/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth",),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "model_final_wo_optim.pth" in result.stderr
+
+
+def test_resource_gate_precedes_run_directory_creation():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    assert source.index('require_profile_resources "${profile}" "${config}"') < source.index(
+        'run_id="$(next_run_id "${mode}")"'
+    )
+    assert source.index("require_profile_resources()") < source.index("runtime_gate()")
+    assert source.index("resolve_resource_profile()") < source.index("runtime_gate()")
+

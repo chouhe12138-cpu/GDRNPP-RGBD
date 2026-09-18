@@ -49,6 +49,21 @@ README 的 `image_sets`/`test_bboxes` 网盘包补齐），所以 Protocol A/B �
 故 `FORMAL_READY` 保持 `False`，结论 **NO-GO**，唯一 blocker 是服务器 EGL smoke：
 `BLOCKED: final CUDA/EGL smoke must be run on the training server.`
 
+**服务器集成（2026-09-18 同日）**：按 `EXP023_LM13_Server_Integration_Modification_Task.md`
+补齐服务器侧契约。`docker/l40/experiment.sh` 的 `create` 新增 `${root}/datasets/lm_imgn`
+只读 mount 与 `GDRN_CONVNEXT_BASE_WEIGHTS` 注入；`check_host()` 拆成通用项，数据集与权重
+改由 profile gate 按容器内读回的 `TRAIN_PROTOCOL.NAME` 选择
+（`lm13` / `lm13_pbr` / `legacy_lmo`，旧 LMO 配置走 legacy，资源清单不变）。新增
+`research/exp022/server_preflight.py`，在容器内报告 profile、split、hierarchy、ConvNeXt、
+VOC 与各 split 记录数，并接进 LM13 的 runtime gate，失败发生在 run 目录创建之前。
+本机实测 `server_preflight`：`lm_13_train_online=2375`、`lm_imgn=13000`、
+`lm_13_test_online=13425`，缺 ConvNeXt env 或非 LM13 配置均 FAIL。launcher 单测由 16 增至
+40 个用例（全部用模拟容器），`pytest -q research` **275 passed**。
+
+**本地 Agent 不连接服务器**，没有在 lab0/lab1 创建容器或运行 runtime gate，因此真实 mount、
+容器内 env、`server_preflight` 的服务器行为与 EGL smoke 均**未标 PASS**，需用户在服务器执行
+（步骤见 [RUNBOOK](RUNBOOK_CN.md) 的 “EXP023 LM13 server profile”）。
+
 详见 [EXP023 RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md)
 和 [EXP022 README](exp022/README.md)。
 

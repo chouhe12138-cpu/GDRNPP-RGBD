@@ -22,9 +22,15 @@ nvidia-smi -i 1   # lab1
 
 - 容器名为 `gdrnpp_chx_lab0` 或 `gdrnpp_chx_lab1`，且必须带
   `gdrnpp.project=GDRNPP-RGBD` 和对应 machine label。
-- repo、BOP/VOC dataset 和 weights 只读挂载；output、cache、项目 home 外置可写。
+- repo、BOP/VOC dataset、`datasets/lm_imgn` 和 weights 只读挂载；output、cache、项目
+  home 外置可写。`lm_imgn` 是 EXP023 主协议的数据源，对应 host
+  `${root}/datasets/lm_imgn`，缺失时 `/workspace/gdrnpp/datasets/lm_imgn` 必须是空目录，
+  否则会静默改变训练数据。
   dataset cache 固定由 `GDRN_DATASET_CACHE_DIR` 指向项目 cache，通用 runtime cache
   由 `XDG_CACHE_HOME` 指向同一外置 cache mount。
+- `GDRN_CONVNEXT_BASE_WEIGHTS` 由 launcher 固定为
+  `/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth`；不要用
+  host 路径覆盖它，也不要在配置里写 `/data/labs/...`。
 - 容器只暴露分配给该账户的单张 GPU，容器内显示为逻辑 GPU 0。
 - 不修改宿主机 Python、CUDA、驱动、账户、权限或共享数据。
 
@@ -35,5 +41,7 @@ stop/remove/prune。
 Git ignored native artifacts；release 中不手工复制 `.so`，源码 mount 始终只读。
 
 `run/eval` 在创建 run 目录前执行统一 runtime gate：复核 ownership 和全部 bind
-mount、output/cache 可写、单卡 CUDA、环境与 native verifier，并在容器内用
-`mmcv.Config.fromfile` 加载目标配置。任一项失败都不会启动训练/评估。
+mount、output/cache 可写、单卡 CUDA、环境与 native verifier，在容器内用
+`mmcv.Config.fromfile` 加载目标配置，再按配置里的 `TRAIN_PROTOCOL.NAME` 选择资源门
+（`lm13` / `lm13_pbr` / `legacy_lmo`，见 `RUNBOOK_CN.md`）。LM13 两档另外在容器里跑
+`research.exp022.server_preflight`。任一项失败都不会启动训练/评估，也不会创建输出目录。

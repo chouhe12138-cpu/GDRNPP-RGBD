@@ -186,7 +186,11 @@ docker/l40/experiment.sh lab0 logs EXP-.../RUN-...
 `run`/`eval` 在创建运行目录前再次强制 working tree clean，并加载 effective config
 执行共享 contract：smoke 必须是 1 epoch、batch 不超过 8、无 periodic evaluation；
 formal 必须是 seed 42、LM-PBR、LM-O GT-box、40 epoch、batch 48、每 5 epoch checkpoint
-与 evaluation。每次 run 的根目录写入 `run_metadata.json`，保存完整 source commit、
+与 evaluation。带 `RESEARCH_PROTOCOL.SCHEDULE="configurable"` 的新实验（当前只有
+EXP023 LM13）走另一支 formal 规则：只要求 `FORMAL_READY=True`、train/test split 非空、
+`EVAL_PERIOD` 在 `(0, TOTAL_EPOCHS]` 内、GT box 与 evaluation renderer；协议数值由
+`research/exp022/preflight.py` 的 `check_lm13_gdrn_protocol` 单独硬校验。每次 run 的根目录
+写入 `run_metadata.json`，保存完整 source commit、
 image ID、image build revision、config、mode 与 run ID。
 
 idle gate 通过 `docker top` 检查容器内除 PID 1 `sleep infinity` 外的全部进程；不能
@@ -199,6 +203,118 @@ config 等短变量，一行执行一个命令，不使用超长单行或反斜�
 `/workspace/gdrnpp` source。若报
 `mount /workspace/gdrnpp has source ..., expected ...`，说明容器仍绑定旧 release，
 必须按“已有容器的受控替换”检查并重建，不能绕过 gate 或在服务器内修改源码。
+
+### EXP023 LM13 server profile
+
+EXP023 主协议（`TRAIN_PROTOCOL.NAME=lm13_gdrn`）训练 LM real 加 DeepIM 渲染图，并让
+ConvNeXt backbone 从 ImageNet 权重初始化，因此比旧的 LMO/PBR 协议多两项服务器资源。
+以 `lab0` 为例，`root=/data/labs/lab0/docker_data/chx`；lab1 只替换 `lab0 -> lab1`：
+
+| host | container | 说明 |
+|---|---|---|
+| `${root}/datasets/lm_imgn` | `/workspace/gdrnpp/datasets/lm_imgn` | DeepIM 渲染图，独立只读 mount |
+| `${root}/weights/convnext/convnext_base_1k_224_ema.pth` | `/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth` | 复用 `${root}/weights` 只读 mount |
+| `${root}/cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz` | `/home/gdrn/.cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz` | LM13 CAD 层级 |
+
+`create` 自动注入，不需要手工准备：
+
+```bash
+--env GDRN_CONVNEXT_BASE_WEIGHTS=/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth
+--mount "type=bind,src=${root}/datasets/lm_imgn,dst=/workspace/gdrnpp/datasets/lm_imgn,readonly"
+```
+
+配置与命令里不得出现 `/data/labs/...` host 路径；容器内路径与该 env 一律由 launcher 提供。
+`lm/test/xyz_crop` 与 `lm_imgn/xyz_crop_imgn` 都**不**需要：两个 LM13 real split 与渲染
+split 都用 `require_xyz=False`，评估也不需要 GT XYZ。
+
+上线前在 host 上确认（旧 LMO 机器不会自动具备这些）：
+
+```bash
+(
+set -Eeuo pipefail
+machine=lab0
+root="/data/labs/${machine}/docker_data/chx"
+test -d "${root}/datasets/BOP_DATASETS/lm/test"
+test -d "${root}/datasets/BOP_DATASETS/lm/image_set"
+test -d "${root}/datasets/BOP_DATASETS/lm/models"
+test -d "${root}/datasets/lm_imgn/image_set"
+test -d "${root}/datasets/lm_imgn/imgn"
+test -d "${root}/datasets/VOC/VOC2012/JPEGImages"
+test -r "${root}/weights/convnext/convnext_base_1k_224_ema.pth"
+test -r "${root}/cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz"
+echo "LM13_HOST_RESOURCES PASS"
+)
+```
+
+层级缺失时不要让 formal 自动生成，显式准备并重跑检查：
+
+```bash
+python -m research.exp022.build_hierarchy --mode independent \
+  --config configs/gdrn/research/exp022_progressive_pcc/train_lm13_gdrn.py
+```
+
+#### profile-specific runtime gate
+
+`run`/`eval` 在创建 run 目录前，先把容器内 `mmcv.Config.fromfile` 的
+`TRAIN_PROTOCOL.NAME` 读回来选择资源门（不按文件名或 EXP 编号猜）：
+
+| `TRAIN_PROTOCOL.NAME` | profile | 资源门 |
+|---|---|---|
+| `lm13_gdrn` / `lm13_real_only` | `lm13` | LM real + `lm_imgn` + VOC + ConvNeXt + LM13 hierarchy + `server_preflight` |
+| `lm13_pbr` | `lm13_pbr` | LM PBR + LM real test + VOC + ConvNeXt + LM13 hierarchy + `server_preflight`；不要求 `lm_imgn` |
+| 缺失 / 其他（全部旧 LMO、PBR 与 EXP013/017/020/021 配置） | `legacy_lmo` | `lm/train_pbr` + `lmo/test` + VOC + `weights/lmo_pbr/model_final_wo_optim.pth` |
+
+`check_host()` 只保留 user/Docker/GPU 与 `${root}` 基础目录；数据集与权重改由上面的
+profile 门在容器内检查。缺任一项时 `run` 在创建输出目录之前就失败。
+
+新 release 的 `verify_required_mounts` 要求 `datasets/lm_imgn` 这一条 mount，而旧容器没有
+它（legacy profile 也走同一个 mount 门，只是不查 `lm_imgn` 的数据内容）。因此从本次修改
+起，**已有容器必须按“已有容器的受控替换”重建一次**才能继续 `run`；空目录是允许的，
+数据缺失只会让 LM13 gate 拒绝，不会影响旧 LMO 实验。
+
+容器内两项手工复核（formal 前各跑一次）：
+
+```bash
+docker exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp gdrnpp_chx_lab0 \
+  python -m research.exp022.server_preflight \
+  --config configs/gdrn/research/exp022_progressive_pcc/train_lm13_gdrn.py
+docker exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp gdrnpp_chx_lab0 \
+  python -m research.exp022.preflight \
+  --config configs/gdrn/research/exp022_progressive_pcc/train_lm13_gdrn.py
+```
+
+`server_preflight` 报告 profile、train/test split、hierarchy、ConvNeXt、VOC 以及各 split
+记录数（应读到 LM real train `2375`、`lm_imgn` `13000`、LM test `13425`）。
+`preflight` 另外核对 340 个 ImageNet 张量、hierarchy 对象顺序、可训练参数集合、
+forward/backward/optimizer step 与推理输出形状。两者都不允许为通过而放宽或吞异常。
+
+#### EGL smoke 与两段 release
+
+release 只读，不要在服务器上编辑 config。第一段 release 保持
+`RESEARCH_PROTOCOL.FORMAL_READY=False`，只跑 smoke：
+
+```bash
+docker/l40/experiment.sh lab0 run \
+  EXP-20260918-023-lm13-progressive-pcc-fulltrain \
+  configs/gdrn/research/exp022_progressive_pcc/smoke_lm13_gdrn.py \
+  smoke
+```
+
+smoke 必须真的使用 `XYZ_RENDERER=egl`、AMP、ConvNeXt checkpoint 与两个训练域，并检查
+`forward` / 有限 loss / `backward` / 有限 grad / `optimizer.step` / AMP 无跳步 /
+checkpoint 写入 / `exit_code=0`。本仓库当前本地开发机的 EGL 抛
+`RuntimeError: Bindless Textures not supported`，所以这一步只能在服务器完成；不要在本地
+用 CPP 结果代替它。
+
+EGL smoke PASS 后：回本地打开 `train_lm13_gdrn.py` 里注释掉的
+`RESEARCH_PROTOCOL = dict(SCHEDULE="configurable", FORMAL_READY=True)`，commit，再
+`docker/l40/create_bundle.sh`，按“已有容器的受控替换”换到新 release，重跑 `check` 与
+runtime gate，然后启动 formal。`FORMAL_READY=False` 时
+`research.run_contract --mode formal` 必然拒绝，这是有意的安全锁。
+
+若最终决定改用 CPP，把 `MODEL.POSE_NET.XYZ_RENDERER` 固定为 `cpp`，重新
+preflight → CUDA+CPP smoke → commit → bundle → release；160 epoch 中不得再切回 EGL，
+并把 renderer 选择写进 RECORD。
 
 ### Renderer 配置边界
 

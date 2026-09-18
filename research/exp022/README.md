@@ -42,6 +42,10 @@ python -m research.exp022.eval_manifest --config configs/gdrn/research/exp022_pr
 
 层级生成器拒绝覆盖已有文件；首次生成后，保持配置中的 hierarchy 路径与产物一致。LM13 正式训练配置仍标记 `FORMAL_READY=False`，需要在确定完整训练、评估和对照协议后再启用。
 
+服务器侧的资源契约（`lm_imgn` 只读 mount、`GDRN_CONVNEXT_BASE_WEIGHTS`、
+profile-aware runtime gate、`server_preflight`、EGL smoke 与两段 release）见
+[RUNBOOK](../RUNBOOK_CN.md) 的 “EXP023 LM13 server profile”。
+
 ## LM-O 第一阶段固定协议
 
 旧 LM-O 第一阶段使用冻结的官方 RGB ConvNeXt 8×8 特征，训练四级 PCC、stage transition、局部残差和可见 mask。新 LM13 配置允许全量 backbone 训练；ResNet-50、部署、Geometry-adaptive partition 与 fragment adjacency 仍为 **DEFERRED**。

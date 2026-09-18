@@ -17,6 +17,7 @@ from core.gdrn_modeling.datasets.lm_syn_imgn import LM_SYN_IMGN_Dataset, SPLITS_
 from research.exp022.dataset_context import resolve_dataset_context
 from research.exp022.eval_manifest import build_manifest, write_manifest
 from research.exp022.preflight import check_lm13_gdrn_protocol
+from research.exp022.server_preflight import build_report, check_convnext
 
 
 LM_ROOT = Path("datasets/BOP_DATASETS/lm")
@@ -280,3 +281,33 @@ def test_context_rejects_a_training_split_with_another_object_order():
     cfg.DATASETS.TRAIN = ("lm_13_train_online", "lmo_pbr_train")
     with pytest.raises(ValueError, match="training split object order mismatch"):
         resolve_dataset_context(cfg)
+
+
+def test_server_preflight_rejects_a_config_outside_the_lm13_protocols():
+    cfg = Config.fromfile(GDRN_CONFIG)
+    cfg.TRAIN_PROTOCOL = dict(NAME="some_future_protocol")
+    with pytest.raises(ValueError, match="not an EXP023 LM13 protocol"):
+        build_report(cfg, counts=False)
+
+
+def test_server_preflight_checks_the_convnext_path_the_config_resolved(tmp_path, monkeypatch):
+    checkpoint = tmp_path / "convnext_base.pth"
+    checkpoint.write_bytes(b"stub")
+    cfg = Config.fromfile(GDRN_CONFIG)
+    cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.checkpoint_path = str(checkpoint)
+    monkeypatch.setenv("GDRN_CONVNEXT_BASE_WEIGHTS", str(checkpoint))
+    report = check_convnext(cfg)
+    assert report == {"convnext_checkpoint": str(checkpoint), "convnext_bytes": 4}
+
+    monkeypatch.delenv("GDRN_CONVNEXT_BASE_WEIGHTS")
+    with pytest.raises(ValueError, match="GDRN_CONVNEXT_BASE_WEIGHTS"):
+        check_convnext(cfg)
+
+
+def test_server_preflight_rejects_a_missing_convnext_file(tmp_path, monkeypatch):
+    absent = tmp_path / "absent.pth"
+    cfg = Config.fromfile(GDRN_CONFIG)
+    cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.checkpoint_path = str(absent)
+    monkeypatch.setenv("GDRN_CONVNEXT_BASE_WEIGHTS", str(absent))
+    with pytest.raises(FileNotFoundError, match="absent.pth"):
+        check_convnext(cfg)

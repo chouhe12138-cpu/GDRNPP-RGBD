@@ -1,10 +1,11 @@
 # EXP023 LM13 Progressive PCC 全 backbone 训练
 
 - `experiment_id`: `EXP-20260918-023-lm13-progressive-pcc-fulltrain`
-- 状态：`PROTOCOL_OVERHAULED / PRETRAIN_CHECKS_PASS / FORMAL_NOT_STARTED`
+- 状态：`PRETRAIN_CHECKS_PASS / SERVER_INTEGRATION_ADDED / EGL_SMOKE_PENDING / FORMAL_NOT_STARTED`
 - 日期：2026-09-18（协议重整同日，随后按
-  `EXP022_LM13_Pretraining_Modification_Task.md` 收口）；源码基准：
-  `5db298c7eb480b5038e517b0a6cc9973b653e421` 加本工作区未提交修改
+  `EXP022_LM13_Pretraining_Modification_Task.md` 收口、按
+  `EXP023_LM13_Server_Integration_Modification_Task.md` 接入服务器）；源码基准：
+  `8304264bf77f8dd04ccf9a63b2de270a5e0bbd35` 加本工作区未提交修改
 - 正式 `run_id`、epoch 与评估指标：未生成。唯一的 checkpoint 来自下面记录的本机接线短训练，
   不是正式结果。
 
@@ -145,18 +146,60 @@ BLOCKED: final CUDA/EGL smoke must be run on the training server.
 形式留下 override（`SCHEDULE="configurable", FORMAL_READY=True`），需在服务器 EGL smoke
 通过后才打开。本轮结论：`NO-GO`，唯一 blocker 是服务器 EGL 渲染器。
 
+## 2026-09-18 服务器集成与 launcher 收口（Observed）
+
+按 `EXP023_LM13_Server_Integration_Modification_Task.md` 补齐服务器侧数据、权重、cache、
+mount 与 runtime gate；未改 Progressive PCC 主体、LM13 protocol 或训练数学。
+
+- `docker/l40/experiment.sh`：`create` 新增 `${root}/datasets/lm_imgn` 只读 mount 与
+  `GDRN_CONVNEXT_BASE_WEIGHTS` 注入；host `${root}/datasets/lm_imgn` 与 repo 侧
+  `datasets/lm_imgn` 在 create 前建成目录，使旧 LMO 容器不被空目录阻塞（LM13 gate 仍会
+  因空数据拒绝）。`verify_required_mounts` 增加该 mount 的强制核对。
+- `check_host()` 拆成通用项（user/Docker/GPU/`${root}` 基础目录），数据集与权重移入
+  profile gate。profile 从容器内 `mmcv.Config.fromfile` 读 `TRAIN_PROTOCOL.NAME` 得到
+  （`lm13_gdrn`/`lm13_real_only` → `lm13`，`lm13_pbr` → `lm13_pbr`，缺失/其他 →
+  `legacy_lmo`），不按文件名或 EXP 编号猜。
+- 新增 `research/exp022/server_preflight.py`：在容器内报告 profile、train/test split、
+  object IDs、hierarchy、BOP targets、LM real、`lm_imgn`、VOC、ConvNeXt 以及各 split
+  记录数；路径失败时以 JSON FAIL 退出。LM13 两档的 runtime gate 会在
+  `validate_run_config` 之前调用它，因此失败发生在 run 目录创建之前。
+- `research/tests/test_experiment_launcher.py` 由 16 增至 40 个用例（含参数化；旧测试保留，
+  只同步更新了两个断言），`research/exp022/tests/test_lm_protocol.py` 由 24 增至 27。
+
+### 本地验证（Observed）
+
+`server_preflight` 在本机实测（非服务器容器）：`lm13_gdrn` → `profile=lm13`，
+`lm_13_train_online=2375`、`lm_imgn=13000`、`lm_13_test_online=13425`（与预期一致，冷启动
+47 s）；`lm13_pbr` → `profile=lm13_pbr`、`lm_pbr_root=.../train_pbr`，不查 `lm_imgn`；
+未设 `GDRN_CONVNEXT_BASE_WEIGHTS` 与传入非 LM13 配置都返回 `status=FAIL` 并给出原因。
+
+launcher 侧全部使用模拟容器（`present` 路径表 + 假的 `docker exec`/`printenv`/python 入口），
+覆盖：`lm_imgn` mount 必须只读、ConvNeXt env 注入、四种 profile 映射、各 profile 的资源
+分派、LM13 缺 `lm_imgn`/ConvNeXt/hierarchy/LM real 时拒绝、`server_preflight` 非零退出时
+拒绝、`lm13_pbr` 不要求 `lm_imgn` 但仍要求 `train_pbr`、legacy 门保持
+`lm/train_pbr`+`lmo/test`+VOC+`lmo_pbr/model_final_wo_optim.pth`、以及资源门在 run 目录
+创建之前。`pytest -q research` **275 passed**。
+
+### 未验证项（不伪造）
+
+本地 Agent 不连接服务器，**没有**在 lab0/lab1 上创建容器或运行 runtime gate。以下必须由
+用户在服务器完成，本轮不标 PASS：真实 bind mount（含 `lm_imgn`）、容器内
+`GDRN_CONVNEXT_BASE_WEIGHTS`、`server_preflight` 在容器缓存下的行为、以及 §EGL smoke。
+
 ## Decision / 待完成
 
-- 本轮只做协议收口与训练前检查，**未产生任何精度结论**，未运行正式训练，未运行完整评估。
+- 本轮只做服务器集成，**未产生任何精度结论**，未运行正式训练，未在服务器上运行任何命令。
 - 两条评估链（legacy ADD(-S)、BOP AR）都只能用 **GT bbox** 跑：官方 Faster R-CNN 的
   `lm/test/test_bboxes/bbox_faster_all.json` 全盘不存在（GDR-Net README 说明它需从单独的
   `image_sets`/`test_bboxes` 网盘包补齐）。因此 Protocol A/B 当前都是诊断口径，
   **不能**与 GDR-Net 论文的 detector-bbox 数字直接比较。
 - LM13 没有 reference 模型，`matched_pnp_eval.py` 目前只能做协议校验；正式 matched 对比
   需等待 EXP021 B/C 结果完整后确定 comparator。
-- 正式训练前只剩服务器侧事项：在训练机上用 EGL 跑通 smoke（forward / loss / backward /
-  optimizer step / 梯度有限 / checkpoint 写入），通过后在 `train_lm13_gdrn.py` 打开
-  `RESEARCH_PROTOCOL.FORMAL_READY=True`，并确认预注册 gate。T-LESS 数据尚未准备，其
-  variable-S 对称监督是单独的后续工作。
+- 正式训练前只剩服务器侧事项：按 `RUNBOOK_CN.md` 的 “EXP023 LM13 server profile” 在
+  lab0/lab1 准备 host 数据与 ConvNeXt 权重，`create` 新容器后确认 runtime gate 与
+  `server_preflight` 通过，再用 EGL 跑通 smoke（forward / loss / backward /
+  optimizer step / 梯度有限 / checkpoint 写入）。通过后回本地打开
+  `train_lm13_gdrn.py` 的 `RESEARCH_PROTOCOL.FORMAL_READY=True`，重新 bundle/release，
+  再启动 formal。T-LESS 数据尚未准备，其 variable-S 对称监督是单独的后续工作。
 - 已发现但本轮未处理：`obj2label` 的反向映射写法在约 40 个其他 loader 中依旧（全仓库无读取
   点，故无行为影响）；`det/yolox/` 下同名文件同样未动。需要时另开 cleanup。
