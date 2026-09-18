@@ -17,7 +17,7 @@ from research.run_contract import validate_research_run_config
 
 
 SOURCE = ".local/dataset_cache/exp022/reused_v1.npz"
-LM_CONFIG = "configs/gdrn/research/exp022_progressive_pcc/train_lm13.py"
+LM_CONFIG = "configs/gdrn/research/exp022_progressive_pcc/train_lm13_pbr.py"
 
 
 def _synthetic_tree(tmp_path, count):

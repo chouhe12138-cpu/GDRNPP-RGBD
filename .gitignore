@@ -81,3 +81,6 @@ exclude-file.txt
 git-pipeline.txt
 *dlaf*
 /models/
+
+# Read-only reference checkouts (GDR-Net, GDRNPP, bop_toolkit); never shipped
+/third_party/

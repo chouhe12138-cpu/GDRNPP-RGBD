@@ -2,6 +2,41 @@
 
 最后核对：2026-09-18。
 
+## EXP023 LM13 数据/训练/评估协议重整（2026-09-18）
+
+按用户提供的 `GDRNPP_LM_dataset_training_evaluation_adjustment_plan.md` 做**协议层整理**，
+不动 `GDRN_PCC` / `ProgressivePCCHead` / `DatasetContext` 的模型结构。原 `train_lm13.py`
+名义上是 LM13、实际数据是 `lm_pbr_13_online_train`（GDRNPP 的 PBR/BOP 协议），现在拆成
+`lm13_gdrn`（主实验，LM real + lm_imgn）/ `lm13_real_only`（数据消融）/ `lm13_pbr`
+（BOP/PBR 域）三条显式协议，模型与在线 XYZ 路径不变。
+
+**数据**：用户提供的 `lm_imgn.zip`（DeepIM 的 OpenGL 渲染集，1k/obj）已解压到
+`/home/wsluser/Datasets/lm_imgn`（`datasets/lm_imgn` 软链接，505,191 文件 / 6.1 GB）。
+新增 `lm_dataset_d2.py`（LM real，从 `lm/test` 按 `image_set/{obj}_{train,test}.txt` 取片）
+与 `lm_syn_imgn.py`，逐类计数与官方划分一致：train `2,375`、test `13,425`、渲染 `13,000`。
+核实到 **`lm/train/` 不等于 image_set 选片**（benchvise 少 891/892 两张），因此不采用该目录。
+`xyz_crop_imgn/` 实际存在，但主实验仍走在线路，预生成的 xyz 留作交叉核对。
+
+**修复**：`img_type` 背景替换改为显式分流（`syn/real/syn_pbr` 各自策略，未知类型报错），
+两处 mapper 共用同一策略函数且不改变 RNG 流；修复 `COLOR_AUG_SYN_ONLY` 因两支都调用
+`_color_aug` 而完全失效的问题；去掉 `lm_pbr.py` 残留的 `ref.lm_full`；`DatasetContext`
+支持多训练 split 并要求对象顺序一致。
+
+**验证**：CPU preflight 三个配置全 PASS（340 张量、`91,292,872` 参数、协议校验）。
+`check_lm_data.py` 数值检查：相机与标准内参误差 `0.0 px`、`bbox` 与 mask 误差 `0.0 px`、
+`bbox3d` 与 `models_info` 尺寸精确一致、平移为米；在线渲染与源 mask 重合 `0.954–0.989`。
+`real_smoke` 三步 AMP PASS、无跳步；真实训练入口 `main_gdrn.py` 用 smoke 配置跑完 1 epoch
+并保存 checkpoint（`RUN-20260918-lm13-gdrn-smoke-s42`，退出码 0）。完整回归 `243 passed`。
+
+**P2**：只做配置与 manifest 接线（新增 `eval_lm13_bop.py`、`eval_manifest.py`，
+`matched_pnp_eval` 完成时写 `eval_manifest.json` 并标为 diagnostic）。**未运行完整评估**。
+两条评估链当前都只能用 GT bbox —— 官方 `bbox_faster_all.json` 全盘缺失（需从 GDR-Net
+README 的 `image_sets`/`test_bboxes` 网盘包补齐），所以 Protocol A/B 是诊断口径，
+不能与 GDR-Net 论文的 detector-bbox 数字直接比较。本轮**没有精度结论**，正式训练未启动。
+
+详见 [EXP023 RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md)
+和 [EXP022 README](exp022/README.md)。
+
 ## EXP022 多数据集接入 / EXP023 LM13 准备（2026-09-18）
 
 EXP022 方法、层级 loader/builder、CPU preflight、真实 CUDA smoke 与 matched evaluator 已接入统一 Dataset Context。LM-O 旧配置只增加上下文字段，仍用原始层级与冻结官方 backbone；LM-O 本机保存真实 batch48 的 AMP smoke PASS，340 个官方 backbone 张量加载，PCC 可训练参数 `3,728,456`，无 AMP 跳步。LM13 训练/测试对象顺序为标准非连续 13 个 BOP ID，独立层级已生成；ImageNet ConvNeXt 340 个张量 CPU 验证与本机 CUDA+CPP 在线 batch1 两步 AMP smoke PASS，完整模型 `91,292,872` 参数可训练。LM13 测试集实读 2600 个实例、类别覆盖 0..12；matched evaluator 对 2600 个 BOP target 的协议验证通过。research 回归 `223 passed`，后加的对象顺序测试单独通过。尚无 LM13 reference/PCC 正式 checkpoint，也无正式训练或评价。T-LESS 当前只有配置预留，数据与 variable-S 对称监督待后续处理。详见 [EXP023 RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md) 和 [EXP022 README](exp022/README.md)。

@@ -11,14 +11,107 @@ from pathlib import Path
 import torch
 from mmcv import Config
 
+import ref
 from core.gdrn_modeling.models.GDRN_PCC import build_model_optimizer
 from research.exp013.preflight import PROJECT_ROOT, checkpoint_model_state
 from research.run_contract import validate_research_run_config
 from research.exp022.dataset_context import resolve_dataset_context
 
 
-CONFIG_ROOT = PROJECT_ROOT / "configs/gdrn/lmo_pbr/research/exp022_progressive_pcc"
+CONFIG_ROOT = PROJECT_ROOT / "configs/gdrn/research/exp022_progressive_pcc"
+# The LM-O arm of EXP022 keeps its own tree; bare `--config` names may resolve
+# into either one so existing commands keep working.
+LMO_CONFIG_ROOT = PROJECT_ROOT / "configs/gdrn/lmo_pbr/research/exp022_progressive_pcc"
 EXPERIMENT_ID = "EXP-20260916-022-progressive-pcc"
+
+# GDR-Net's LINEMOD protocol, mirrored by lm13_gdrn_protocol.py.  A formal run
+# that drifts from these values is refused rather than silently reinterpreted.
+LM13_GDRN_TRAIN = ("lm_13_train_online", "lm_imgn_13_train_1k_per_obj_online")
+LM13_GDRN_INPUT = {
+    "COLOR_AUG_PROB": 0.0,
+    "CHANGE_BG_PROB": 0.5,
+    "PBR_CHANGE_BG_PROB": 0.5,
+    "DZI_TYPE": "uniform",
+    "DZI_PAD_SCALE": 1.5,
+    "DZI_SCALE_RATIO": 0.25,
+    "DZI_SHIFT_RATIO": 0.25,
+    "TRUNCATE_FG": False,
+}
+LM13_GDRN_SOLVER = {
+    "TOTAL_EPOCHS": 160,
+    "REFERENCE_BS": 24,
+    "WARMUP_ITERS": 1000,
+    "WARMUP_METHOD": "linear",
+    "ANNEAL_METHOD": "cosine",
+    "ANNEAL_POINT": 0.72,
+}
+
+
+def resolve_config_path(raw: Path) -> Path:
+    """Resolve a bare config name against the EXP022 config trees."""
+    if raw.is_absolute() or raw.exists():
+        return raw
+    for root in (CONFIG_ROOT, LMO_CONFIG_ROOT):
+        candidate = root / raw
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(f"EXP022 config not found in {CONFIG_ROOT} or {LMO_CONFIG_ROOT}: {raw}")
+
+
+def check_lm13_gdrn_protocol(cfg) -> dict:
+    """Verify the LM13 GDR-Net protocol before its data or training is trusted."""
+    train = tuple(str(name) for name in cfg.DATASETS.TRAIN)
+    if train != LM13_GDRN_TRAIN:
+        raise ValueError(f"lm13_gdrn training splits must be {LM13_GDRN_TRAIN}, got {train}")
+    # solver_utils prefers WARMUP_RATIO over WARMUP_ITERS and would replace
+    # ANNEAL_POINT with that ratio, so it has to stay unset
+    if cfg.SOLVER.get("WARMUP_RATIO", None) is not None:
+        raise ValueError("lm13_gdrn must leave WARMUP_RATIO unset")
+    for name, expected in LM13_GDRN_INPUT.items():
+        actual = cfg.INPUT.get(name, None)
+        if actual != expected:
+            raise ValueError(f"lm13_gdrn INPUT.{name} must be {expected}, got {actual}")
+    for name, expected in LM13_GDRN_SOLVER.items():
+        actual = cfg.SOLVER.get(name, None)
+        if actual != expected:
+            raise ValueError(f"lm13_gdrn SOLVER.{name} must be {expected}, got {actual}")
+    if float(cfg.DATALOADER.FILTER_VISIB_THR) != 0.0:
+        raise ValueError("lm13_gdrn keeps every annotated instance (FILTER_VISIB_THR=0)")
+    if str(cfg.SOLVER.OPTIMIZER_CFG.type) != "Ranger":
+        raise ValueError(f"lm13_gdrn baseline must be Ranger, got {cfg.SOLVER.OPTIMIZER_CFG.type}")
+    if float(cfg.SOLVER.OPTIMIZER_CFG.get("lr", 0.0)) != 1e-4:
+        raise ValueError("lm13_gdrn baseline learning rate must be 1e-4")
+    if float(cfg.SOLVER.OPTIMIZER_CFG.get("weight_decay", 0.0)) != 0.0:
+        raise ValueError("lm13_gdrn baseline must not use weight decay")
+    return {
+        "train_splits": list(train),
+        "reference_batch_size": int(cfg.SOLVER.REFERENCE_BS),
+        "total_epochs": int(cfg.SOLVER.TOTAL_EPOCHS),
+    }
+
+
+def check_protocol_files(cfg, context) -> dict:
+    """Check the files the configured evaluation protocols need."""
+    if not Path(context.bop_targets).is_file():
+        raise FileNotFoundError(f"BOP targets missing: {context.bop_targets}")
+    data_ref = ref.__dict__[context.data_ref_key]
+    name = str(cfg.VAL.TARGETS_FILENAME)
+    candidates = [Path(data_ref.dataset_root) / name,
+                  PROJECT_ROOT / "lib/pysixd/tools/lm" / name,
+                  PROJECT_ROOT / name]
+    legacy = next((path for path in candidates if path.is_file()), None)
+    if legacy is None:
+        raise FileNotFoundError(f"legacy LM targets {name} not found in {[str(p) for p in candidates]}")
+    detector_files = [str(entry) for entry in cfg.DATASETS.DET_FILES_TEST]
+    bbox_type = str(cfg.TEST.TEST_BBOX_TYPE).lower()
+    if bbox_type == "est":
+        if not detector_files:
+            raise ValueError("detector-bbox evaluation needs DATASETS.DET_FILES_TEST")
+        for entry in detector_files:
+            if not Path(entry).is_file():
+                raise FileNotFoundError(f"detector bbox file missing: {entry}")
+    return {"bop_targets": str(context.bop_targets), "legacy_targets": str(legacy),
+            "bbox_source": bbox_type, "detector_files": detector_files}
 
 
 def load_official_backbone(model, weights: Path):
@@ -63,17 +156,21 @@ def verify_imagenet_backbone(model, checkpoint: Path) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=CONFIG_ROOT / "train_reused.py")
+    parser.add_argument("--config", type=Path, default=LMO_CONFIG_ROOT / "train_reused.py")
     parser.add_argument("--weights", type=Path)
     args = parser.parse_args()
     torch.set_num_threads(4)
-    config_path = args.config if args.config.is_absolute() or args.config.exists() else CONFIG_ROOT / args.config
+    config_path = resolve_config_path(args.config)
     cfg = Config.fromfile(str(config_path))
     mode = "smoke" if config_path.stem.startswith("smoke") else (
         "prepare" if cfg.get("RESEARCH_PROTOCOL", {}).get("SCHEDULE") == "configurable" else "formal"
     )
     validate_research_run_config(cfg, mode=mode, expected_experiment_id=cfg.EXPERIMENT_ID)
     context = resolve_dataset_context(cfg)
+    protocol = {}
+    if str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "lm13_gdrn":
+        protocol = check_lm13_gdrn_protocol(cfg)
+    files = check_protocol_files(cfg, context)
     cfg.MODEL.DEVICE = "cpu"
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)
     model, optimizer = build_model_optimizer(cfg)
@@ -117,6 +214,7 @@ def main() -> int:
                       "dataset": context.key, "num_objects": context.num_objects,
                       "object_ids": context.object_ids,
                       "hierarchy_path": str(context.hierarchy_path),
+                      "protocol": protocol, "files": files,
                       "backbone_checkpoint": str(args.weights or cfg.MODEL.WEIGHTS or
                                                  cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.get("checkpoint_path", "")),
                       "backbone_tensors": loaded,

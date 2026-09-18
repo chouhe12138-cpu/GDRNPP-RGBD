@@ -4,7 +4,21 @@
 
 旧 LM-O 训练配置仍在 `configs/gdrn/lmo_pbr/research/exp022_progressive_pcc/`，使用原始 `reused_v1.npz` 和冻结的官方 ConvNeXt。其方法参数现在引用 `configs/gdrn/research/exp022_progressive_pcc/method.py`；有效配置仅增加 `DATASET_CONTEXT`，不更改 PCC 数学结构。
 
-新实验从 `configs/gdrn/research/exp022_progressive_pcc/common.py` 继承公共模型，从 `configs/gdrn/research/_base_/research_runtime.py` 继承可调整的训练协议。`train_lm13.py` 使用标准 LM 13 类、独立表面层级和 ImageNet ConvNeXt 初始化，完整训练 backbone 与 PCC；这是新的实验协议，不与旧 LM-O 冻结 backbone 的结果直接当作单变量比较。`smoke_lm13.py` 仅取 PBR 场景 0 的少量实例。`tless_reserved.py` 只保留配置接口，待数据和 variable-S 对称监督就绪后再检查或训练。
+新实验从 `configs/gdrn/research/exp022_progressive_pcc/common.py` 继承公共模型，从 `configs/gdrn/research/_base_/research_runtime.py` 继承可调整的训练协议。LM13 已按 GDR-Net 的 LM 协议拆成三条**显式**协议，不再由一个配置代表三种训练定义：
+
+| 配置 | 协议 | 训练数据 |
+|---|---|---|
+| `train_lm13_gdrn.py` | `lm13_gdrn` 主实验 | `lm_13_train_online` + `lm_imgn_13_train_1k_per_obj_online` |
+| `train_lm13_real_only.py` | `lm13_real_only` 数据消融 | `lm_13_train_online` |
+| `train_lm13_pbr.py` | `lm13_pbr` BOP/PBR 域 | `lm_pbr_13_online_train` |
+
+主实验与 real_only 共用 `lm13_gdrn_protocol.py`（160 epoch、effective batch 24、Ranger 1e-4、
+`COLOR_AUG_PROB=0`、VOC 背景 0.5、DZI 1.5/0.25/0.25）；协议文件放在实验目录而不是 `_base_/`，
+因为 mmcv 不允许兄弟 base 之间出现重复键。`smoke_lm13_gdrn.py` / `smoke_lm13_pbr.py` 是各自的
+小样本 smoke。`tless_reserved.py` 只保留配置接口，待数据和 variable-S 对称监督就绪后再检查或训练。
+LM real 与 lm_imgn 的 loader 是 `core/gdrn_modeling/datasets/lm_dataset_d2.py` 与 `lm_syn_imgn.py`；
+LM real 从 `lm/test/{scene}` 按 `image_set/{obj}_{train,test}.txt` 取片（`lm/train/` 是便利副本，
+与官方划分并不完全一致）。
 
 `DATASET_CONTEXT` 集中定义数据集身份、CAD ref、BOP 名称和目标文件；`resolve_dataset_context` 从注册的 train/test metadata 取得对象顺序和真实 BOP ID，并校验 hierarchy 行顺序。新增数据集需注册 split、配置 CAD ref、生成 hierarchy 并指定对应 reference 模型。LM13 当前没有 matched reference checkpoint，因此 matched evaluator 仅完成协议验证，尚未产生正式指标。
 
@@ -12,10 +26,16 @@
 
 ```bash
 export GDRN_CONVNEXT_BASE_WEIGHTS=/path/to/convnext_base_1k_224_ema.pth
-python -m research.exp022.build_hierarchy --config configs/gdrn/research/exp022_progressive_pcc/train_lm13.py --mode independent
-python -m research.exp022.preflight --config configs/gdrn/research/exp022_progressive_pcc/train_lm13.py
-python -m research.exp022.real_smoke --config configs/gdrn/research/exp022_progressive_pcc/smoke_lm13.py --renderer cpp --device cuda:0 --batch-size 1 --steps 2
-python -m research.exp022.matched_pnp_eval --config configs/gdrn/research/exp022_progressive_pcc/train_lm13.py --validate-only
+CFG=configs/gdrn/research/exp022_progressive_pcc/train_lm13_gdrn.py
+python -m research.exp022.build_hierarchy --config $CFG --mode independent
+python -m research.exp022.preflight --config $CFG
+# 逐条核对数据：位姿单位、相机、CAD 尺寸、mask/bbox 与在线渲染的一致性
+python -m research.exp022.check_lm_data --config $CFG --renderer cpp --device cuda:0 --batch-size 4
+python -m research.exp022.real_smoke --config configs/gdrn/research/exp022_progressive_pcc/smoke_lm13_gdrn.py --renderer cpp --device cuda:0 --batch-size 4 --steps 3
+python -m research.exp022.matched_pnp_eval --config $CFG --validate-only
+# 评估 provenance；正式评估前对每条协议各写一份
+python -m research.exp022.eval_manifest --config $CFG --checkpoint <ckpt> --output <eval-dir>
+python -m research.exp022.eval_manifest --config configs/gdrn/research/exp022_progressive_pcc/eval_lm13_bop.py --checkpoint <ckpt> --output <eval-dir>
 ```
 
 层级生成器拒绝覆盖已有文件；首次生成后，保持配置中的 hierarchy 路径与产物一致。LM13 正式训练配置仍标记 `FORMAL_READY=False`，需要在确定完整训练、评估和对照协议后再启用。

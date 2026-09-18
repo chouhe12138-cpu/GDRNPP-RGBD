@@ -36,8 +36,9 @@ from research.exp021.matched_pnp_eval import (
     _configured, _forward as exp021_forward, _git_state, _surface_lookups,
     _symmetry_diagnostics, aggregate, export_bop,
 )
-from research.exp022.preflight import CONFIG_ROOT
+from research.exp022.preflight import LMO_CONFIG_ROOT, resolve_config_path
 from research.exp022.dataset_context import resolve_dataset_context
+from research.exp022.eval_manifest import build_manifest, write_manifest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -325,6 +326,17 @@ def run_evaluation(reference_config: Path, official: Path, pcc_config: Path,
     meta.update(status="COMPLETE", num_targets=len(rows), max_gt_xyz_reprojection_px=max_gt_reproj,
                 elapsed_seconds=time.perf_counter() - started)
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    # This evaluator answers a correspondence question under a frozen support;
+    # it is deliberately not labelled as the official LM or BOP protocol.
+    write_manifest(output, build_manifest(
+        cfg_p, context, checkpoint=str(pcc_checkpoint),
+        bop_toolkit_root=ROOT / ".local/bop_toolkit",
+        extra={"evaluation": "fixed_support_matched_ransac_pnp",
+               "eval_protocol": "matched_diagnostic",
+               "reference_config": str(reference_config),
+               "reference_checkpoint": str(official),
+               "fixed_support_source": meta["fixed_support_source"]},
+    ))
     return summary
 
 
@@ -369,7 +381,7 @@ def bop_evaluate(output: Path, dataset: str, targets_filename: str):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=CONFIG_ROOT / "train_reused.py")
+    parser.add_argument("--config", type=Path, default=LMO_CONFIG_ROOT / "train_reused.py")
     parser.add_argument("--reference-config", type=Path)
     parser.add_argument("--reference-checkpoint", "--official-checkpoint", type=Path)
     parser.add_argument("--pcc-checkpoint", type=Path)
@@ -382,7 +394,7 @@ def main() -> int:
     parser.add_argument("--bop-eval", action="store_true")
     parser.add_argument("--validate-only", action="store_true")
     args = parser.parse_args()
-    config_path = args.config if args.config.is_absolute() or args.config.exists() else CONFIG_ROOT / args.config
+    config_path = resolve_config_path(args.config)
     cfg = Config.fromfile(str(config_path))
     context = resolve_dataset_context(cfg)
     if context.test_dataset is None:

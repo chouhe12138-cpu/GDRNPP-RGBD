@@ -1,4 +1,4 @@
-_base_ = ["./train_lm13.py"]
+_base_ = ["./train_lm13_pbr.py"]
 
 DATASETS = dict(TRAIN=("lm_pbr_13_online_smoke",), TEST=())
 DATALOADER = dict(NUM_WORKERS=0)

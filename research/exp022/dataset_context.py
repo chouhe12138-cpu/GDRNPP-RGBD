@@ -43,8 +43,8 @@ def hierarchy_path_from_config(cfg) -> Path:
 
 def resolve_dataset_context(cfg, *, require_hierarchy: bool = True) -> DatasetContext:
     """Register splits, check their class order, then validate the CAD rows."""
-    if not cfg.DATASETS.TRAIN or len(cfg.DATASETS.TRAIN) != 1:
-        raise ValueError("EXP022 requires exactly one training split")
+    if not cfg.DATASETS.TRAIN:
+        raise ValueError("EXP022 requires at least one training split")
     settings = cfg.get("DATASET_CONTEXT", {})
     if not settings:
         raise ValueError("EXP022 requires DATASET_CONTEXT in its config")
@@ -57,6 +57,16 @@ def resolve_dataset_context(cfg, *, require_hierarchy: bool = True) -> DatasetCo
     ids = tuple(int(data_ref.obj2id[name]) for name in names)
     if not ids or len(set(ids)) != len(ids):
         raise ValueError("EXP022 training object IDs must be nonempty and unique")
+    # additional training splits may mix domains, but must describe the same
+    # objects in the same order as the first one
+    for extra_name in list(cfg.DATASETS.TRAIN)[1:]:
+        extra_meta = MetadataCatalog.get(str(extra_name))
+        extra_ref = ref.__dict__[extra_meta.ref_key]
+        extra_ids = tuple(int(extra_ref.obj2id[name]) for name in extra_meta.objs)
+        if extra_ids != ids:
+            raise ValueError(
+                f"EXP022 training split object order mismatch: {extra_name} -> {extra_ids} != {ids}"
+            )
     test_name = str(cfg.DATASETS.TEST[0]) if cfg.DATASETS.TEST else None
     if len(cfg.DATASETS.TEST) > 1:
         raise ValueError("EXP022 supports one test split")

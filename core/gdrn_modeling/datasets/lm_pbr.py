@@ -83,8 +83,8 @@ class LM_PBR_Dataset:
         ##################################################
 
         # NOTE: careful! Only the selected objects
-        data_ref = ref.__dict__[data_cfg["ref_key"]]
-        self.cat_ids = [int(data_ref.obj2id[name]) for name in self.objs]
+        self.data_ref = ref.__dict__[data_cfg["ref_key"]]
+        self.cat_ids = [int(self.data_ref.obj2id[name]) for name in self.objs]
         # map selected objs to [0, num_objs-1]
         self.cat2label = {v: i for i, v in enumerate(self.cat_ids)}  # id_map
         self.label2cat = {label: cat for cat, label in self.cat2label.items()}
@@ -297,7 +297,7 @@ class LM_PBR_Dataset:
             model = inout.load_ply(
                 osp.join(
                     self.models_root,
-                    f"obj_{ref.lm_full.obj2id[obj_name]:06d}.ply",
+                    f"obj_{self.data_ref.obj2id[obj_name]:06d}.ply",
                 ),
                 vertex_scale=self.scale_to_meter,
             )

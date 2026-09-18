@@ -118,6 +118,22 @@ def build_gdrn_augmentation(cfg, is_train):
     return augmentation
 
 
+def background_replace_probability(cfg, img_type: str) -> float:
+    """Background-replacement probability for one image domain.
+
+    Shared by both train mappers so the domain policy cannot drift between the
+    online and the pre-generated-XYZ paths.
+    """
+
+    if img_type == "syn":
+        return 1.0
+    if img_type == "real":
+        return float(cfg.INPUT.CHANGE_BG_PROB)
+    if img_type == "syn_pbr":
+        return float(cfg.INPUT.get("PBR_CHANGE_BG_PROB", cfg.INPUT.CHANGE_BG_PROB))
+    raise ValueError(f"Unknown img_type: {img_type}")
+
+
 class GDRN_Online_DatasetFromList(Base_DatasetFromList):
     """NOTE: we can also use the default DatasetFromList and
     implement a similar custom DataMapper,
@@ -353,16 +369,12 @@ class GDRN_Online_DatasetFromList(Base_DatasetFromList):
             depth = depth.astype("float32")
 
         # currently only replace bg for train ###############################
-        # some synthetic data already has bg, img_type should be real or something else but not syn
+        # the per-domain policy lives in background_replace_probability
         img_type = dataset_dict.get("img_type", "real")
-        do_replace_bg = False
-        if img_type == "syn":
-            log_first_n(logging.WARNING, "replace bg", n=10)
-            do_replace_bg = True
-        else:  # real image
-            if np.random.rand() < cfg.INPUT.CHANGE_BG_PROB:
-                log_first_n(logging.WARNING, "replace bg for real", n=10)
-                do_replace_bg = True
+        bg_prob = background_replace_probability(cfg, img_type)
+        # drawing only when the policy is probabilistic keeps the RNG stream
+        # of fully deterministic domains unchanged
+        do_replace_bg = bg_prob >= 1.0 or np.random.rand() < bg_prob
         if do_replace_bg:
             assert "segmentation" in dataset_dict["inst_infos"]
             mask = cocosegm2mask(dataset_dict["inst_infos"]["segmentation"], im_H_ori, im_W_ori)
@@ -384,11 +396,11 @@ class GDRN_Online_DatasetFromList(Base_DatasetFromList):
 
         # NOTE: maybe add or change color augment here ===================================
         if self.color_aug_prob > 0 and self.color_augmentor is not None:
-            if np.random.rand() < self.color_aug_prob:
-                if cfg.INPUT.COLOR_AUG_SYN_ONLY and img_type not in ["real"]:
-                    image = self._color_aug(image, self.color_aug_type)
-                else:
-                    image = self._color_aug(image, self.color_aug_type)
+            apply_color = np.random.rand() < self.color_aug_prob
+            if cfg.INPUT.COLOR_AUG_SYN_ONLY:
+                apply_color = apply_color and img_type != "real"
+            if apply_color:
+                image = self._color_aug(image, self.color_aug_type)
 
         # other transforms (mainly geometric ones);
         # for 6d pose task, flip is not allowed in general except for some 2d keypoints methods

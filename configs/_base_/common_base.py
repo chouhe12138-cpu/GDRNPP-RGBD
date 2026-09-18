@@ -52,6 +52,7 @@ INPUT = dict(
     BG_IMGS_ROOT="datasets/VOCdevkit/VOC2012/",  # "datasets/coco/train2017/" | "datasets/SUN_RGBD/SUNRGBD"
     NUM_BG_IMGS=10000,
     CHANGE_BG_PROB=0.5,  # prob to change bg of real image
+    PBR_CHANGE_BG_PROB=0.5,  # prob to change bg of a PBR render (syn_pbr, has bg)
     # truncation fg (randomly replace some side of fg with bg during replace_bg)
     TRUNCATE_FG=False,
     BG_KEEP_ASPECT_RATIO=True,

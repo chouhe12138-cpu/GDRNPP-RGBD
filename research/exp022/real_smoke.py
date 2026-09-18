@@ -20,14 +20,14 @@ from core.gdrn_modeling.datasets.data_loader import build_gdrn_train_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
 from core.gdrn_modeling.engine.engine_utils import batch_data, get_renderer
 from core.gdrn_modeling.models.GDRN_PCC import build_model_optimizer
-from research.exp022.preflight import CONFIG_ROOT, load_official_backbone
+from research.exp022.preflight import LMO_CONFIG_ROOT, load_official_backbone, resolve_config_path
 from research.exp022.dataset_context import resolve_dataset_context
 from research.run_contract import validate_research_run_config
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", type=Path, default=CONFIG_ROOT / "smoke_reused.py")
+    parser.add_argument("--config", type=Path, default=LMO_CONFIG_ROOT / "smoke_reused.py")
     parser.add_argument("--weights", type=Path)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--renderer", choices=("cpp", "egl"), default="cpp")
@@ -49,7 +49,7 @@ def main() -> int:
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    config_path = args.config if args.config.is_absolute() or args.config.exists() else CONFIG_ROOT / args.config
+    config_path = resolve_config_path(args.config)
     cfg = Config.fromfile(str(config_path))
     validate_research_run_config(cfg, mode="smoke",
                                  expected_experiment_id=cfg.EXPERIMENT_ID)
