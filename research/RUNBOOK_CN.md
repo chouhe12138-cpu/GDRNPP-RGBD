@@ -285,6 +285,7 @@ docker exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp gdrnpp_chx_lab0
 | `lm13_gdrn` | `lm13` | LM real + `lm_imgn` + VOC + ConvNeXt + LM13 hierarchy + `server_preflight` |
 | `lm13_real_only` | `lm13` | 同上，但按配置实际的 `DATASETS.TRAIN` **不要求** `lm_imgn` |
 | `lm13_pbr` | `lm13_pbr` | LM PBR + LM real test + VOC + ConvNeXt + LM13 hierarchy + `server_preflight`；不要求 `lm_imgn` |
+| `lmo_full_imagenet` | `lmo_full_imagenet` | LM PBR + LM-O test + VOC + ConvNeXt ImageNet 权重 + `reused_v1.npz` + 容器内 EXP022 `preflight`；不要求官方 LM-O 训练权重 |
 | 缺失（全部旧 LMO、PBR 与 EXP013/017/020/021 配置） | `legacy_lmo` | `lm/train_pbr` + `lmo/test` + VOC + `weights/lmo_pbr/model_final_wo_optim.pth` |
 | 其他非空名称 | — | 直接 fail：`unknown TRAIN_PROTOCOL.NAME`，不再回落到 legacy |
 
@@ -292,6 +293,14 @@ docker exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp gdrnpp_chx_lab0
 `lm_imgn*` split 才要求），因此 `lm13_real_only` 这条消融臂不需要服务器准备 DeepIM 渲染图。
 新增非空 `TRAIN_PROTOCOL.NAME` 时必须同时更新 launcher 的映射表：未列出的名字会被拒绝，
 不会静默套用旧 LMO 的资源清单。
+
+EXP024 的 `train_lmo_full_imagenet.py` 在 lab1 使用独立实验 ID，正式配置初始
+`FORMAL_READY=False`。先按本节 bundle/release 与受控容器替换流程准备 lab1，再在容器里
+运行 `research.exp022.preflight` 和 `real_smoke` 的 EGL/AMP 真实 batch4；核对 340 个
+ImageNet 张量、有限 loss/梯度、无 AMP 跳步、显存和步骤时间。之后回本地开启
+`FORMAL_READY=True`，提交并创建第二段 release，再由 launcher 的 `run ... formal`
+启动。40 epoch 的 E5–E40 checkpoint 与评估口径见 EXP024 RECORD。不要在服务器
+release 中直接修改配置，也不要把 EXP024 的运行目录放进 EXP022。
 
 `check_host()` 只保留 user/Docker/GPU 与 `${root}` 基础路径；`${root}` 下的
 `datasets/weights/outputs/cache/home` 由 `create` 负责建立（`--mount type=bind` 不接受不存在的

@@ -17,6 +17,11 @@
 结构重构和本地工程对比。服务器 EGL、正式训练和 matched PnP 尚未运行，不能据本地
 smoke 判断精度或机制。geometry-adaptive partition 与 fragment adjacency 延后。
 
+2026-09-19 用户另指定 lab1 开展 EXP024：保持 EXP022 的 LM-O/PBR40 与 PCC 方法，
+改用 ImageNet ConvNeXt-Base 初始化并训练完整 backbone。EXP022 冻结臂在 lab0 继续；
+EXP023 LM13 留待 EXP022 完成后进行。EXP024 与 EXP022 同时改变初始化和冻结状态，
+结果比较只能描述组合策略的差异，不作单因素解冻归因。
+
 ## 已建立的证据
 
 - Oracle/RANSAC 表明预测 correspondence 中存在可用于姿态的信息。

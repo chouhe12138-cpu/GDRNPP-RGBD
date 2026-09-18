@@ -48,6 +48,37 @@ LM13_GDRN_SOLVER = {
 }
 
 
+def check_lmo_full_imagenet_protocol(cfg) -> dict:
+    """Keep the LM-O full-training arm matched to EXP022 except for initialization and freezing."""
+    expected = {
+        "DATASETS.TRAIN": ("lmo_pbr_train",),
+        "DATASETS.TEST": ("lmo_bop_test",),
+        "SOLVER.TOTAL_EPOCHS": 40,
+        "SOLVER.IMS_PER_BATCH": 4,
+        "SOLVER.REFERENCE_BS": 48,
+        "SOLVER.CHECKPOINT_PERIOD": 5,
+        "TEST.EVAL_PERIOD": 5,
+        "TEST.TEST_BBOX_TYPE": "gt",
+        "MODEL.POSE_NET.XYZ_RENDERER": "egl",
+        "MODEL.POSE_NET.BACKBONE.FREEZE": False,
+        "MODEL.POSE_NET.BACKBONE.LR_MULT": 0.1,
+        "SOLVER.AMP.ENABLED": True,
+    }
+    for key, wanted in expected.items():
+        value = cfg
+        for part in key.split("."):
+            value = value[part]
+        if value != wanted:
+            raise ValueError(f"lmo_full_imagenet requires {key}={wanted!r}, got {value!r}")
+    if cfg.MODEL.WEIGHTS:
+        raise ValueError("lmo_full_imagenet must initialize from ImageNet, not MODEL.WEIGHTS")
+    if cfg.SOLVER.OPTIMIZER_CFG.type != "AdamW" or float(cfg.SOLVER.OPTIMIZER_CFG.lr) != 3e-4:
+        raise ValueError("lmo_full_imagenet requires EXP022 AdamW at 3e-4")
+    return {"train_splits": list(cfg.DATASETS.TRAIN),
+            "physical_batch_size": 4, "reference_batch_size": 48,
+            "accumulation_steps": 12, "total_epochs": 40}
+
+
 def resolve_config_path(raw: Path) -> Path:
     """Resolve a bare config name against the EXP022 config trees."""
     if raw.is_absolute() or raw.exists():
@@ -174,6 +205,8 @@ def main() -> int:
     # smoke.  Only a full-size config is held to the formal definition.
     if mode != "smoke" and str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "lm13_gdrn":
         protocol = check_lm13_gdrn_protocol(cfg)
+    if mode != "smoke" and str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "lmo_full_imagenet":
+        protocol = check_lmo_full_imagenet_protocol(cfg)
     files = check_protocol_files(cfg, context)
     cfg.MODEL.DEVICE = "cpu"
     cfg.SOLVER.BASE_LR = float(cfg.SOLVER.OPTIMIZER_CFG.lr)

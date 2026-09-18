@@ -1,6 +1,18 @@
 # 当前研究状态
 
-最后核对：2026-09-18。
+最后核对：2026-09-19。
+
+## EXP024 LM-O ImageNet 全主干训练准备（2026-09-19）
+
+用户指定在空闲 lab1 上训练 LM-O 的全量解冻 ConvNeXt + PCC，主干从 ImageNet
+ConvNeXt-Base 权重初始化。新实验沿用 EXP022 的 PBR40/GT-box、`reused_v1.npz`、
+PCC 方法和 E5–E40 评价点；物理 batch4 累积 12 次至 effective batch48，40 epoch、
+FP16 AMP。独立实验 ID 与 launcher profile 已准备，正式配置暂保持
+`FORMAL_READY=False`。本地 CPU preflight 验证 340 个 ImageNet 主干张量及
+`91,292,872` 个可训练参数；本会话本地 CUDA 不可用。用户回传的 lab1 只读检查确认
+GPU 1 空闲、数据/权重/层级存在、项目容器空闲且仍挂载 `effc99b`；EGL/AMP smoke
+和正式训练均未运行。初始化来源和冻结状态同时变化，不能把 EXP024 与
+EXP022 的差值解释为单独的解冻效应。详见 [EXP024 RECORD](experiments/EXP-20260919-024-lmo-progressive-pcc-fulltrain/RECORD.md)。
 
 ## EXP023 LM13 数据/训练/评估协议重整（2026-09-18）
 

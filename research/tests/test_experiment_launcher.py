@@ -19,6 +19,7 @@ LM13_OBJECTS = (
     "eggbox", "glue", "holepuncher", "iron", "lamp", "phone",
 )
 LM13_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz"
+LMO_FULL_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/reused_v1.npz"
 LM13_IMGN_SPLIT = "lm_imgn_13_train_1k_per_obj_online"
 CONVNEXT_CHECKPOINT = (
     "/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth"
@@ -49,6 +50,7 @@ LM13_CONTAINER_PATHS = (
     CONVNEXT_CHECKPOINT,
     "/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth",
     LM13_HIERARCHY,
+    LMO_FULL_HIERARCHY,
 ) + tuple(
     f"/workspace/gdrnpp/datasets/lm_imgn/image_set/train_{obj}.txt" for obj in LM13_OBJECTS
 )
@@ -532,6 +534,7 @@ def test_lm_imgn_mount_is_required_read_only(tmp_path):
     ("lm13_gdrn", "lm13"),
     ("lm13_real_only", "lm13"),
     ("lm13_pbr", "lm13_pbr"),
+    ("lmo_full_imagenet", "lmo_full_imagenet"),
     ("", "legacy_lmo"),
 ])
 def test_resource_profile_mapping(name, expected):
@@ -598,7 +601,7 @@ def test_every_declared_train_protocol_resolves_to_a_profile():
                 config.read_text(encoding="utf-8"),
             )
         )
-    assert declared == {"lm13_gdrn", "lm13_real_only", "lm13_pbr"}
+    assert declared == {"lm13_gdrn", "lm13_real_only", "lm13_pbr", "lmo_full_imagenet"}
     for name in sorted(declared):
         result = _source_and_run(
             "container=test-container\n"
@@ -609,7 +612,7 @@ def test_every_declared_train_protocol_resolves_to_a_profile():
             check=False,
         )
         assert result.returncode == 0, (name, result.stderr)
-        assert result.stdout.strip() in {"lm13", "lm13_pbr"}
+        assert result.stdout.strip() in {"lm13", "lm13_pbr", "lmo_full_imagenet"}
 
 
 def test_resource_profile_ignores_noise_before_the_config_value():
@@ -641,9 +644,11 @@ def test_require_profile_resources_dispatches_on_the_profile():
     result = _source_and_run(
         "require_lm13_resources() { echo lm13:$1; }\n"
         "require_lm13_pbr_resources() { echo lm13-pbr:$1; }\n"
+        "require_lmo_full_imagenet_resources() { echo lmo-full:$1; }\n"
         "require_legacy_lmo_resources() { echo legacy; }\n"
         "require_profile_resources lm13 configs/a.py\n"
         "require_profile_resources lm13_pbr configs/a.py\n"
+        "require_profile_resources lmo_full_imagenet configs/a.py\n"
         "require_profile_resources legacy_lmo configs/a.py"
     )
     assert result.stdout.splitlines() == [
@@ -651,6 +656,8 @@ def test_require_profile_resources_dispatches_on_the_profile():
         "RESOURCE_PROFILE lm13",
         "lm13-pbr:configs/a.py",
         "RESOURCE_PROFILE lm13_pbr",
+        "lmo-full:configs/a.py",
+        "RESOURCE_PROFILE lmo_full_imagenet",
         "legacy",
         "RESOURCE_PROFILE legacy_lmo",
     ]
@@ -790,6 +797,44 @@ def test_legacy_lmo_gate_keeps_the_original_requirements():
     assert "model_final_wo_optim.pth" in result.stderr
 
 
+def test_lmo_full_gate_uses_imagenet_and_hierarchy_without_official_weights():
+    official = "/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth"
+    result = _resource_gate(
+        "require_lmo_full_imagenet_resources configs/research/train.py",
+        train_protocol="lmo_full_imagenet",
+        hierarchy=LMO_FULL_HIERARCHY,
+        missing=(official,),
+    )
+    assert result.returncode == 0, result.stderr
+
+    for missing, expected in (
+        ((CONVNEXT_CHECKPOINT,), "convnext_base_1k_224_ema.pth"),
+        ((LMO_FULL_HIERARCHY,), "reused_v1.npz"),
+        (("/workspace/gdrnpp/datasets/BOP_DATASETS/lmo/test",), "lmo/test"),
+    ):
+        rejected = _resource_gate(
+            "require_lmo_full_imagenet_resources configs/research/train.py",
+            train_protocol="lmo_full_imagenet",
+            hierarchy=LMO_FULL_HIERARCHY,
+            missing=missing,
+            check=False,
+        )
+        assert rejected.returncode != 0
+        assert expected in rejected.stderr
+
+
+def test_lmo_full_gate_stops_on_failed_model_preflight():
+    rejected = _resource_gate(
+        "fake_server_preflight=1\n"
+        "require_lmo_full_imagenet_resources configs/research/train.py",
+        train_protocol="lmo_full_imagenet",
+        hierarchy=LMO_FULL_HIERARCHY,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "LM-O full-training preflight failed" in rejected.stderr
+
+
 def test_resource_gate_precedes_run_directory_creation():
     source = LAUNCHER.read_text(encoding="utf-8")
     assert source.index('require_profile_resources "${profile}" "${config}"') < source.index(
@@ -853,4 +898,3 @@ def test_create_owns_the_runtime_directories():
     check_host_block = source[source.index("check_host()"):source.index("container_exists()")]
     assert "for directory in" not in check_host_block
     assert "${root}/outputs" not in check_host_block
-

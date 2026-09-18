@@ -50,6 +50,14 @@ profile-aware runtime gate、`server_preflight`、EGL smoke 与两段 release）
 
 旧 LM-O 第一阶段使用冻结的官方 RGB ConvNeXt 8×8 特征，训练四级 PCC、stage transition、局部残差和可见 mask。新 LM13 配置允许全量 backbone 训练；ResNet-50、部署、Geometry-adaptive partition 与 fragment adjacency 仍为 **DEFERRED**。
 
+EXP024 是单独的 LM-O 全主干训练：保持 EXP022 的 PBR40、GT-box、`reused_v1.npz`、
+PCC 方法与 E5–E40 评估点，改为 ImageNet ConvNeXt-Base 初始化并解冻 backbone。
+`train_lmo_full_imagenet.py` 使用物理 batch 4、梯度累积 12 次、effective batch 48，
+backbone 学习率为 PCC 的 0.1 倍。`smoke_lmo_full_imagenet.py` 用于短步 EGL smoke；
+正式配置 `FORMAL_READY=False`，待 lab1 EGL/AMP 训练与资源检查通过后才开启。
+这同时改变 backbone 初始化来源与冻结状态，因此与 EXP022 冻结臂的性能差不能
+单独归因于“解冻”。事实和 gate 见 EXP024 RECORD。
+
 当前结构：`1024→512→256→128→64` CNN 通道阶梯；stage 间为双线性上采样加 1×1 Conv。各级以 256 维 image token 做图像 self-attention，S1/S2 为全局 attention，S3/S4 各为 8×8 window + shift=4 window attention。每级仅匹配当前 parent 下 8 个 CAD child：独立 Q/K/V 投影得到 raw route logits 与 soft CAD context，前者训练 CE/更新 Top-2 beam，后者直接经 stage 的 `context_proj` 与小 gate 以残差方式回注 CNN feature。图像 attention 使用 Pre-Norm、8 heads、无 FFN；全局及普通 window 使用 `nn.MultiheadAttention(need_weights=False)`，shifted window 复用其 Q/K/V/out 权重并用广播 mask 的 SDPA。CAD 局部匹配保留显式 8-way logits 与 packed routes。最终 fused Stage-4 feature 经同一个 image projection 进入 leaf-local residual head；visible mask 来自 64 通道特征。
 
 ## 固定协议
