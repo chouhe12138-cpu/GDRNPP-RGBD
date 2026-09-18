@@ -149,9 +149,14 @@ def test_gdrn_config_matches_the_protocol():
     assert float(cfg.SOLVER.OPTIMIZER_CFG.lr) == 1e-4
     assert float(cfg.SOLVER.OPTIMIZER_CFG.weight_decay) == 0.0
     assert cfg.SOLVER.get("WARMUP_RATIO", None) is None
+    # GDR-Net's flat_and_anneal decays to zero; the 0.01 research default would
+    # stop at 1e-6 instead.
+    assert float(cfg.SOLVER.TARGET_LR_FACTOR) == 0.0
+    assert float(cfg.SOLVER.ANNEAL_POINT) == 0.72
     assert float(cfg.DATALOADER.FILTER_VISIB_THR) == 0.0
     assert cfg.SEED == 42
-    assert int(cfg.TEST.EVAL_PERIOD) > 0
+    assert int(cfg.TEST.EVAL_PERIOD) == 20
+    assert (int(cfg.SOLVER.IMS_PER_BATCH), int(cfg.SOLVER.REFERENCE_BS)) == (4, 24)
 
 
 def test_real_only_changes_only_the_training_splits():
@@ -190,6 +195,13 @@ def test_protocol_check_rejects_a_warmup_ratio():
         check_lm13_gdrn_protocol(cfg)
 
 
+def test_protocol_check_rejects_a_nonzero_final_lr():
+    cfg = Config.fromfile(GDRN_CONFIG)
+    cfg.SOLVER.TARGET_LR_FACTOR = 0.01  # the research runtime default
+    with pytest.raises(ValueError, match="TARGET_LR_FACTOR"):
+        check_lm13_gdrn_protocol(cfg)
+
+
 def test_protocol_check_rejects_a_different_data_domain():
     cfg = Config.fromfile(GDRN_CONFIG)
     cfg.DATASETS.TRAIN = ("lm_13_train_online",)
@@ -207,7 +219,7 @@ def test_protocol_check_rejects_a_non_ranger_baseline():
 def test_eval_configs_declare_their_own_protocols():
     legacy = Config.fromfile(GDRN_CONFIG)
     bop = Config.fromfile(BOP_EVAL_CONFIG)
-    assert legacy.DATASETS.TEST == ("lm_13_test",)
+    assert legacy.DATASETS.TEST == ("lm_13_test_online",)
     assert legacy.VAL.TARGETS_FILENAME == "lm_test_targets_bb8.json"
     assert legacy.VAL.USE_BOP is False
     assert legacy.EVAL_PROTOCOL.NAME == "lm_legacy_diagnostic"
@@ -223,7 +235,7 @@ def test_eval_configs_declare_their_own_protocols():
 
 
 @pytest.mark.parametrize("config,dataset,test_split,protocol,targets", [
-    (GDRN_CONFIG, "lm13", "lm_13_test", "lm_legacy_diagnostic", "lm_test_targets_bb8.json"),
+    (GDRN_CONFIG, "lm13", "lm_13_test_online", "lm_legacy_diagnostic", "lm_test_targets_bb8.json"),
     (BOP_EVAL_CONFIG, "lm13", "lm_bop_test_13", "bop_official", "test_targets_bop19.json"),
 ])
 def test_manifest_records_the_evaluation_provenance(tmp_path, config, dataset, test_split,
@@ -260,7 +272,7 @@ def test_mixed_domain_config_passes_the_context_check():
     cfg = Config.fromfile(GDRN_CONFIG)
     context = resolve_dataset_context(cfg)
     assert context.object_ids == (1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15)
-    assert context.test_dataset == "lm_13_test"
+    assert context.test_dataset == "lm_13_test_online"
 
 
 def test_context_rejects_a_training_split_with_another_object_order():

@@ -34,6 +34,21 @@
 README 的 `image_sets`/`test_bboxes` 网盘包补齐），所以 Protocol A/B 是诊断口径，
 不能与 GDR-Net 论文的 detector-bbox 数字直接比较。本轮**没有精度结论**，正式训练未启动。
 
+**正式训练前收口（2026-09-18 同日）**：按
+`EXP022_LM13_Pretraining_Modification_Task.md` 再作四处修改，未动 PCC 网络主体 ——
+`lm13_gdrn_protocol.py` 显式 `TARGET_LR_FACTOR=0.0`（原继承 `0.01`，160 epoch 只能衰减到
+`1e-6`）、`preflight.py` 把该字段纳入硬校验并修掉 smoke 配置被正式协议检查拒绝的既存缺陷、
+`train_lm13_gdrn.py` 的 `TEST` 换成 `lm_13_test_online` 且 `EVAL_PERIOD=20`、
+`lmo_bop_test.py` 的 `obj2label` 反向映射修正。验证：5 个配置加载、三个 preflight PASS、
+`check_lm_data` 全部 0 误差、test split 在无 `xyz_crop` 机器上可加载（旧 split 断言失败作对照）、
+20 步 CUDA+CPP smoke loss 单调下降且 AMP 无跳步、真实入口 1 epoch 退出码 0 并写出 checkpoint
+（`iteration=3`、optimizer `step=4`、`base_lrs=[1e-4,1e-5]`、scheduler `_last_lr=4.996e-7`
+与 warmup 理论值一致）、`pytest -q research` **248 passed**。
+
+本机 EGL 实测抛 `RuntimeError: Bindless Textures not supported`，按任务书不伪造 PASS，
+故 `FORMAL_READY` 保持 `False`，结论 **NO-GO**，唯一 blocker 是服务器 EGL smoke：
+`BLOCKED: final CUDA/EGL smoke must be run on the training server.`
+
 详见 [EXP023 RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md)
 和 [EXP022 README](exp022/README.md)。
 

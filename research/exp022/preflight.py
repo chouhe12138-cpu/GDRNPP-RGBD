@@ -44,6 +44,7 @@ LM13_GDRN_SOLVER = {
     "WARMUP_METHOD": "linear",
     "ANNEAL_METHOD": "cosine",
     "ANNEAL_POINT": 0.72,
+    "TARGET_LR_FACTOR": 0.0,
 }
 
 
@@ -168,7 +169,10 @@ def main() -> int:
     validate_research_run_config(cfg, mode=mode, expected_experiment_id=cfg.EXPERIMENT_ID)
     context = resolve_dataset_context(cfg)
     protocol = {}
-    if str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "lm13_gdrn":
+    # The smoke config inherits TRAIN_PROTOCOL from the formal one but swaps in
+    # the *_smoke splits, so the formal protocol check would reject its own
+    # smoke.  Only a full-size config is held to the formal definition.
+    if mode != "smoke" and str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "lm13_gdrn":
         protocol = check_lm13_gdrn_protocol(cfg)
     files = check_protocol_files(cfg, context)
     cfg.MODEL.DEVICE = "cpu"

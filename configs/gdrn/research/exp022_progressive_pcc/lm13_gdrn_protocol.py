@@ -52,4 +52,8 @@ SOLVER = dict(
     WARMUP_METHOD="linear",
     ANNEAL_METHOD="cosine",
     ANNEAL_POINT=0.72,
+    # GDR-Net's LM13 flat_and_anneal decays to zero. The research runtime
+    # default of 0.01 would leave the final LR at 1e-6, so override it here
+    # rather than in the global base, which other experiments still inherit.
+    TARGET_LR_FACTOR=0.0,
 )

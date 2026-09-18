@@ -83,7 +83,7 @@ class LMO_BOP_TEST_Dataset(object):
         # map selected objs to [0, num_objs-1]
         self.cat2label = {v: i for i, v in enumerate(self.cat_ids)}  # id_map
         self.label2cat = {label: cat for cat, label in self.cat2label.items()}
-        self.obj2label = OrderedDict((obj, obj_id) for obj, obj_id in enumerate(self.objs))
+        self.obj2label = OrderedDict((obj, obj_id) for obj_id, obj in enumerate(self.objs))
         ##########################################################
 
     def __call__(self):

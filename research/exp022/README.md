@@ -13,7 +13,9 @@
 | `train_lm13_pbr.py` | `lm13_pbr` BOP/PBR 域 | `lm_pbr_13_online_train` |
 
 主实验与 real_only 共用 `lm13_gdrn_protocol.py`（160 epoch、effective batch 24、Ranger 1e-4、
-`COLOR_AUG_PROB=0`、VOC 背景 0.5、DZI 1.5/0.25/0.25）；协议文件放在实验目录而不是 `_base_/`，
+`COLOR_AUG_PROB=0`、VOC 背景 0.5、DZI 1.5/0.25/0.25、cosine 终点 `TARGET_LR_FACTOR=0`）；
+主实验每 20 epoch 做一次 GT-bbox RANSAC-PnP 诊断评估（`EVAL_PERIOD=20`），测试集用
+`lm_13_test_online` 以免依赖评估不需要的预生成 `xyz_crop`。协议文件放在实验目录而不是 `_base_/`，
 因为 mmcv 不允许兄弟 base 之间出现重复键。`smoke_lm13_gdrn.py` / `smoke_lm13_pbr.py` 是各自的
 小样本 smoke。`tless_reserved.py` 只保留配置接口，待数据和 variable-S 对称监督就绪后再检查或训练。
 LM real 与 lm_imgn 的 loader 是 `core/gdrn_modeling/datasets/lm_dataset_d2.py` 与 `lm_syn_imgn.py`；

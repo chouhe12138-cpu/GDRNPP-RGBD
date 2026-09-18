@@ -1,9 +1,10 @@
 # EXP023 LM13 Progressive PCC 全 backbone 训练
 
 - `experiment_id`: `EXP-20260918-023-lm13-progressive-pcc-fulltrain`
-- 状态：`PROTOCOL_OVERHAULED / LOCAL_TRAIN_AND_DATA_CHECK_PASS / FORMAL_NOT_STARTED`
-- 日期：2026-09-18（协议重整同日）；源码基准：`1e2ad1266ef5ab0feec9e005fd700af332b39219`
-  加本工作区未提交修改
+- 状态：`PROTOCOL_OVERHAULED / PRETRAIN_CHECKS_PASS / FORMAL_NOT_STARTED`
+- 日期：2026-09-18（协议重整同日，随后按
+  `EXP022_LM13_Pretraining_Modification_Task.md` 收口）；源码基准：
+  `5db298c7eb480b5038e517b0a6cc9973b653e421` 加本工作区未提交修改
 - 正式 `run_id`、epoch 与评估指标：未生成。唯一的 checkpoint 来自下面记录的本机接线短训练，
   不是正式结果。
 
@@ -95,14 +96,67 @@ LM13、实际数据是 `lm_pbr_13_online_train`（GDRNPP 的 PBR/BOP 协议）�
 - 回归：完整 `pytest -q research` **243 passed**；三个 LM13 配置 CPU preflight 均 PASS。
 - `third_party/` 已加入 `.gitignore`（只读参考代码，不上传服务器）。
 
+## 2026-09-18 正式训练前收口（Observed / Derived）
+
+按 `EXP022_LM13_Pretraining_Modification_Task.md` 收口，未改 Progressive PCC 网络主体。
+四处修改：
+
+- `lm13_gdrn_protocol.py` 显式加 `SOLVER.TARGET_LR_FACTOR=0.0`。此前继承
+  `research_runtime` 的 `0.01`，160 epoch 的 `flat_and_anneal` 最终只衰减到 `1e-6`，
+  而 GDR-Net LM13 基线衰减到 0。只覆盖本协议，不动全局默认值（derive：
+  `solver_utils` 用 `base_lr * target_lr_factor` 作为 cosine 终点）。
+- `preflight.py` 把 `TARGET_LR_FACTOR` 加进 `LM13_GDRN_SOLVER`，继承回 `0.01` 会被拒绝。
+  另修一处既存缺陷：smoke 配置从正式配置继承 `TRAIN_PROTOCOL.NAME="lm13_gdrn"` 但换成
+  `*_smoke` split，因此 `preflight --config smoke_lm13_gdrn.py` 会被正式协议检查拒绝自己的
+  smoke；现在只有非 smoke 模式做严格协议校验。
+- `train_lm13_gdrn.py` 的 `TEST` 由 `("lm_13_test",)` 改为 `("lm_13_test_online",)`，并显式设
+  `EVAL_PERIOD=20`（原继承 5，160 epoch 会跑 32 次全量 13k 图 RANSAC-PnP）。
+  `BEST_CHECKPOINT.ENABLED=False`，每 20 epoch 共 8 次评估。
+- `lmo_bop_test.py` 的 `obj2label` 反向映射修正为 `(obj, obj_id) for obj_id, obj in
+  enumerate(...)`。该成员全仓库只赋值、无读取，所以是纯 cleanup；同形写法在约 40 个其他
+  loader（含 `det/yolox/`）中仍未改，本次按范围限定只动该文件。
+
+### 验证（Observed）
+
+| 检查 | 结果 |
+|---|---|
+| 5 个 LM13 配置 mmcv 加载 | PASS，无 duplicate key |
+| effective config | `IMS_PER_BATCH=4`、`REFERENCE_BS=24`、`TOTAL_EPOCHS=160`、Ranger `lr=1e-4` `wd=0`、`WARMUP_ITERS=1000`、`ANNEAL_METHOD=cosine`、`ANNEAL_POINT=0.72`、`TARGET_LR_FACTOR=0.0`、`EVAL_PERIOD=20`、`TEST_BBOX_TYPE=gt` |
+| CPU preflight（gdrn / smoke / bop-eval） | 三者 `status=PASS`，340 backbone 张量、`91,292,872` 可训练参数、13 objects |
+| `check_lm_data` | 相机与内参误差 `0.0 px`、`bbox` 与 mask 误差 `0.0 px`、`bbox3d` 与 `models_info` 相对误差 `3.06e-08`、平移 0.88–1.10 m、在线渲染覆盖源 mask `0.954–0.989` |
+| lm_imgn 13 类覆盖 | 逐类 3 个样本，`benchvise→benchviseblue` 别名生效、固定内参一致、`t_z` 0.54–1.09 m |
+| test split 去 xyz_crop | `lm_13_test_online` 在 `lm/test/xyz_crop` 不存在的机器上加载成功；同一机器上旧 `lm_13_test` 因 `osp.exists(xyz_path)` 断言失败（对照） |
+| 20 步 CUDA+CPP smoke | PASS，三项 loss 单调下降，`amp_skipped_steps=0`，峰值 allocated `2.820 GB` |
+| 真实入口 1 epoch（`main_gdrn.py`，CPP） | 退出码 0，写 `model_epoch_001.pth`（1.46 GB）；checkpoint 内 `iteration=3`（4 步）、optimizer `step=4`、436 个状态张量、`base_lrs=[1e-4, 1e-5]`（backbone `LR_MULT=0.1`）、scheduler `_last_lr=4.996e-7`（warmup 第 4 步的理论值）、GradScaler `scale=65536` 且 `_growth_tracker=4`（无跳步）、backbone 张量与 ImageNet 源不再逐位相等（确有优化步写入） |
+| 回归 | `pytest -q research` `248 passed` |
+| `run_contract` formal 模式 | `FORMAL_READY=False` → 拒绝；置 `True` 后 PASS（`training_renderer=egl`、`evaluation_renderer=cpp`、`evaluation_period=20`） |
+
+### 最终 CUDA + EGL smoke：BLOCKED
+
+本机 EGL 实测不可用：`lib/egl_renderer/glutils/egl_offscreen_context.py:226`
+抛 `RuntimeError: Bindless Textures not supported`（与 EXP021 记录的本机限制一致）。
+按任务书 §6 不伪造 PASS，因此：
+
+```text
+BLOCKED: final CUDA/EGL smoke must be run on the training server.
+```
+
+正式配置的 `RESEARCH_PROTOCOL.FORMAL_READY` 保持 `False`；`train_lm13_gdrn.py` 末尾以注释
+形式留下 override（`SCHEDULE="configurable", FORMAL_READY=True`），需在服务器 EGL smoke
+通过后才打开。本轮结论：`NO-GO`，唯一 blocker 是服务器 EGL 渲染器。
+
 ## Decision / 待完成
 
-- 本轮只做协议整理与接线，**未产生任何精度结论**，未运行正式训练，未运行完整评估。
+- 本轮只做协议收口与训练前检查，**未产生任何精度结论**，未运行正式训练，未运行完整评估。
 - 两条评估链（legacy ADD(-S)、BOP AR）都只能用 **GT bbox** 跑：官方 Faster R-CNN 的
   `lm/test/test_bboxes/bbox_faster_all.json` 全盘不存在（GDR-Net README 说明它需从单独的
   `image_sets`/`test_bboxes` 网盘包补齐）。因此 Protocol A/B 当前都是诊断口径，
   **不能**与 GDR-Net 论文的 detector-bbox 数字直接比较。
 - LM13 没有 reference 模型，`matched_pnp_eval.py` 目前只能做协议校验；正式 matched 对比
   需等待 EXP021 B/C 结果完整后确定 comparator。
-- 正式训练前仍需：预注册 gate、显式打开 `RESEARCH_PROTOCOL.FORMAL_READY`、确定服务器 EGL
-  资源检查。T-LESS 数据尚未准备，其 variable-S 对称监督是单独的后续工作。
+- 正式训练前只剩服务器侧事项：在训练机上用 EGL 跑通 smoke（forward / loss / backward /
+  optimizer step / 梯度有限 / checkpoint 写入），通过后在 `train_lm13_gdrn.py` 打开
+  `RESEARCH_PROTOCOL.FORMAL_READY=True`，并确认预注册 gate。T-LESS 数据尚未准备，其
+  variable-S 对称监督是单独的后续工作。
+- 已发现但本轮未处理：`obj2label` 的反向映射写法在约 40 个其他 loader 中依旧（全仓库无读取
+  点，故无行为影响）；`det/yolox/` 下同名文件同样未动。需要时另开 cleanup。

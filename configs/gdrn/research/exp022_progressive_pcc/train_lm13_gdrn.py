@@ -13,7 +13,10 @@ DATASETS = dict(
         "lm_13_train_online",
         "lm_imgn_13_train_1k_per_obj_online",
     ),
-    TEST=("lm_13_test",),
+    # `_online` is the same image/pose/bbox protocol with require_xyz=False, so
+    # evaluation stops depending on a pre-generated xyz_crop the test set never
+    # needs.
+    TEST=("lm_13_test_online",),
     # The official Faster R-CNN boxes for LM are not available locally, so the
     # detector-bbox protocol cannot run yet; see TRAIN_PROTOCOL/EVAL_PROTOCOL.
     DET_FILES_TEST=(),
@@ -31,7 +34,16 @@ MODEL = dict(
         )),
     ),
 )
-TEST = dict(TEST_BBOX_TYPE="gt", USE_PNP=True, PNP_TYPE="ransac_pnp")
+TEST = dict(
+    # A full LM test pass runs RANSAC-PnP over ~13k images, and best-checkpoint
+    # selection is off, so epoch 5 is too frequent for 160 epochs: every 20
+    # epochs gives 8 checkpoints of interest instead of 32 full evaluations.
+    # run_contract requires EVAL_PERIOD > 0 for a configurable formal run.
+    EVAL_PERIOD=20,
+    TEST_BBOX_TYPE="gt",
+    USE_PNP=True,
+    PNP_TYPE="ransac_pnp",
+)
 
 TRAIN_PROTOCOL = dict(NAME="lm13_gdrn", DATA_DOMAIN="real+imgn")
 # BBOX_SOURCE=gt keeps this a diagnostic until the official detector boxes are
@@ -49,3 +61,11 @@ VAL = dict(
     USE_BOP=False,
     RENDERER_TYPE="cpp",
 )
+
+# Formal runs stay locked at the research_runtime default (FORMAL_READY=False)
+# until the training renderer is verified on the server.  The formal protocol
+# needs XYZ_RENDERER="egl" for online geometry, which this machine cannot
+# provide ("Bindless Textures not supported"), so the local checks cover
+# everything except the renderer.  Enable the override below only after the
+# EGL smoke, backward, optimizer step and checkpoint write pass there.
+# RESEARCH_PROTOCOL = dict(SCHEDULE="configurable", FORMAL_READY=True)
