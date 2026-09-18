@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -18,6 +19,7 @@ LM13_OBJECTS = (
     "eggbox", "glue", "holepuncher", "iron", "lamp", "phone",
 )
 LM13_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz"
+LM13_IMGN_SPLIT = "lm_imgn_13_train_1k_per_obj_online"
 CONVNEXT_CHECKPOINT = (
     "/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth"
 )
@@ -94,6 +96,7 @@ fake_docker() {{
       if [[ "$2" == "-c" ]]; then
         case "$5" in
           TRAIN_PROTOCOL.NAME) printf '%s\n' "${{fake_train_protocol:-}}" ;;
+          DATASETS.TRAIN) printf '%s\n' "${{fake_train_splits:-}}" ;;
           MODEL.POSE_NET.PCC_HEAD.HIERARCHY_PATH) printf '%s\n' "${{fake_hierarchy:-}}" ;;
           *) return 1 ;;
         esac
@@ -112,6 +115,7 @@ def _resource_gate(
     *,
     missing: tuple[str, ...] = (),
     train_protocol: str = "lm13_gdrn",
+    train_splits: tuple[str, ...] = ("lm_13_train_online", LM13_IMGN_SPLIT),
     convnext: str = CONVNEXT_CHECKPOINT,
     hierarchy: str = LM13_HIERARCHY,
     check: bool = True,
@@ -122,6 +126,7 @@ def _resource_gate(
     )
     preamble += (
         f"fake_train_protocol={shlex.quote(train_protocol)}\n"
+        f"fake_train_splits={shlex.quote(chr(10).join(train_splits))}\n"
         f"fake_convnext={shlex.quote(convnext)}\n"
         f"fake_hierarchy={shlex.quote(hierarchy)}\n"
     )
@@ -528,7 +533,6 @@ def test_lm_imgn_mount_is_required_read_only(tmp_path):
     ("lm13_real_only", "lm13"),
     ("lm13_pbr", "lm13_pbr"),
     ("", "legacy_lmo"),
-    ("some_future_protocol", "legacy_lmo"),
 ])
 def test_resource_profile_mapping(name, expected):
     result = _source_and_run(
@@ -539,6 +543,73 @@ def test_resource_profile_mapping(name, expected):
         f"resolve_resource_profile configs/research/{name or 'legacy_lmo'}.py"
     )
     assert result.stdout.strip() == expected
+
+
+@pytest.mark.parametrize("name", ["lm13_typo", "some_future_protocol", "lm13_gdrn_v2"])
+def test_unknown_train_protocol_is_rejected(name):
+    """An unrecognised name must not silently inherit the legacy LM-O contract."""
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        f"train_protocol={shlex.quote(name)}\n"
+        "container_config_value() { printf '%s\\n' \"${train_protocol}\"; }\n"
+        "resolve_resource_profile configs/research/train.py",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "unknown TRAIN_PROTOCOL.NAME" in result.stderr
+    assert name in result.stderr
+
+
+def test_unknown_train_protocol_stops_the_runtime_gate_before_the_contract():
+    """The gate must reject the config outright, not fall through to legacy resources."""
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        "require_clean_worktree() { echo clean; }\n"
+        "require_owned_container() { echo ownership; }\n"
+        "verify_required_mounts() { echo mounts; }\n"
+        "require_writable_output() { echo output; }\n"
+        "require_dataset_cache() { echo dataset-cache; }\n"
+        "require_bop_renderer_path() { echo bop-renderer; }\n"
+        "require_cuda() { echo cuda; }\n"
+        "verify_environment() { echo environment; }\n"
+        "verify_native() { echo native; }\n"
+        "load_runtime_config() { echo config:$1; }\n"
+        "require_profile_resources() { echo resources:$1; }\n"
+        "validate_run_config() { echo contract:$1; }\n"
+        "container_config_value() { printf '%s\\n' 'lm13_typo'; }\n"
+        "runtime_gate formal configs/research/train.py",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "unknown TRAIN_PROTOCOL.NAME" in result.stderr
+    assert "resources:" not in result.stdout
+    assert "contract:" not in result.stdout
+
+
+def test_every_declared_train_protocol_resolves_to_a_profile():
+    """The fail-closed branch must never reject a name the repository declares."""
+    declared = set()
+    for config in sorted((ROOT / "configs").rglob("*.py")):
+        declared.update(
+            re.findall(
+                r'TRAIN_PROTOCOL\s*=\s*dict\(NAME="([^"]+)"',
+                config.read_text(encoding="utf-8"),
+            )
+        )
+    assert declared == {"lm13_gdrn", "lm13_real_only", "lm13_pbr"}
+    for name in sorted(declared):
+        result = _source_and_run(
+            "container=test-container\n"
+            "docker_bin=fake_docker\n"
+            f"train_protocol={shlex.quote(name)}\n"
+            "container_config_value() { printf '%s\\n' \"${train_protocol}\"; }\n"
+            "resolve_resource_profile configs/research/train.py",
+            check=False,
+        )
+        assert result.returncode == 0, (name, result.stderr)
+        assert result.stdout.strip() in {"lm13", "lm13_pbr"}
 
 
 def test_resource_profile_ignores_noise_before_the_config_value():
@@ -596,6 +667,7 @@ def test_lm13_resource_gate_accepts_a_complete_container():
     (("/workspace/gdrnpp/datasets/lm_imgn/image_set/train_phone.txt",), "train_phone.txt"),
     (("/workspace/gdrnpp/datasets/lm_imgn/imgn/ape/000000_0-pose.txt",), "*-pose.txt"),
     (("/workspace/gdrnpp/datasets/VOCdevkit/VOC2012/JPEGImages",), "JPEGImages"),
+    (("/workspace/gdrnpp/datasets/BOP_DATASETS/lm/test",), "BOP_DATASETS/lm/test"),
     (("/workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/models_info.json",), "models_info.json"),
     ((LM13_HIERARCHY,), "independent_v2.npz"),
 ])
@@ -639,6 +711,49 @@ def test_lm13_gate_surfaces_a_server_preflight_failure():
     assert "LM13 server preflight failed" in result.stderr
 
 
+def test_lm13_real_only_gate_does_not_require_the_deepim_renders():
+    """The real-only ablation trains without lm_imgn, so the gate must not ask for it."""
+    imgn = tuple(path for path in LM13_CONTAINER_PATHS if "/lm_imgn/" in path)
+    assert imgn
+    result = _resource_gate(
+        "require_lm13_resources configs/research/train_lm13_real_only.py",
+        train_protocol="lm13_real_only",
+        train_splits=("lm_13_train_online",),
+        missing=imgn,
+    )
+    assert result.returncode == 0, result.stderr
+    # ... while the render-training arm is still rejected without them
+    rejected = _resource_gate(
+        "require_lm13_resources configs/research/train_lm13_gdrn.py",
+        missing=imgn,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "lm_imgn" in rejected.stderr
+
+
+def test_lm13_imgn_requirement_comes_from_the_configured_train_splits():
+    result = _source_and_run(
+        "container=test-container\n"
+        "docker_bin=fake_docker\n"
+        "require_lm13_real_data() { echo real; }\n"
+        "require_lm_imgn_data() { echo imgn; }\n"
+        "require_voc_data() { echo voc; }\n"
+        "require_convnext_weights() { echo convnext; }\n"
+        "require_lm13_hierarchy() { echo hierarchy; }\n"
+        "require_lm13_server_preflight() { echo preflight; }\n"
+        "container_config_list() { printf '%s\\n' \"${fake_train_splits}\"; }\n"
+        "fake_train_splits=$'lm_13_train_online\\nlm_imgn_13_train_1k_per_obj_online'\n"
+        "require_lm13_resources configs/a.py\n"
+        "fake_train_splits='lm_13_train_online'\n"
+        "require_lm13_resources configs/a.py"
+    )
+    assert result.stdout.splitlines() == [
+        "real", "imgn", "voc", "convnext", "hierarchy", "preflight",
+        "real", "voc", "convnext", "hierarchy", "preflight",
+    ]
+
+
 def test_lm13_pbr_gate_does_not_require_the_deepim_renders():
     imgn = tuple(path for path in LM13_CONTAINER_PATHS if "/lm_imgn/" in path)
     assert imgn
@@ -661,6 +776,11 @@ def test_legacy_lmo_gate_keeps_the_original_requirements():
     result = _resource_gate("require_legacy_lmo_resources")
     assert result.returncode == 0
 
+    # the LM-O contract predates lm_imgn, so its content is not its business
+    imgn = tuple(path for path in LM13_CONTAINER_PATHS if "/lm_imgn/" in path)
+    result = _resource_gate("require_legacy_lmo_resources", missing=imgn)
+    assert result.returncode == 0
+
     result = _resource_gate(
         "require_legacy_lmo_resources",
         missing=("/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth",),
@@ -677,4 +797,60 @@ def test_resource_gate_precedes_run_directory_creation():
     )
     assert source.index("require_profile_resources()") < source.index("runtime_gate()")
     assert source.index("resolve_resource_profile()") < source.index("runtime_gate()")
+
+
+def test_check_host_accepts_a_fresh_profile_without_runtime_directories(tmp_path):
+    """`create` runs check_host before making outputs/cache/home, so it must not need them."""
+    root = tmp_path / "docker_data/chx"
+    root.mkdir(parents=True)
+    for directory in ("datasets", "weights", "outputs", "cache", "home"):
+        assert not (root / directory).exists()
+    result = _source_and_run(
+        'machine="$(id -un)"\n'
+        "gpu_id=0\n"
+        f"root={shlex.quote(str(root))}\n"
+        "docker_bin=/bin/true\n"
+        "nvidia-smi() { echo '0, GPU-uuid, NVIDIA L40, 0 MiB, 46068 MiB, 0 %'; }\n"
+        "check_host"
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip().endswith("46068 MiB, 0 %")
+
+
+def test_check_host_still_requires_the_project_root(tmp_path):
+    result = _source_and_run(
+        'machine="$(id -un)"\n'
+        "gpu_id=0\n"
+        f"root={shlex.quote(str(tmp_path / 'absent'))}\n"
+        "docker_bin=/bin/true\n"
+        "nvidia-smi() { echo gpu; }\n"
+        "check_host",
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "missing project root" in result.stderr
+
+
+def test_create_owns_the_runtime_directories():
+    source = LAUNCHER.read_text(encoding="utf-8")
+    create_block = source[source.index("\n    create)"):source.index("\n    run)")]
+    for target in (
+        "${root}/datasets",
+        "${root}/weights",
+        "${root}/datasets/lm_imgn",
+        "${root}/outputs",
+        "${root}/cache",
+        "${root}/cache/gdrnpp_datasets",
+        "${root}/home",
+        "${root}/home/.cache",
+    ):
+        assert f'"{target}"' in create_block, target
+
+    # and create must not fabricate real dataset content
+    for target in ("lm/test", "lm_imgn/imgn", "VOC2012/JPEGImages"):
+        assert target not in create_block, target
+
+    check_host_block = source[source.index("check_host()"):source.index("container_exists()")]
+    assert "for directory in" not in check_host_block
+    assert "${root}/outputs" not in check_host_block
 

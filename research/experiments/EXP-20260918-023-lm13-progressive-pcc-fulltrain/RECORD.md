@@ -1,7 +1,8 @@
 # EXP023 LM13 Progressive PCC 全 backbone 训练
 
 - `experiment_id`: `EXP-20260918-023-lm13-progressive-pcc-fulltrain`
-- 状态：`PRETRAIN_CHECKS_PASS / SERVER_INTEGRATION_ADDED / EGL_SMOKE_PENDING / FORMAL_NOT_STARTED`
+- 状态：`PRETRAIN_CHECKS_PASS / SERVER_INTEGRATION_ADDED / LAUNCHER_CLOSURE_ADDED /
+  EGL_SMOKE_PENDING / FORMAL_NOT_STARTED`
 - 日期：2026-09-18（协议重整同日，随后按
   `EXP022_LM13_Pretraining_Modification_Task.md` 收口、按
   `EXP023_LM13_Server_Integration_Modification_Task.md` 接入服务器）；源码基准：
@@ -185,6 +186,48 @@ launcher 侧全部使用模拟容器（`present` 路径表 + 假的 `docker exec
 本地 Agent 不连接服务器，**没有**在 lab0/lab1 上创建容器或运行 runtime gate。以下必须由
 用户在服务器完成，本轮不标 PASS：真实 bind mount（含 `lm_imgn`）、容器内
 `GDRN_CONVNEXT_BASE_WEIGHTS`、`server_preflight` 在容器缓存下的行为、以及 §EGL smoke。
+
+## 2026-09-18 launcher 收口（Observed / Derived）
+
+按 `EXP023_Final_Server_Code_Closure_Task.md` 修四处剩余工程问题，未动 PCC 网络主体、LM13
+protocol 数学与路径约定。
+
+- **`check_host` / `create` 职责冲突**（Derived：`create` 先调 `check_host`，再 `mkdir -p`，
+  而 `check_host` 当时要求 `datasets/weights/outputs/cache/home` 已存在，干净 profile 的
+  第一次 `create` 必然提前失败）。现在 `check_host` 只查 user / Docker / GPU / `${root}`
+  本身；`${root}` 下的运行目录（含 `datasets`、`weights`、`cache/gdrnpp_datasets`、
+  `home/.cache`）由 `create` 建立。`create` 仍不生成真实数据内容（`lm/test`、
+  `VOC2012/JPEGImages`、`lm_imgn/imgn` 一律不建），这些由 profile 资源门验证。
+- **`lm13_real_only` 不再被要求提供 `lm_imgn`**：该臂与主实验共用 `lm13` profile，但
+  `DATASETS.TRAIN` 只有 `lm_13_train_online`。新增 `container_config_list()`（读容器内
+  `mmcv.Config.fromfile` 的序列值）与 `lm13_uses_deepim_renders()`，`require_lm13_resources`
+  按实际 TRAIN split 决定是否调用 `require_lm_imgn_data`，与 `server_preflight.py` 的口径一致。
+- **未知 `TRAIN_PROTOCOL.NAME` 改为 fail-closed**：原先 `*) → legacy_lmo` 会把
+  `lm13_typo` 之类的名字静默当成旧 LMO 契约，用错资源清单。现在只有空名映射到
+  `legacy_lmo`，其他非空名直接 `unknown TRAIN_PROTOCOL.NAME` 退出。仓库扫描确认现存合法
+  非空名只有 `lm13_gdrn`、`lm13_real_only`、`lm13_pbr`（`eval_lm13_bop.py` 与两个 smoke
+  配置继承其中之一），并加了一条测试断言"仓库声明的每个名字都能解析到 profile"。
+- **RUNBOOK 的 hierarchy 准备改为 container-safe**：不再指导在 host release 目录直接跑
+  项目 Python，改为（A）复制本地已验证的 `independent_v2.npz`，或（B）`create` 之后在容器内
+  `docker exec ... python -m research.exp022.build_hierarchy` 生成，并明确方案 B 之后必须
+  重跑 `server_preflight` 与 `preflight`。
+
+### 验证（Observed）
+
+| 检查 | 结果 |
+|---|---|
+| `pytest -q research` | `285 passed`（上轮 275；launcher 测试 40 → 50 用例） |
+| 三个配置的真实 `TRAIN_PROTOCOL.NAME` / `DATASETS.TRAIN` | 用 launcher 内嵌的同一段 Python 直跑：`lm13_gdrn`→两个 split、`lm13_real_only`→仅 `lm_13_train_online`、`lm13_pbr`→`lm_pbr_13_online_train`；EXP017 legacy 配置→空名 |
+| `lm13_real_only` 无 `lm_imgn` | PASS；同条件下 `lm13_gdrn` 仍 FAIL |
+| `lm13_pbr` 无 `lm_imgn` | PASS；缺 `train_pbr` 仍 FAIL |
+| legacy LMO 无 `lm_imgn` 内容 | PASS；缺 `lmo_pbr/model_final_wo_optim.pth` 仍 FAIL |
+| 未知非空名 | `lm13_typo` / `some_future_protocol` / `lm13_gdrn_v2` 均 FAIL 且报 `unknown TRAIN_PROTOCOL.NAME` |
+| 干净 profile 的 `check_host` | `${root}` 存在但 `datasets/weights/outputs/cache/home` 全不存在时 PASS；`${root}` 缺失时仍 FAIL |
+
+### 未验证项（不伪造）
+
+同上：本轮仍未连接服务器。真实 bind mount、容器内 runtime gate、容器内
+`server_preflight`/`preflight` 与 EGL smoke 都未执行，不标 PASS。
 
 ## Decision / 待完成
 

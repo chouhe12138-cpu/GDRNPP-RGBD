@@ -11,10 +11,15 @@
 DeepIM 渲染图）和 `weights`，并注入 `GDRN_DATASET_CACHE_DIR`、
 `GDRN_CONVNEXT_BASE_WEIGHTS` 与 `BOP_RENDERER_PATH`。`lm_imgn` 在 host 上不存在时
 会被建成空目录，旧 LMO 容器仍可创建，但 LM13 的资源门会因空数据拒绝启动。
+`${root}` 下的 `datasets/weights/outputs/cache/home` 由 `create` 建立（bind mount
+不接受不存在的来源）；`check_host` 只检查 user/Docker/GPU 与 `${root}` 本身，因此干净
+profile 的第一次 `create` 不会被尚未创建的运行目录挡住。
 
 `run`/`eval` 按配置里的 `TRAIN_PROTOCOL.NAME` 选择 profile（`lm13` / `lm13_pbr` /
 `legacy_lmo`）并检查对应数据与权重，LM13 两档还会在容器内运行
-`research.exp022.server_preflight`。
+`research.exp022.server_preflight`。`lm13` profile 下是否需要 `lm_imgn` 由容器内读回的
+`DATASETS.TRAIN` 决定，所以 `lm13_real_only` 不需要 DeepIM 渲染图；未列出的非空
+`TRAIN_PROTOCOL.NAME` 会被直接拒绝，不会回落到 `legacy_lmo`。
 
 fresh Git release 执行 `experiment.sh ... create IMAGE_REF` 时会检查 image revision
 兼容性，并自动提取 Git ignored native artifacts；不需要手工复制 `.so`。

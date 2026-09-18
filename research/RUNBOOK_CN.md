@@ -246,12 +246,34 @@ echo "LM13_HOST_RESOURCES PASS"
 )
 ```
 
-层级缺失时不要让 formal 自动生成，显式准备并重跑检查：
+LM13 CAD 层级 `independent_v2.npz` 不是数据，也不能由训练入口自动生成：缺失时 formal 必须被
+资源门拒绝。它必须先在服务器就位，且**不要在 host 的 release 目录里直接跑项目 Python** ——
+服务器约定是项目代码一律经 Docker 执行，host 侧 release 目录可能没有 conda 环境，也可能
+拿到与镜像不一致的依赖。两条都可行：
+
+方案 A，复制本地已验证的 artifact（推荐，与本地结果逐位一致）。本地文件在仓库的 ignored
+cache 里：`<repo>/.local/dataset_cache/exp022/lm13/independent_v2.npz`（约 1.5 MB），
+先传到 host，再落到 cache mount：
 
 ```bash
-python -m research.exp022.build_hierarchy --mode independent \
+# 在本地开发机
+scp .local/dataset_cache/exp022/lm13/independent_v2.npz <server>:/tmp/independent_v2.npz
+
+# 在服务器
+install -D -m 644 /tmp/independent_v2.npz \
+  "${root}/cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz"
+```
+
+方案 B，建好容器后在容器内生成（先 `create`，再按上面的 host 检查复核）：
+
+```bash
+docker exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp gdrnpp_chx_lab0 \
+  python -m research.exp022.build_hierarchy --mode independent \
   --config configs/gdrn/research/exp022_progressive_pcc/train_lm13_gdrn.py
 ```
+
+方案 B 生成后必须重跑下面的 `server_preflight` 与 `preflight`：层级是新的 artifact，先前的
+检查结果对它不再有效。
 
 #### profile-specific runtime gate
 
@@ -260,12 +282,21 @@ python -m research.exp022.build_hierarchy --mode independent \
 
 | `TRAIN_PROTOCOL.NAME` | profile | 资源门 |
 |---|---|---|
-| `lm13_gdrn` / `lm13_real_only` | `lm13` | LM real + `lm_imgn` + VOC + ConvNeXt + LM13 hierarchy + `server_preflight` |
+| `lm13_gdrn` | `lm13` | LM real + `lm_imgn` + VOC + ConvNeXt + LM13 hierarchy + `server_preflight` |
+| `lm13_real_only` | `lm13` | 同上，但按配置实际的 `DATASETS.TRAIN` **不要求** `lm_imgn` |
 | `lm13_pbr` | `lm13_pbr` | LM PBR + LM real test + VOC + ConvNeXt + LM13 hierarchy + `server_preflight`；不要求 `lm_imgn` |
-| 缺失 / 其他（全部旧 LMO、PBR 与 EXP013/017/020/021 配置） | `legacy_lmo` | `lm/train_pbr` + `lmo/test` + VOC + `weights/lmo_pbr/model_final_wo_optim.pth` |
+| 缺失（全部旧 LMO、PBR 与 EXP013/017/020/021 配置） | `legacy_lmo` | `lm/train_pbr` + `lmo/test` + VOC + `weights/lmo_pbr/model_final_wo_optim.pth` |
+| 其他非空名称 | — | 直接 fail：`unknown TRAIN_PROTOCOL.NAME`，不再回落到 legacy |
 
-`check_host()` 只保留 user/Docker/GPU 与 `${root}` 基础目录；数据集与权重改由上面的
-profile 门在容器内检查。缺任一项时 `run` 在创建输出目录之前就失败。
+`lm13` profile 下是否需要 `lm_imgn` 由容器内读回的 `DATASETS.TRAIN` 决定（存在任一
+`lm_imgn*` split 才要求），因此 `lm13_real_only` 这条消融臂不需要服务器准备 DeepIM 渲染图。
+新增非空 `TRAIN_PROTOCOL.NAME` 时必须同时更新 launcher 的映射表：未列出的名字会被拒绝，
+不会静默套用旧 LMO 的资源清单。
+
+`check_host()` 只保留 user/Docker/GPU 与 `${root}` 基础路径；`${root}` 下的
+`datasets/weights/outputs/cache/home` 由 `create` 负责建立（`--mount type=bind` 不接受不存在的
+来源），数据集与权重内容改由上面的 profile 门在容器内检查。缺任一项时 `run` 在创建输出目录
+之前就失败。
 
 新 release 的 `verify_required_mounts` 要求 `datasets/lm_imgn` 这一条 mount，而旧容器没有
 它（legacy profile 也走同一个 mount 门，只是不查 `lm_imgn` 的数据内容）。因此从本次修改

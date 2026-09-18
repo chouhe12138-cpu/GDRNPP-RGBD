@@ -111,14 +111,16 @@ hydrate_native_artifacts() {
 # and checkpoint requirements moved into the per-protocol resource gates below:
 # EXP023 LM13 trains on LM real plus the DeepIM renders and shares neither the
 # LM-O nor the LM-PBR dataset set, so a single hardcoded list cannot serve both.
+#
+# Runtime directories under ${root} are deliberately not checked here: `create`
+# runs this before it makes them, so requiring them would reject the very first
+# create on a clean profile.  `create` owns them; the mount gate catches a
+# missing one on every later run.
 check_host() {
     [[ "$(id -un)" == "${machine}" ]] || fail "run this profile as ${machine}"
     [[ -x "${docker_bin}" ]] || fail "missing ${docker_bin}"
     "${docker_bin}" info >/dev/null
-    local directory
-    for directory in datasets weights outputs cache home; do
-        [[ -d "${root}/${directory}" ]] || fail "missing profile root: ${root}/${directory}"
-    done
+    [[ -d "${root}" ]] || fail "missing project root: ${root}"
     nvidia-smi -i "${gpu_id}" \
         --query-gpu=index,uuid,name,memory.used,memory.free,utilization.gpu \
         --format=csv,noheader
@@ -313,6 +315,28 @@ print(value if isinstance(value, str) else "")
 ' "/workspace/gdrnpp/${config}" "${key}"
 }
 
+# `container_config_value` prints strings only, so sequence-valued keys such as
+# DATASETS.TRAIN need their own reader.  One entry per line.
+container_config_list() {
+    local config="$1" key="$2"
+    "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp \
+        "${container}" python -c '
+import sys
+from mmcv import Config
+value = Config.fromfile(sys.argv[1])
+for part in sys.argv[2].split("."):
+    value = value.get(part, {}) if hasattr(value, "get") else {}
+if isinstance(value, str):
+    value = (value,)
+for item in value:
+    print(item)
+' "/workspace/gdrnpp/${config}" "${key}"
+}
+
+# Every non-empty TRAIN_PROTOCOL.NAME in the repository must be listed here.
+# An unrecognised name is a configuration error, not a licence to fall back to
+# the legacy contract: a typo'd LM13 config would otherwise be checked against
+# the wrong dataset set and only fail much later inside training.
 resolve_resource_profile() {
     local config="$1" name
     name="$(container_config_value "${config}" TRAIN_PROTOCOL.NAME)" || \
@@ -323,8 +347,9 @@ resolve_resource_profile() {
     case "${name}" in
         lm13_gdrn|lm13_real_only) printf 'lm13\n' ;;
         lm13_pbr) printf 'lm13_pbr\n' ;;
-        # configs without a research train protocol keep the original LM-O contract
-        *) printf 'legacy_lmo\n' ;;
+        # LM-O and every pre-EXP023 config carry no train protocol at all
+        "") printf 'legacy_lmo\n' ;;
+        *) fail "unknown TRAIN_PROTOCOL.NAME: ${name} (config ${config})" ;;
     esac
 }
 
@@ -394,10 +419,23 @@ require_lm13_server_preflight() {
         fail "LM13 server preflight failed: ${config}"
 }
 
+# `lm13_gdrn` trains on the real images plus the DeepIM renders and reports the
+# `lm13` profile, but `lm13_real_only` is the same model on the real images
+# alone and reports the same profile.  Whether the renders are needed therefore
+# comes from the splits the config actually trains on, not from the profile name.
+lm13_uses_deepim_renders() {
+    local config="$1" splits
+    splits="$(container_config_list "${config}" DATASETS.TRAIN)" || \
+        fail "cannot read DATASETS.TRAIN from container config: ${config}"
+    grep -q '^lm_imgn' <<< "${splits}"
+}
+
 require_lm13_resources() {
     local config="$1"
     require_lm13_real_data
-    require_lm_imgn_data
+    if lm13_uses_deepim_renders "${config}"; then
+        require_lm_imgn_data
+    fi
     require_voc_data
     require_convnext_weights
     require_lm13_hierarchy "${config}"
@@ -594,17 +632,24 @@ main() {
         "${docker_bin}" image inspect "${image_ref}" >/dev/null 2>&1 || fail "image not found: ${image_ref}"
         require_image_source_compatibility "${image_ref}"
         hydrate_native_artifacts "${image_ref}"
+        # `--mount type=bind` refuses a missing source, so every bind source has
+        # to exist before `docker run`.  These are the launcher-owned runtime
+        # directories; real dataset content is never created here and stays the
+        # resource gates' business.
         mkdir -p \
-            "${repo_root}/datasets/BOP_DATASETS" \
-            "${repo_root}/datasets/VOCdevkit" \
-            "${repo_root}/datasets/lm_imgn" \
-            "${repo_root}/pretrained_models" \
-            "${repo_root}/output" \
+            "${root}/datasets" \
+            "${root}/weights" \
             "${root}/datasets/lm_imgn" \
             "${root}/outputs" \
             "${root}/cache" \
             "${root}/cache/gdrnpp_datasets" \
-            "${root}/home/.cache"
+            "${root}/home" \
+            "${root}/home/.cache" \
+            "${repo_root}/datasets/BOP_DATASETS" \
+            "${repo_root}/datasets/VOCdevkit" \
+            "${repo_root}/datasets/lm_imgn" \
+            "${repo_root}/pretrained_models" \
+            "${repo_root}/output"
         "${docker_bin}" run -d \
             --gpus "device=${gpu_id}" \
             --user "$(id -u):$(id -g)" \

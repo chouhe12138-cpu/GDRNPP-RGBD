@@ -64,6 +64,20 @@ VOC 与各 split 记录数，并接进 LM13 的 runtime gate，失败发生在 r
 容器内 env、`server_preflight` 的服务器行为与 EGL smoke 均**未标 PASS**，需用户在服务器执行
 （步骤见 [RUNBOOK](RUNBOOK_CN.md) 的 “EXP023 LM13 server profile”）。
 
+**launcher 收口（2026-09-18 同日）**：按 `EXP023_Final_Server_Code_Closure_Task.md` 修完剩余
+四个工程问题，仍未动 PCC 网络主体与 LM13 protocol 数学。`check_host()` 只查 user/Docker/GPU/
+`${root}`，运行目录（`datasets`/`weights`/`cache/gdrnpp_datasets`/`home/.cache`）改由 `create`
+建立，干净 profile 的首次 `create` 不再被尚未创建的目录挡住，且 `create` 仍不生成任何真实数据
+内容；`lm13` profile 下是否需要 `lm_imgn` 改由容器内读回的 `DATASETS.TRAIN` 决定
+（`lm13_real_only` 因此不再要求 DeepIM 渲染图，与 `server_preflight.py` 口径一致）；未知非空
+`TRAIN_PROTOCOL.NAME` 改为 fail-closed（`unknown TRAIN_PROTOCOL.NAME`），只有空名才回落
+`legacy_lmo`，仓库现存合法名仍只有 `lm13_gdrn`/`lm13_real_only`/`lm13_pbr`；RUNBOOK 的
+hierarchy 准备改为 container-safe（复制本地已验证 artifact，或 `create` 后在容器内
+`build_hierarchy` 并重跑两项 preflight），不再指导在 host release 目录直接跑项目 Python。
+验证：launcher 单测 40 → 50 用例、`pytest -q research` **285 passed**；用 launcher 内嵌的同一
+段 Python 直读三个配置确认 `TRAIN_PROTOCOL.NAME` 与 `DATASETS.TRAIN` 的实际取值，EXP017
+legacy 配置读回空名。正式 blocker 仍只剩服务器资源部署、容器 runtime gate 与 EGL smoke。
+
 详见 [EXP023 RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md)
 和 [EXP022 README](exp022/README.md)。
 

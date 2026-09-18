@@ -45,3 +45,5 @@ mount、output/cache 可写、单卡 CUDA、环境与 native verifier，在容�
 `mmcv.Config.fromfile` 加载目标配置，再按配置里的 `TRAIN_PROTOCOL.NAME` 选择资源门
 （`lm13` / `lm13_pbr` / `legacy_lmo`，见 `RUNBOOK_CN.md`）。LM13 两档另外在容器里跑
 `research.exp022.server_preflight`。任一项失败都不会启动训练/评估，也不会创建输出目录。
+未知的非空 `TRAIN_PROTOCOL.NAME` 直接 fail，不会套用 legacy 资源清单；`create` 负责建立
+`${root}` 下的运行目录，`check_host` 不预设它们已存在。
