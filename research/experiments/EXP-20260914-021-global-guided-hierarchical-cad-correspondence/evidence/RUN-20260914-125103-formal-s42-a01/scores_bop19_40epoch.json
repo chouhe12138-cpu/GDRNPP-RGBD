@@ -1,0 +1,10 @@
+{
+  "bop19_average_recall": 0.6889988465974625,
+  "bop19_average_recall_ad": 0.2590542099192618,
+  "bop19_average_recall_mspd": 0.8767474048442905,
+  "bop19_average_recall_mssd": 0.6669204152249135,
+  "bop19_average_recall_reS": 0.5370242214532872,
+  "bop19_average_recall_teS": 0.7953863898500577,
+  "bop19_average_recall_vsd": 0.5233287197231834,
+  "bop19_average_time_per_image": 0.23032622426748275
+}

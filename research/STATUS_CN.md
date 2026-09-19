@@ -145,8 +145,11 @@ C 臂在 8×8 特征上增加两层图像—CAD Transformer、全局粗区域偏
 注入。V1 固定为 RGB 与冻结阶段，只训练新增 CAD head；不执行 backbone 联合微调。
 对称监督按实例从完整 BOP SE(3) 等价路径中选择一条，三项 loss 共用该分支。
 
-当前状态：`FORMAL_BC_E15_AVAILABLE / TRAINING_EXIT_UNCONFIRMED /
-MATCHED_PNP_PENDING`。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
+当前状态：`FORMAL_BC_E40_COMPLETE / EXIT_CODE_UNCONFIRMED / MATCHED_PNP_PENDING`。
+B/C 两臂的正式训练均已跑到 `iter 255919/255920`，E5–E40 八个固定评估点的常规
+direct-pose 指标与逐物体结果已全部同步。用户 2026-09-19 确认 EXP021 结束，其记录与
+结果可直接提交并推送；同时指出当前代码与网络结构设计存在问题，后续不在现有设计上
+直接继续，EXP022 及之后的实验等待用户安排。确定性 hierarchy 已生成到 ignored dataset cache；EXP021
 20 项测试通过；B/C CPU preflight 均通过，分别有 233,347 / 2,923,587 个 trainable
 参数，官方 checkpoint 只缺 `cad_head.*`，优化步后冻结张量不变。真实 LM-O 单目标
 evaluator 接线 smoke 已完成，能输出 fixed support、K=1/2/4/8、对称/路由/几何与
@@ -188,16 +191,19 @@ B/C forward+backward 均值约为 `0.426/0.523 s`，端到端中位数约
 DataLoader 长尾限制，不设严格时间 gate。本次加速作为同一 EXP021 formal 的工程
 实现更新，不新建 formal 实验；实际训练 run 的 source 与进度见下段。
 
-2026-09-16 同步的 B/C 日志均记录 source `effc99b`、seed 42、FP16 AMP；
-B run `RUN-20260914-125103-formal-s42-a01`，C run
-`RUN-20260914-125349-formal-s42-a01`。两臂 E5/E10/E15 的 checkpoint 保存日志、
-常规 direct-pose `EVAL_SUMMARY` 与 BOP score JSON 已记录于 EXP021 RECORD；
-六份 score 的 BOP AR 均与对应 epoch 日志相等。E10 B/C BOP AR
-`0.685010/0.693179`、ADD(-S)0.1d `0.526644/0.560554`、reS
-`0.521107/0.538639`、teS `0.793080/0.803460`。日志副本最后一条训练指标为
-B iter `100499/255920`、C iter `97499/255920`，均处于 epoch 16；
-退出码与后续进度未提供。所获 formal 源码是 `effc99b`，不包含后续本地
-`f01dff5` 加速；完整 fixed-support matched PnP、E40 和资源 gate 均尚未生成。
+2026-09-19 同步的 B/C 日志记录 source `effc99b`、seed 42、FP16 AMP；B run
+`RUN-20260914-125103-formal-s42-a01`，C run `RUN-20260914-125349-formal-s42-a01`。
+两臂均到达 `iter 255919/255920[100.0%]` 并有
+`FINAL_EVAL_REUSED periodic_epoch=40`；日志中无 `Traceback`/OOM/`RuntimeError`，
+但也**没有退出码行**，进程退出状态仍未确认。E5–E40 全部八个点的 checkpoint 保存
+日志、常规 direct-pose `EVAL_SUMMARY` 与 BOP score JSON 已记录于 EXP021 RECORD；
+16 份 score 的 BOP AR 均与对应 epoch 日志逐点相等。E40 B/C BOP AR
+`0.688999/0.693675`、ADD(-S)0.1d `0.525952/0.534256`、reS
+`0.537024/0.546021`、teS `0.795386/0.806690`；八个固定点中 C 高于 B 的为 BOP
+`8/8`、reS `8/8`、teS `7/8`、ADD(-S)0.1d `7/8`（两个负项都在 E5）。这些都只是
+常规 direct-pose 描述，不用于重选模型。所获 formal 源码是 `effc99b`，不包含后续本地
+`f01dff5` 加速；完整 fixed-support matched PnP、K sweep 和资源 gate 仍未生成，
+作为证据缺口保留，不因实验收口补做。
 
 协议、gate 和入口见 [EXP021 README](exp021/README.md)，事实记录见
 [EXP021 RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md)。
@@ -308,11 +314,13 @@ matched PnP 缺口作为已结束实验的未生成证据保留；不启动 EPro
 
 ## 下一步
 
-1. 不干扰远程 formal；B/C run_id 和 source 已记录，待训练结束后补充退出状态、
-   E20–E40 checkpoint 文件名/epoch 和剩余预定正式评估点。
-2. 训练完成后直接使用加速版本进入下一阶段，不为本次工程加速另建 formal 实验。
-3. 对 B/C 固定 checkpoint 做 K=1/2/4/8 fixed-support matched RANSAC-PnP、完整
-   BOP evaluator 与 batch-1 profile，按预注册 mechanism/resource gate 决策。
+1. EXP021 训练已结束：B/C run_id、source 与 E5–E40 八个固定评估点（含逐物体
+   ADD(-S)0.1d）均已记录并随记录提交；仍缺 run exit code 与服务器权重文件核验。
+2. 用户已判定当前代码与网络结构设计需要修正，后续不在现有设计上直接继续；EXP022
+   及之后的实验暂不修改，等待用户安排。EXP021 剩余的 fixed-support matched
+   RANSAC-PnP/K sweep 是否补做由用户决定，不自动执行。
+3. 不为本次 EXP021 工程加速另建 formal 实验；B/C K=1/2/4/8 fixed-support matched
+   PnP、完整 BOP evaluator 与 batch-1 profile 仍未生成，作为证据缺口保留。
 4. EXP020 后续补证已结束；B E15/E20/E25 score 归属、A/B exit code 与正式 matched
    PnP 未核实或未生成，保留缺口，不安排追加执行。
 5. 暂不恢复 EXP014-D；不启动 EPro（Historical/Deferred）；不自动加 seed。

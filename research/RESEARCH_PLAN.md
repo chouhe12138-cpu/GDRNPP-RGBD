@@ -55,12 +55,14 @@ EXP023 LM13 留待 EXP022 完成后进行。EXP024 与 EXP022 同时改变初始
    评价未生成；B E15/E20/E25 score 与日志存在 epoch 冲突，reS/teS 未核对。
    用户于 2026-09-16 决定结束后续补证，保留上述缺口；详见 RECORD。不以
    direct-pose 趋势代替主结论。
-4. EXP021 V1 已完成实现、本地 CPU preflight 和 CUDA/EGL 工程检查；B/C formal
-   source `effc99b` 的 E5/E10/E15 评估已记录。待完整 formal 训练结束后执行
-   固定 support 的 K=1/2/4/8 matched evaluator。
-   不启动原设计中的 backbone 联合微调；是否进入下一轮由预注册机制和资源 gate 决定。
+4. EXP021 V1 的 B/C formal 训练已结束（source `effc99b`，两臂均到
+   `iter 255919/255920`），E5–E40 八个固定点的常规 direct-pose 结果与逐物体
+   ADD(-S)0.1d 已全部记录；仍缺 run exit code 与 固定 support 的 K=1/2/4/8
+   matched evaluator。2026-09-19 用户判定当前代码与网络结构设计需要修正，因此
+   不在现有设计上直接继续，matched PnP/K sweep 是否补做由用户决定。
+   不启动原设计中的 backbone 联合微调。
    EXP022 第一阶段在本机重构后仍须先过服务器 EGL 真 batch 资源检查；与 EXP021
-   的正式 matched comparator 待其结果完整后确定。
+   的正式 matched comparator 待其证据补齐后确定。
 5. 需要训练的新实验仍由用户确认后才在分配的 L40/GPU 上启动；固定比较点，不按 LM-O 中间结果
    选择模型。
 6. D 保持暂停，除非用户明确恢复并重新定义其显存与 renderer 方案。
