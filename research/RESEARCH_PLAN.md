@@ -2,6 +2,11 @@
 
 ## 目标
 
+2026-09-19 最新安排：先完成 CAD hierarchy 公共加载、几何和诊断的轻量整理，
+保持旧模型与训练协议。consistent_v3 的 surface oracle 支持将 T3+residual 作为
+下一阶段候选；尚不证明网络路由与残差可学习性。本轮不预留 EXP025、不实现新模型。
+下述既有实验安排保留为背景，后续训练等待用户安排。
+
 围绕 LM-O 遮挡场景，研究 GDRNPP dense XYZ、Region、ROI2D 和深度统计如何被
 直接姿态头有效利用。当前论文链保持 RGB 主干与 geometry head 的可比性，不把
 早期 oracle、PBR calibration 或 smoke 指标当作正式性能结果。

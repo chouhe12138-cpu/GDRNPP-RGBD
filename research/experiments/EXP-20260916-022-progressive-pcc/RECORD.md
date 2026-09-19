@@ -89,3 +89,70 @@ Decision：四项工程修订及本地检查完成。服务器 EGL profile、正
 - Observed：EXP022 V1 训练只计算 canonical 与固定的第二个 equivalent 分支；原 loader 虽读取 `symmetry_counts`，却未拒绝计数超过 2 的层级。当前本地主层级 `reused_v1.npz` 和消融层级 `independent_v2.npz` 的计数均为 `[1,1,1,1,1,2,2,1]`，最大值 2；对象顺序为 `(1,5,6,8,9,10,11,12)`。这证明当前两份本地 artifact 满足 V1 边界，不证明未来数据集也满足。
 - 修改：loader 检查计数和变换数组形状、计数范围，并在最大计数 `>2` 时以明确错误拒绝；preflight JSON 输出完整计数与最大值。构造 `count=3` 的层级文件，单测确认 loader 报错。未改对称分支算法、层级生成器或 artifact。
 - 验证：`pytorch22` 下 EXP022 `28 passed`、完整 research `216 passed`；主臂 `train_reused.py` 与独立消融 `smoke_independent.py` 的 CPU preflight 均 PASS，报告最大计数 2、官方 backbone 340 张量、PCC 参数 3,728,456。未运行服务器或正式训练。本次是数据适用性检查，不是多对称分支支持；T-LESS 等有更多等价姿态的数据仍需独立设计与验证。
+
+## 2026-09-19 CAD 公共模块与全层 sanity 纠正
+
+### Observed：修改与历史输出
+
+基线 source 为 `86da1174b67a954fcdc6bd592ce45aa28784c83d`；修改后为该 commit
+上的工作树，经用户确认后作为单次提交纳入 Git；本轮不启动训练。新增公共 CADHierarchy loader、NumPy
+几何及层级诊断；builder 与 oracle CLI 调用公共实现。旧 PCC 只改 loader 适配器，
+整个 ProgressivePCCHead 类与 HEAD 的 AST 精确一致；正式配置、训练 launcher、
+DatasetContext、PnP/BOP 链路未改，consistent_v3 仍被旧模型拒绝。
+
+现有 `output/diagnostics/exp022_t3_residual_oracle_full/hierarchy_sanity.json`
+将 reused_v1 标为 PASS；这是原程序只判断 T3→T4 的输出，原文件保留。
+本轮用各层原始 anchors/radii 复算
+`parent_radius / max_j(norm(child_anchor-parent_anchor)+child_radius)`，
+全部关系的 `<1` 节点数如下（按 T1→T2、T2→T3、T3→T4 排序）：
+
+| artifact | `<1` 节点数 | 修正后静态 sanity |
+|---|---|---|
+| reused_v1 | 0 / 512 / 0 | FAIL；failed_relations 包含 level2_over_level3 |
+| independent_v2 | 64 / 512 / 4084 | FAIL |
+| consistent_v3 | 0 / 0 / 0 | PASS |
+
+这只纠正静态检查，不覆盖历史 evaluator decision，也不改变第五轮 depth/render
+两族原阈值。原 full summary 中 consistent_v3 的 depth GT 为 FAIL、rendered
+surface GT 为 PASS，二者继续并列保留。表面 global_coverage 的实际定义为
+“全局最近锚点对应球覆盖”，不是所有球并集；本轮保留原字段与数值，补充描述。
+公共采样报告新增未命中节点数，但不把未命中判为空节点，不新增科学 gate。
+
+### Observed：本地工程与数值回归
+
+以下 run 标识直接对应唯一目录，均为 CPU、24 targets、无模型/训练/checkpoint，
+`--hierarchy .local/dataset_cache/exp022/consistent_v3.npz --limit 24`，其余 CLI
+默认参数不变（train_reused 配置、GT bbox、seed 20260730、max-correspondences=0）。
+原始输出均位于 ignored `output/diagnostics/`：
+
+- `refactor_baseline_20260919_a01`：修改前 source 86da117，退出码 0。
+- `refactor_after_20260919_a01`：初次抽取后，退出码 0。
+- `refactor_after_20260919_a02`：补齐通用报告后最终复核，退出码 0。
+
+baseline 与最终 a02 的 `summary.json`、`per_object.json`、`per_target.jsonl`、
+`residual_norm_histogram.csv` **逐字节一致**，因此包括逐 target support 计数、
+两族 residual/correspondence/pose、聚合指标与 decision；无需使用浮点容差。
+原有 hierarchy_sanity/coverage 字段值也全部精确一致，仅增加 failed_relations、
+采样解释及未命中节点字段。完整 run metadata 包含时间、source 和路径差异，未要求相同。
+本次没有重复全量 BOP、第五轮完整评价或正式 1M sample 建树，也没有覆盖任何旧产物。
+
+- 公共模块测试：`29 passed`；涵盖合成结构、动态深度、对象顺序、非法数值、
+  数据集身份、symmetry、路径/residual、全层 sanity、导入隔离、真实三棵树和旧 Torch 对照。
+- 完整 `python -m pytest -q research`：`317 passed, 3 failed`。三个失败为
+  `test_lm_real_loader_returns_bop_records`、`test_lm_imgn_loader_uses_the_render_conventions`、
+  `test_benchviseblue_renders_map_to_the_benchvise_object`，均在 LM models 目录写
+  `models_*.pkl` 时抛 `OSError: [Errno 30] Read-only file system`，与 EXP024
+  已记录的环境问题一致。没有改外部数据权限或 loader 来绕过失败，不标全套 PASS。
+- builder CLI `--help` 通过。相同 seed=17 的 100,000 个合成均匀立方体点，
+  与 HEAD 原 builder 比较，四层 anchors、walk 与退化清单精确一致。
+  初次检查错误地要求该小样本无退化而失败；复核发现两版本均有 8 个退化 cell，
+  因此该项只验证函数等价，不标为成功完整建树，不输出 artifact。
+- `--hierarchy-only` CLI 实测：reused_v1 返回 FAIL / exit 1，consistent_v3
+  返回 PASS / exit 0；保留原命令行退出语义。`git diff --check` 通过。
+
+### Decision 与证据边界
+
+本轮轻量整理完成，API 与使用边界见 `research/cad_hierarchy/README.md`。
+旧训练路径隔离保留。T3+residual 是后续候选，surface oracle 不证明网络路由与
+残差可学习性；不创建 EXP025、不追加训练或 seed。既有 NPZ 与第四/第五轮原始
+输出继续留在原位置，本轮不扩展为常规源码快照或哈希链。

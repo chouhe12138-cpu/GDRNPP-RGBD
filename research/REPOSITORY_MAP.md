@@ -6,6 +6,10 @@
 
 ## 代码与配置归属
 
+CAD 公共接口新增于 `core/gdrn_modeling/cad/hierarchy.py`（结构加载、动态层级）与
+`research/cad_hierarchy/`（NumPy 几何、全层 sanity、采样覆盖）；用法与边界见
+[公共 README](cad_hierarchy/README.md)。旧 PCC 只通过兼容适配器复用加载，模型计算不变。
+
 | 类别 | 位置 | 职责与边界 |
 |---|---|---|
 | 上游与稳定代码 | `core/`、`lib/`、`det/` | 模型、数据、训练/评估、几何、renderer/native 和检测器；core 并非纯上游快照 |

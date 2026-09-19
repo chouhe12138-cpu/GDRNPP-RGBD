@@ -2,6 +2,16 @@
 
 最后核对：2026-09-19。
 
+## CAD hierarchy 轻量整理（2026-09-19）
+
+在 `86da117` 基础上抽取公共 artifact loader、NumPy 几何与诊断，旧 PCC 保留
+训练数学、buffer 和 legacy policy。修正 sanity 只判 T3→T4 的遗漏：`reused_v1`
+现在报告 T2→T3 的 512 个父球覆盖失败；`consistent_v3` 全部关系通过。旧输出不覆盖。
+当前仅整理基础设施；T3+residual 保留为后续候选，未建立 EXP025 或启动训练。
+本轮验证与原始回归目录见 [EXP022 RECORD](experiments/EXP-20260916-022-progressive-pcc/RECORD.md)，
+公共 API 见 [README](cad_hierarchy/README.md)。下方服务器准备记录属于历史状态，
+不能据此推断新一轮训练已经启动。
+
 ## EXP024 LM-O ImageNet 全主干训练准备（2026-09-19）
 
 用户指定在空闲 lab1 上训练 LM-O 的全量解冻 ConvNeXt + PCC，主干从 ImageNet

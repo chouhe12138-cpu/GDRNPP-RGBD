@@ -2,6 +2,9 @@
 
 本页是实验状态的唯一中央索引。详细协议、结果和结论只写在对应 `RECORD.md`。
 
+2026-09-19：EXP022 新增公共 CAD hierarchy 整理与 sanity 纠正记录；不新增实验 ID，
+不改变下表 formal 状态。新公共 API 见 [说明](cad_hierarchy/README.md)。
+
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |

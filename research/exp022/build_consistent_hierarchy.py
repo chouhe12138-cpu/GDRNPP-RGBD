@@ -42,11 +42,12 @@ import numpy as np
 from mmcv import Config
 
 import ref
-from research.exp021.build_cad_hierarchy import (
-    _fps,
-    _nearest,
-    _normalize,
-    _sample_surface,
+from research.cad_hierarchy.geometry import (
+    farthest_point_sampling as _fps,
+    nearest_anchor as _nearest,
+    normalize_vectors as _normalize,
+    sample_surface as _sample_surface,
+    traverse_hierarchy,
 )
 from research.exp022.build_hierarchy import (
     LMO_CONFIG,
@@ -95,14 +96,7 @@ def _partition(points: np.ndarray, level: int, node: int, anchors: np.ndarray,
 
 def _walk(points: np.ndarray, anchors: dict[int, np.ndarray]) -> np.ndarray:
     """Nested nearest-child walk; returns the [P, 4] id path, identical to the head."""
-    parent = np.zeros(len(points), dtype=np.int64)
-    ids = np.empty((len(points), 4), dtype=np.int64)
-    for depth in range(1, 5):
-        grouped = anchors[depth].reshape(-1, 8, 3)
-        delta = points[:, None, :] - grouped[parent]
-        parent = parent * 8 + np.einsum("pkj,pkj->pk", delta, delta).argmin(-1)
-        ids[:, depth - 1] = parent
-    return ids
+    return traverse_hierarchy(points, [anchors[d] for d in sorted(anchors)], 8)
 
 
 def _object(obj_id: int, seed: int, sample_count: int, model_dir: Path,

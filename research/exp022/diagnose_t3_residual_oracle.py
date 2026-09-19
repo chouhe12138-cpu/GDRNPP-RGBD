@@ -53,10 +53,6 @@ from scipy.spatial import cKDTree
 
 from core.gdrn_modeling.datasets.data_loader import build_gdrn_test_loader
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
-from core.gdrn_modeling.models.heads.progressive_pcc_head import (
-    LEVEL_SIZES,
-    load_pcc_hierarchy,
-)
 from lib.pysixd import inout
 from lib.utils.mask_utils import cocosegm2mask
 from research.diagnostics.exp019_epro.correspondence import (
@@ -69,7 +65,12 @@ from research.diagnostics.exp019_epro.repo_adapter import (
     _depth_to_object,
     _sample_nearest,
 )
-from research.exp021.build_cad_hierarchy import DEFAULT_SEED, _sample_surface
+from research.cad_hierarchy.geometry import (
+    sample_surface as _sample_surface, assign_paths, residual_norms, oracle_xyz, anchor_xyz,
+)
+from research.cad_hierarchy.diagnostics import (
+    surface_representation, hierarchy_sanity, residual_stats,
+)
 from research.exp020.matched_pnp_eval import (
     MIN_FIXED_SUPPORT,
     RANSAC_CONFIDENCE,
@@ -86,6 +87,7 @@ from research.exp022.preflight import LMO_CONFIG_ROOT
 
 
 ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SEED = 20260914  # Historical diagnostic sampling protocol.
 EXPERIMENT_ID = "EXP-20260916-022-progressive-pcc"
 ARMS = ("a_gt", "b_t4_oracle", "c_t3_oracle", "d_t3_anchor")
 ARM_LABELS = {
@@ -212,114 +214,18 @@ def render_object_points(mesh: TriMesh, R: np.ndarray, t: np.ndarray, K: np.ndar
 # hierarchy
 # --------------------------------------------------------------------------- #
 def load_hierarchy_artifact(path: Path, expected_object_ids, dataset_key):
-    """Load an EXP022-shaped artifact without the head's ``(mode, version)`` whitelist.
+    """Generic artifact loading plus this four-level diagnostic's legacy scope."""
+    from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
 
-    ``load_pcc_hierarchy`` additionally pins the artifact generation so the training
-    path cannot silently pick up a tree no config points at.  This diagnostic is
-    model-free and is used to compare two generations of the same 8^4 contract, so it
-    re-checks every shape, finiteness and positivity rule by hand and returns the
-    provenance instead of rejecting it.
-    """
-    path = Path(path)
-    if not path.is_file():
-        raise FileNotFoundError(f"EXP022 hierarchy missing: {path}")
-    with np.load(path, allow_pickle=False) as data:
-        expected = {"object_ids", "extents", "diameters", "symmetry_counts",
-                    "symmetry_transforms", "generator_version", "mode", "source_leaf_indices"}
-        for depth in range(1, 5):
-            expected.update({f"level{depth}_{field}" for field in ("anchors", "normals", "radii")})
-        missing = expected.difference(data.files)
-        if missing:
-            raise ValueError(f"EXP022 hierarchy missing arrays: {sorted(missing)}")
-        provenance = {"mode": str(data["mode"]),
-                      "generator_version": int(data["generator_version"])}
-        arrays = {name: torch.from_numpy(np.asarray(data[name]).copy()) for name in expected
-                  if name not in {"generator_version", "mode"}}
-        stored_dataset = str(data["dataset_key"]) if "dataset_key" in data else None
-    object_ids = tuple(int(value) for value in arrays["object_ids"].tolist())
-    if object_ids != tuple(expected_object_ids):
-        raise ValueError(f"EXP022 object order mismatch: {object_ids}")
-    if dataset_key is not None and stored_dataset != dataset_key:
-        if not (dataset_key == "lmo" and stored_dataset is None):
-            raise ValueError("EXP022 hierarchy dataset mismatch")
-    num_objects = len(object_ids)
-    if (tuple(arrays["extents"].shape) != (num_objects, 3)
-            or tuple(arrays["diameters"].shape) != (num_objects,)):
-        raise ValueError("EXP022 extent/diameter shape mismatch")
-    if tuple(arrays["source_leaf_indices"].shape) != (num_objects, 4096):
-        raise ValueError("EXP022 source_leaf_indices shape mismatch")
-    counts = arrays["symmetry_counts"]
-    transforms = arrays["symmetry_transforms"]
-    if tuple(counts.shape) != (num_objects,) or counts.dtype not in (torch.int32, torch.int64):
-        raise ValueError("EXP022 symmetry_counts must contain N integer counts")
-    if transforms.ndim != 4 or transforms.shape[0] != num_objects or tuple(transforms.shape[2:]) != (4, 4):
-        raise ValueError("EXP022 symmetry_transforms must have shape [N,S,4,4]")
-    max_sym = int(counts.max().item())
-    if max_sym > 2:
-        raise RuntimeError(f"EXP022 V1 symmetry branch supports at most 2 equivalents, got {max_sym}")
-    if torch.any(counts < 1) or max_sym > transforms.shape[1]:
-        raise ValueError("EXP022 symmetry_counts are outside stored transform bounds")
-    for depth, count in enumerate(LEVEL_SIZES, start=1):
-        for field, shape in (("anchors", (num_objects, count, 3)),
-                             ("normals", (num_objects, count, 3)),
-                             ("radii", (num_objects, count))):
-            value = arrays[f"level{depth}_{field}"]
-            if tuple(value.shape) != shape or not torch.isfinite(value).all():
-                raise ValueError(f"Invalid EXP022 level{depth}_{field}: {tuple(value.shape)}")
-            if field == "radii" and torch.any(value <= 0):
-                raise ValueError(f"Non-positive EXP022 level{depth} radius")
-    return arrays, provenance
-
-
-def _levels_from_hierarchy(hierarchy: dict) -> dict[int, dict[str, np.ndarray]]:
-    """Expose the model's own loader contract as float64 numpy level arrays."""
-    return {
-        depth: {
-            "anchors": hierarchy[f"level{depth}_anchors"].numpy().astype(np.float64),
-            "radii": hierarchy[f"level{depth}_radii"].numpy().astype(np.float64),
-            "normals": hierarchy[f"level{depth}_normals"].numpy().astype(np.float64),
-        }
-        for depth in (1, 2, 3, 4)
-    }
-
-
-def assign_paths(points: np.ndarray, object_index: int, levels: dict) -> np.ndarray:
-    """8-ary parent-child traversal identical to the head's ``_target_paths``.
-
-    Returns ``[P,4]`` int64 ids for T1..T4.  ``points`` are object-space metric XYZ
-    that have *not* been transformed, matching the head's canonical branch.
-    """
-    parent = np.zeros(len(points), dtype=np.int64)
-    ids = np.empty((len(points), 4), dtype=np.int64)
-    for depth in range(1, 5):
-        grouped = levels[depth]["anchors"][object_index].reshape(-1, 8, 3)
-        delta = points[:, None, :] - grouped[parent]
-        child = np.einsum("pkj,pkj->pk", delta, delta).argmin(-1)
-        parent = parent * 8 + child
-        ids[:, depth - 1] = parent
-    return ids
-
-
-def residual_norms(points: np.ndarray, ids: np.ndarray, object_index: int, levels: dict,
-                   depth: int) -> np.ndarray:
-    """``||(x - anchor) / radius||`` under the stored level anchors/radii."""
-    anchors = levels[depth]["anchors"][object_index][ids[:, depth - 1]]
-    radii = levels[depth]["radii"][object_index][ids[:, depth - 1]]
-    return np.linalg.norm((points - anchors) / radii[:, None], axis=-1)
-
-
-def oracle_xyz(points: np.ndarray, ids: np.ndarray, object_index: int, levels: dict,
-               depth: int) -> np.ndarray:
-    """Bounded-residual optimum: project onto the closed unit ball, then decode."""
-    anchors = levels[depth]["anchors"][object_index][ids[:, depth - 1]]
-    radii = levels[depth]["radii"][object_index][ids[:, depth - 1]]
-    raw = (points - anchors) / radii[:, None]
-    norm = np.linalg.norm(raw, axis=-1, keepdims=True)
-    return anchors + radii[:, None] * (raw / np.maximum(norm, 1.0))
-
-
-def anchor_xyz(ids: np.ndarray, object_index: int, levels: dict, depth: int) -> np.ndarray:
-    return levels[depth]["anchors"][object_index][ids[:, depth - 1]]
+    hierarchy = load_cad_hierarchy(
+        path, expected_object_ids=expected_object_ids, dataset_key=dataset_key,
+        allow_missing_dataset=dataset_key == "lmo")
+    if hierarchy.level_counts != (8, 64, 512, 4096):
+        raise ValueError("T3/T4 oracle requires levels 8/64/512/4096")
+    if int(hierarchy.symmetry_counts.max()) > 2:
+        raise RuntimeError("EXP022 V1 symmetry branch supports at most 2 equivalents")
+    provenance = {key: hierarchy.metadata[key] for key in ("mode", "generator_version")}
+    return hierarchy, provenance
 
 
 def producer_map(producer: str, points: np.ndarray, ids: np.ndarray, object_index: int,
@@ -337,92 +243,6 @@ def producer_map(producer: str, points: np.ndarray, ids: np.ndarray, object_inde
     return np.ascontiguousarray(((out / extent.reshape(1, 1, 3)) + 0.5).transpose(2, 0, 1))
 
 
-def surface_representation(levels: dict, object_ids: tuple[int, ...],
-                           surface_points: dict[int, np.ndarray]) -> dict:
-    """Static coverage of the *ideal* CAD surface by the T3/T4 residual balls.
-
-    The depth-derived GT sits several millimetres off the mesh, which is larger than
-    most leaf radii, so sampling the mesh itself separates that data deficit from the
-    hierarchy's own capability:
-
-    * ``global``    -- an ideal surface point is inside *some* ball of this level
-    * ``traversal`` -- the ball of the leaf reached by the 8-ary nearest-child walk
-                       (what the head supervises and infers) contains it
-    """
-    report = {"samples_per_object": int(len(next(iter(surface_points.values())))),
-              "sample_seed": int(DEFAULT_SEED), "per_object": {}}
-    pooled = {level: [] for level in LEVELS}
-    agreement = {depth: [] for depth in (2, 3, 4)}
-    for index, obj_id in enumerate(object_ids):
-        points = surface_points[obj_id]
-        ids = assign_paths(points, index, levels)
-        entry = {"num_points": int(len(points))}
-        for depth in (2, 3, 4):
-            nearest = cKDTree(levels[depth]["anchors"][index]).query(points, k=1)[1]
-            agreement[depth].append(float((nearest == ids[:, depth - 1]).mean()))
-        for level, depth in LEVEL_DEPTH.items():
-            anchors = levels[depth]["anchors"][index][ids[:, depth - 1]]
-            radii = levels[depth]["radii"][index][ids[:, depth - 1]]
-            traversal = np.linalg.norm(points - anchors, axis=1) / radii
-            nearest = cKDTree(levels[depth]["anchors"][index]).query(points, k=1)
-            entry[f"global_coverage_{level}"] = float(
-                (nearest[0] / levels[depth]["radii"][index][nearest[1]] <= 1.0).mean())
-            entry[f"traversal_coverage_{level}"] = float((traversal <= 1.0).mean())
-            entry[f"traversal_p95_{level}"] = float(np.percentile(traversal, 95))
-            pooled[level].append(traversal)
-        report["per_object"][str(obj_id)] = entry
-    for depth in (2, 3, 4):
-        report[f"traversal_matches_global_level{depth}"] = float(np.mean(agreement[depth]))
-    for level in LEVELS:
-        norms = np.concatenate(pooled[level])
-        report[f"pooled_traversal_coverage_{level}"] = float((norms <= 1.0).mean())
-        report[f"pooled_traversal_p95_{level}"] = float(np.percentile(norms, 95))
-        report[f"pooled_global_coverage_{level}"] = float(
-            np.mean([item[f"global_coverage_{level}"] for item in report["per_object"].values()]))
-    return report
-
-
-def hierarchy_sanity(levels: dict, object_ids: tuple[int, ...]) -> dict:
-    """Static artifact contract plus parent coverage of the child residual balls."""
-    num_objects = len(object_ids)
-    report = {"object_ids": [int(v) for v in object_ids], "levels": {}, "parent_coverage": {}}
-    for depth, count in enumerate(LEVEL_SIZES, start=1):
-        anchors, radii = levels[depth]["anchors"], levels[depth]["radii"]
-        report["levels"][f"level{depth}"] = {
-            "anchors_shape": list(anchors.shape),
-            "radii_shape": list(radii.shape),
-            "expected_anchors_shape": [num_objects, count, 3],
-            "expected_radii_shape": [num_objects, count],
-            "shape_ok": list(anchors.shape) == [num_objects, count, 3]
-            and list(radii.shape) == [num_objects, count],
-            "all_finite": bool(np.isfinite(anchors).all() and np.isfinite(radii).all()),
-            "radius_min_m": float(radii.min()),
-            "radius_max_m": float(radii.max()),
-            "all_radii_positive": bool((radii > 0).all()),
-        }
-    for child_depth in (2, 3, 4):
-        parent_count = LEVEL_SIZES[child_depth - 2]
-        child_anchors = levels[child_depth]["anchors"].reshape(num_objects, parent_count, 8, 3)
-        child_radii = levels[child_depth]["radii"].reshape(num_objects, parent_count, 8)
-        required = (
-            np.linalg.norm(child_anchors - levels[child_depth - 1]["anchors"][:, :, None, :],
-                           axis=-1) + child_radii
-        ).max(-1)
-        ratio = (levels[child_depth - 1]["radii"] / np.maximum(required, 1e-12)).reshape(-1)
-        report["parent_coverage"][f"level{child_depth - 1}_over_level{child_depth}"] = {
-            "count": int(ratio.size),
-            "min": float(ratio.min()),
-            "p1": float(np.percentile(ratio, 1)),
-            "p50": float(np.percentile(ratio, 50)),
-            "mean": float(ratio.mean()),
-            "below_one": int(np.count_nonzero(ratio < 1.0)),
-            "below_1.049": int(np.count_nonzero(ratio < 1.049)),
-        }
-    coverage = report["parent_coverage"]["level3_over_level4"]
-    shapes_ok = all(item["shape_ok"] and item["all_finite"] and item["all_radii_positive"]
-                    for item in report["levels"].values())
-    report["result"] = "PASS" if shapes_ok and coverage["below_one"] == 0 else "FAIL"
-    return report
 
 
 # --------------------------------------------------------------------------- #
@@ -437,25 +257,6 @@ def _mean(values) -> float | None:
     array = _finite([value for value in values if value is not None])
     return float(array.mean()) if array.size else None
 
-
-def residual_stats(norms) -> dict | None:
-    array = _finite(norms)
-    if not array.size:
-        return None
-    stats = {
-        "count": int(array.size),
-        "mean": float(array.mean()),
-        "p50": float(np.percentile(array, 50)),
-        "p75": float(np.percentile(array, 75)),
-        "p90": float(np.percentile(array, 90)),
-        "p95": float(np.percentile(array, 95)),
-        "p99": float(np.percentile(array, 99)),
-        "max": float(array.max()),
-    }
-    for threshold in (0.25, 0.50, 0.75, 1.00):
-        stats[f"fraction_le_{threshold:.2f}"] = float((array <= threshold).mean())
-    stats["fraction_gt_1.00"] = float((array > 1.0).mean())
-    return stats
 
 
 def error_stats(values_mm) -> dict | None:
@@ -736,9 +537,10 @@ def run(config: Path, output: Path, limit: int | None, max_correspondences: int,
     path = Path(hierarchy_path) if hierarchy_path is not None else context.hierarchy_path
     if hierarchy_path is None:
         # The configured tree must also satisfy the head's own loader contract.
+        from core.gdrn_modeling.models.heads.progressive_pcc_head import load_pcc_hierarchy
         load_pcc_hierarchy(path, expected_object_ids=context.object_ids, dataset_key=context.key)
     hierarchy, provenance = load_hierarchy_artifact(path, context.object_ids, context.key)
-    levels = _levels_from_hierarchy(hierarchy)
+    levels = hierarchy.numpy_levels()
     sanity = hierarchy_sanity(levels, context.object_ids)
     output.mkdir(parents=True, exist_ok=False)
     (output / "hierarchy_sanity.json").write_text(json.dumps(sanity, indent=2), encoding="utf-8")
@@ -800,13 +602,14 @@ def run(config: Path, output: Path, limit: int | None, max_correspondences: int,
         model_path = context.cad_model_dir / f"obj_{obj_id:06d}.ply"
         model = inout.load_ply(str(model_path), vertex_scale=context.cad_vertex_scale)
         vertices[obj_id] = np.asarray(model["pts"], dtype=np.float64)
-        diameters[obj_id] = float(hierarchy["diameters"][index].item())
+        diameters[obj_id] = float(hierarchy.diameters[index].item())
         meshes[obj_id] = load_tri_mesh(model_path)
         sampled, _ = _sample_surface(model, SURFACE_SAMPLES,
                                      np.random.default_rng(DEFAULT_SEED + obj_id))
         surface_points[obj_id] = sampled.astype(np.float64)
     sanity["surface_representation"] = surface_representation(levels, context.object_ids,
-                                                              surface_points)
+                                                              surface_points, selected_depths=(4, 3),
+                                                              sample_seed=DEFAULT_SEED)
     (output / "hierarchy_sanity.json").write_text(json.dumps(sanity, indent=2), encoding="utf-8")
     print(json.dumps({key: value for key, value in sanity["surface_representation"].items()
                       if key != "per_object"}, indent=2), flush=True)
@@ -926,8 +729,8 @@ def run(config: Path, output: Path, limit: int | None, max_correspondences: int,
                         support_mask=surface_visible, roi2d_px_map=roi2d_px,
                         xyz_gt_m=surface_xyz, **plan_kwargs)
 
-                    count = int(hierarchy["symmetry_counts"][class_index].item())
-                    transforms = hierarchy["symmetry_transforms"][class_index].numpy()[:count]
+                    count = int(hierarchy.symmetry_counts[class_index].item())
+                    transforms = hierarchy.symmetry_transforms[class_index].numpy()[:count]
                     seed = SEED_BASE + len(rows)
                     families = {}
                     for family, target_plan, source, source_ids in (
@@ -1092,7 +895,7 @@ def main() -> int:
         context = resolve_dataset_context(cfg, require_hierarchy=args.hierarchy is None)
         path = args.hierarchy or context.hierarchy_path
         hierarchy, provenance = load_hierarchy_artifact(path, context.object_ids, context.key)
-        sanity = hierarchy_sanity(_levels_from_hierarchy(hierarchy), context.object_ids)
+        sanity = hierarchy_sanity(hierarchy.numpy_levels(), context.object_ids)
         sanity["hierarchy"] = str(path)
         sanity["hierarchy_sha256"] = _sha256(path)
         sanity["hierarchy_mode"] = provenance["mode"]

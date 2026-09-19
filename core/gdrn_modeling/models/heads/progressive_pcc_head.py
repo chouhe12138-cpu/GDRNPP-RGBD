@@ -17,59 +17,31 @@ LEVEL_SIZES = (8, 64, 512, 4096)
 
 def load_pcc_hierarchy(path: str | Path, *, expected_object_ids=None,
                        dataset_key: str | None = None) -> dict[str, torch.Tensor]:
+    # Preserve policy errors before generic structural validation (including S > 2).
+    from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
+
     path = Path(path)
     if not path.is_file():
         raise FileNotFoundError(f"EXP022 hierarchy missing: {path}")
     with np.load(path, allow_pickle=False) as data:
-        expected = {"object_ids", "extents", "diameters", "symmetry_counts", "symmetry_transforms",
-                    "generator_version", "mode", "source_leaf_indices"}
-        for depth in range(1, 5):
-            expected.update({f"level{depth}_{field}" for field in ("anchors", "normals", "radii")})
-        missing = expected.difference(data.files)
-        if missing:
-            raise ValueError(f"EXP022 hierarchy missing arrays: {sorted(missing)}")
-        version, mode = int(data["generator_version"]), str(data["mode"])
-        if (mode, version) not in {("reused", 1), ("independent", 2)}:
+        required = {"generator_version", "mode", "source_leaf_indices", "symmetry_counts"}
+        if required.difference(data.files):
+            raise ValueError(f"EXP022 hierarchy missing arrays: {sorted(required.difference(data.files))}")
+        if (str(data["mode"]), int(data["generator_version"])) not in {("reused", 1), ("independent", 2)}:
             raise ValueError("EXP022 hierarchy version or mode mismatch")
-        arrays = {name: torch.from_numpy(np.asarray(data[name]).copy()) for name in expected
-                  if name not in {"generator_version", "mode"}}
-        stored_dataset = str(data["dataset_key"]) if "dataset_key" in data else None
-    object_ids = tuple(int(value) for value in arrays["object_ids"].tolist())
-    num_objects = len(object_ids)
-    if not object_ids or len(set(object_ids)) != num_objects:
-        raise ValueError("EXP022 object IDs must be nonempty and unique")
-    if expected_object_ids is not None and object_ids != tuple(expected_object_ids):
-        raise ValueError("EXP022 object order mismatch")
-    if dataset_key is not None and stored_dataset != dataset_key:
-        if not (dataset_key == "lmo" and stored_dataset is None):
-            raise ValueError("EXP022 hierarchy dataset mismatch")
-    if tuple(arrays["extents"].shape) != (num_objects, 3) or tuple(arrays["diameters"].shape) != (num_objects,):
-        raise ValueError("EXP022 extent/diameter shape mismatch")
-    counts = arrays["symmetry_counts"]
-    transforms = arrays["symmetry_transforms"]
-    if tuple(counts.shape) != (num_objects,) or counts.dtype not in (torch.int32, torch.int64):
-        raise ValueError("EXP022 symmetry_counts must contain N integer counts")
-    if transforms.ndim != 4 or transforms.shape[0] != num_objects or tuple(transforms.shape[2:]) != (4, 4):
-        raise ValueError("EXP022 symmetry_transforms must have shape [N,S,4,4]")
-    max_sym = int(counts.max().item())
-    if max_sym > 2:
-        raise RuntimeError(
-            f"EXP022 V1 symmetry branch supports at most 2 equivalents, got {max_sym}"
-        )
-    if torch.any(counts < 1) or max_sym > transforms.shape[1]:
-        raise ValueError("EXP022 symmetry_counts are outside stored transform bounds")
-    for depth, count in enumerate(LEVEL_SIZES, start=1):
-        for field, shape in (("anchors", (num_objects, count, 3)),
-                             ("normals", (num_objects, count, 3)),
-                             ("radii", (num_objects, count))):
-            value = arrays[f"level{depth}_{field}"]
-            if tuple(value.shape) != shape or not torch.isfinite(value).all():
-                raise ValueError(f"Invalid EXP022 level{depth}_{field}: {tuple(value.shape)}")
-            if field == "radii" and torch.any(value <= 0):
-                raise ValueError(f"Non-positive EXP022 level{depth} radius")
-    if tuple(arrays["source_leaf_indices"].shape) != (num_objects, 4096):
-        raise ValueError("EXP022 source_leaf_indices shape mismatch")
-    return arrays
+        counts = data["symmetry_counts"]
+        if counts.ndim != 1 or counts.dtype not in (np.dtype('int32'), np.dtype('int64')):
+            raise ValueError("EXP022 symmetry_counts must contain N integer counts")
+        if counts.size and counts.max() > 2:
+            raise RuntimeError(
+                f"EXP022 V1 symmetry branch supports at most 2 equivalents, got {int(counts.max())}"
+            )
+    hierarchy = load_cad_hierarchy(
+        path, expected_object_ids=expected_object_ids, dataset_key=dataset_key,
+        allow_missing_dataset=dataset_key == "lmo")
+    if hierarchy.level_counts != LEVEL_SIZES:
+        raise ValueError("EXP022 hierarchy requires four levels 8/64/512/4096")
+    return hierarchy.tensor_arrays()
 
 
 class ProgressivePCCHead(nn.Module):
