@@ -28,10 +28,11 @@ formal 恢复为真实 batch48；旧固定 batch 结果为重构前结构的历�
 NUMERICAL_REVIEW 结论（optimizer resume 修复、AMP 上溢定位、residual 条件化）
 建立在重构前结构上，其结论边界见对应小节。第二轮按修复指导包
 `CAD_GDRNPP_EXP025_FIX_GUIDE_f2f735f` 定位并修复了 optimizer resume 边界，把
-non-finite gradient 定位为 AMP 缩放后的 fp16 梯度上溢，并完成 residual 条件化对照；
-模型、loss、层级与协议未改，`FORMAL_READY=False` 不变。是否据此修改训练策略
-（放宽 AMP guard 或降低初始 scale）与正式 residual 头（T3 conditioning 与/或零初始化）
-仍待用户确认。
+non-finite gradient 定位为 AMP 缩放后的 fp16 梯度上溢，并完成 residual 条件化对照。
+**当时留下的两个"待确认"随后都已落地**：正式 residual 头已改为预测 soft-T3
+conditioning + 末层零初始化（Residual V2，见对应小节，`residual_detach_route=True`）；
+AMP 初始 scale 已具备生产配置能力（`SOLVER.AMP.INIT_SCALE`，见收口轮小节），其余
+AMP guard 语义保持生产 engine 的 GradScaler 行为。
 
 ## Observed：Image 分支结构重构与 formal batch 修正（2026-09-20，交接包 v2）
 
@@ -76,9 +77,11 @@ mask BCE、hierarchy 与 SHA 契约均未改。末级 stage 不回写（`to_feat
 - 四级 SA 的结构契约：shape/token 数（8×8→64×64、末级 4096×256）、每级调用一次、
   扰动任一级 SA 参数都会改变下一级输入与下一级 transition 的输入、CA 顺序
   T0/T1/T2/T3（1/8/64/512 tokens）、每级 SA 参数都有梯度（`test_image_branch.py`）。
-- `real_smoke`（CUDA、batch4、8 步、CPP、official frozen）：初始 scale
-  32768/16384/8192 均 **PASS**（无跳步、checkpoint 往返一致、90/90 个 image stage
-  参数更新）；65536 在 step1 失败于 `mask_predictor.weight`。
+- `real_smoke`（CUDA、batch4、8 步、CPP、official frozen；本地固定 batch、无
+  accumulation 的单步路径）：在**当前初始状态**下，初始 scale 32768/16384/8192 均
+  **PASS**（无跳步、checkpoint 往返一致、90/90 个 image stage 参数更新）；65536 在
+  step1 失败于 `mask_predictor.weight`。这些是本地固定 batch 的结果，不是 formal
+  batch48 的结论。
 - `amp_boundary_probe`（新工具）：同 seed42、同 batch、同 backbone 初始化的一步
   FP32 对照。重构前结构 `mask_predictor` 未缩放梯度元素最大值 0.707
   （×65536 = 46,355 < 65,504，通过）；重构后 1.156（×65536 = 75,746 > 65,504，上溢）。
@@ -101,10 +104,39 @@ mask BCE、hierarchy 与 SHA 契约均未改。末级 stage 不回写（`to_feat
 - 服务器真实 batch48 + EGL gate **未执行**（本机无 EGL），`FORMAL_READY` 保持 `False`，
   未启动 40 epoch 正式训练。
 
-Derived：重构后 mask 头未缩放梯度元素最大值 1.156 与 fp16 上限的关系决定了 65536
-必然上溢、32768 不会（阈值在两者之间），与旧结构在同一量级（旧结构历史 trained 状态的
-scale sweep 为 16384 通过、32768 在 step167 失败）。因此没有依据按旧结果固定 formal 的
-初始 scale；AMP 在真实 batch48 下的行为待服务器实测。
+Derived：**在当前固定 batch 与当前初始权重**下，mask 头未缩放梯度元素最大值 1.156 与
+fp16 上限的关系使 65536 必然上溢、32768 不会（阈值在两者之间），与旧结构在同一量级
+（旧结构历史 trained 状态的 scale sweep 为 16384 通过、32768 在 step167 失败）。
+这是该 batch/该状态下的量级窗口，不是"任何 batch48 下 32768 都安全"的结论，也没有依据按
+旧结果固定 formal 的初始 scale；AMP 在真实 batch48 下的行为待服务器实测。
+
+## Observed：AMP 初始 scale 配置能力与文档收口（2026-09-20，收口轮 2）
+
+**能力**：新增可选字段 `SOLVER.AMP.INIT_SCALE`，经
+`solver_utils.amp_precision_plugins(cfg)` 接到生产入口——`main_gdrn` 把它作为
+`LightningLite(plugins=...)` 的 native AMP precision plugin 传入，由该 plugin 持有按该值
+创建的 GradScaler。未设置时函数返回 `None`，Lite 仍自建 scaler（65536），历史实验行为
+不变；要求 `SOLVER.AMP.ENABLED=True` 且值 ≥ 1，否则 fail-closed。只改初始值：动态
+growth/backoff、scaler 的 checkpoint 保存/恢复、GradScaler 跳步时 scheduler 不推进的
+逻辑都未触碰。EXP025 的 `train.py` **不设置**该字段，`FORMAL_READY=False` 不变。
+
+**Observed（本机）**：
+
+- 新增 `research/tests/test_amp_init_scale.py` 9 项：未设置时返回 `None` 且不新增配置键；
+  设置后 plugin/scaler 使用该值而 growth/backoff 仍是 torch 默认；AMP 关闭或值 < 1 时
+  fail-closed；`main_gdrn` 的 Lite 调用确实接收该 plugin；两个诊断 `_Lite` 同样接收；
+  真实 Lite（CUDA）用配置的 scaler 训练一步且参数更新、干净步不降 scale；scaler 的
+  checkpoint 往返把 scale 与 growth tracker 一起恢复（resume 的 scale 覆盖 INIT_SCALE，
+  初始值不覆盖已存档状态）；跳步 gate 读数与 engine 的读取顺序不变。
+  `pytest -q research/tests/test_amp_init_scale.py` **9 passed**。
+- 真实入口（`main_gdrn` + `smoke.py`、本机 CPP、`--opts SOLVER.AMP.INIT_SCALE=2048`）
+  退出码 0，checkpoint 记录 `gradscaler.scale=2048`；同一入口不设置该字段时仍是 65536
+  （`exp025_refactor_main_smoke_a02`）。
+
+**文档收口**：`accumulation_smoke` 顶部说明改为与 `smoke.py`（4/48）一致；RECORD 第二轮
+留下的"residual 头 / AMP 策略待确认"改为已解决并指回对应小节；README 的 `learnability`
+示例显式给 `--amp-scale`，并写明 65536 在当前本地单步路径已知会首步溢出；本地通过/溢出
+的表述统一限定为"当前固定 batch、当前初始状态"，不外推到 formal batch48。
 
 ## 预注册检查的作用
 
@@ -342,8 +374,9 @@ Derived（诊断口径，单 batch、seed42、200 步、常数 lr3e-4、route we
 - 三臂训练参数集不完全相同（conditioned 臂以 probe 的 `Linear(2D,D)+GELU+Linear(D,3)`
   替换 `residual_predictor`；zero-init 臂只改初始化），属条件对照而非严格单变量消融。
   GT T3 仅用于该诊断的输入，未进入 loss、正式 forward 或推理。
-- **是否据此修改正式 residual 头（加入预测 T3 的 soft conditioning 与/或零初始化）尚未决定**，
-  本轮未改任何正式模型、loss 或配置。
+- **该问题随后已解决**：正式 residual 头已改为预测 T3 的 soft conditioning + 末层零初始化
+  （Residual V2，见"Residual V2 实现与 fixed-batch 复验"节），本段的三臂数值保留为当时的
+  诊断证据；`base` 臂当时记录的饱和/平台属于重构前的随机初始化实现。
 
 ## Observed：formal-path accumulation smoke（2026-09-20）
 
@@ -551,7 +584,9 @@ detached worktree 中用同一脚本、同一 batch 运行）、`exp025_refactor
 （最高通过 scale 的 8 步 smoke）、`exp025_refactor_smoke_a01.json`（65536 在 step1 失败及
 其 telemetry）、`exp025_refactor_fixed60_a01.json`（60 步固定 batch 可训练性 smoke）、
 `exp025_refactor_accum_a01.json`（4/48 本地形状的状态机 smoke）、
-`exp025_refactor_main_smoke_a02.json`（derived：真实入口 1 epoch 的 checkpoint 审计）。
+`exp025_refactor_main_smoke_a02.json`（derived：真实入口 1 epoch 的 checkpoint 审计）、
+`exp025_init_scale_main_a01.json`（derived：真实入口带 `SOLVER.AMP.INIT_SCALE=2048` 的
+checkpoint 审计，`gradscaler.scale=2048`）。
 
 ## 下一步（待用户确认）
 
@@ -561,9 +596,10 @@ detached worktree 中用同一脚本、同一 batch 运行）、`exp025_refactor
    profile 的 preflight、EGL 真实 batch48 前反向、optimizer update、checkpoint
    save/resume 与峰值显存，并实测 batch48 下的 AMP/GradScaler 行为；通过前
    `FORMAL_READY` 保持 `False`。
-2. **AMP 初始 scale**：本机边界是 32768 通过、65536 在 step1 上溢（Mask 头）；生产
-   engine 已按 GradScaler 语义跳过并降 scale，是否把正式初始 scale 固定为某个值属训练
-   策略，未经确认不实施。
+2. **AMP 初始 scale**：本机固定 batch 的边界是 32768 通过、65536 在 step1 上溢（Mask 头）；
+   生产 engine 已按 GradScaler 语义跳过并降 scale，且现在可以通过
+   `SOLVER.AMP.INIT_SCALE` 显式固定起始值（见收口轮小节）。最终用哪个值要等服务器
+   真实 batch48 + EGL gate，当前**未设置**该字段。
 3. **机制复验**：新结构的 route/residual 响应需要重新做 fixed-batch 诊断（必要时再到
    E5–E40）；重构前的 fixed-batch 数值与结论不能迁移到新结构。
 

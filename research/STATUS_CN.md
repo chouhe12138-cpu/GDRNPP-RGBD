@@ -25,8 +25,9 @@ head 参数 8,217,796 → **10,787,652**，模型总参数 95,683,588 → **98,3
 `pytest -q research` **377 passed**、CPU preflight **PASS**（head 10,787,652、
 `hierarchy_sha_match=true`）。新增单测覆盖四级 shape/token 数、每级调用一次、写回传播
 （扰动任一级 SA 会改变下一级输入）、CA 顺序 T0/T1/T2/T3、每级参数有梯度、formal 48/48。
-`real_smoke`（CUDA batch4、8 步、CPP）在初始 scale 32768/16384/8192 全部 **PASS**
-（无跳步、checkpoint 往返一致、90/90 个 image stage 参数更新），65536 于 step1 失败于
+`real_smoke`（CUDA batch4、8 步、CPP；本地固定 batch、无 accumulation 的单步路径）
+在初始 scale 32768/16384/8192 全部 **PASS**（无跳步、checkpoint 往返一致、
+90/90 个 image stage 参数更新；这是当前固定 batch 与当前初始状态下的结果），65536 于 step1 失败于
 `mask_predictor.weight`；新增 `amp_boundary_probe` 的同 seed 一步 FP32 对照显示该参数
 未缩放梯度元素最大值由旧结构 0.707 升到 1.156（×65536 = 75,746 > 65,504），
 是**缩放后的 fp16 边界**而非 loss/结构发散。`learnability` 60 步 LOCAL_SMOKE 两臂 loss
@@ -36,6 +37,16 @@ head 参数 8,217,796 → **10,787,652**，模型总参数 95,683,588 → **98,3
 65536。注意 accumulation 的 divisor 会把每个 micro-batch 的缩放 fp16 梯度缩小 12 倍，
 因此 formal 48/48（accumulate=1）比本机 4×12 诊断更贴近 fp16 边界，batch48 的 AMP 行为
 只能由服务器实测。
+
+**AMP 初始 scale 已具备生产配置能力**：新增可选字段 `SOLVER.AMP.INIT_SCALE`，
+`main_gdrn` 经 `solver_utils.amp_precision_plugins(cfg)` 把它作为 `LightningLite` 的
+native AMP precision plugin 传入；未设置时返回 `None`、Lite 仍自建 scaler（65536），
+历史实验行为不变；`AMP.ENABLED=False` 或值 < 1 时 fail-closed。只改初始值，动态
+growth/backoff、scaler 的 checkpoint 保存/恢复、GradScaler 跳步时 scheduler 不推进的
+逻辑均未触碰。`research/tests/test_amp_init_scale.py` 9 项覆盖上述各点（未设置兼容、
+设置生效、roundtrip、gate 不变），本机真实入口带 `SOLVER.AMP.INIT_SCALE=2048` 跑完
+1 epoch（退出码 0、checkpoint `gradscaler.scale=2048`）。EXP025 的 `train.py`
+**故意不设置**该字段：最终用 65536/32768/16384 由服务器真实 batch48 + EGL gate 决定。
 
 **重构前的固定 batch 结果（Residual V1/V2、AMP scale sweep、route/T3 accuracy、
 residual probe、生产路径 AMP recovery）属于旧 Image 分支**，保留为历史诊断证据，

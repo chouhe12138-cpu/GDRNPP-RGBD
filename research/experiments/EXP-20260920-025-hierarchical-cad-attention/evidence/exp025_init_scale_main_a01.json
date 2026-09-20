@@ -1,0 +1,24 @@
+{
+  "kind": "derived_summary",
+  "source": "output/diagnostics/exp025_init_scale_main_a01",
+  "command": "main_gdrn.py --config-file smoke.py --num-gpus 1 --opts OUTPUT_DIR=... MODEL.POSE_NET.XYZ_RENDERER=cpp SOLVER.AMP.INIT_SCALE=2048",
+  "note": "the production entry with the optional AMP.INIT_SCALE set; the same entry without it is exp025_refactor_main_smoke_a02 (gradscaler.scale=65536)",
+  "exit_code": 0,
+  "gradscaler": {
+    "scale": 2048.0,
+    "growth_factor": 2.0,
+    "backoff_factor": 0.5,
+    "growth_interval": 2000,
+    "_growth_tracker": 2
+  },
+  "epoch1": {
+    "iteration": 12,
+    "epoch": 1,
+    "optimizer_steps": [
+      2
+    ],
+    "scheduler_last_epoch": 2
+  },
+  "checkpoint": "checkpoints/model_epoch_001.pth",
+  "interpretation": "SOLVER.AMP.INIT_SCALE reaches the GradScaler production actually trains with; unset it stays at the Lite/torch default 65536.  No scale value is chosen here: the final one waits for the server batch48/EGL gate"
+}

@@ -25,6 +25,12 @@ MODEL['POSE_NET'].update(dict(
 DATALOADER = dict(NUM_WORKERS=16)
 # Formal training is a real batch 48: one optimizer update per iteration.  Local
 # memory-limited shapes belong to smoke.py / the exp025 diagnostics, not to this file.
+#
+# AMP.INIT_SCALE pins the GradScaler's starting scale through the production entry
+# (`main_gdrn` passes it to LightningLite as a precision plugin).  It is deliberately
+# unset here: the default 65536 stays in force until the server real-batch48 + EGL gate
+# measures what batch 48 without accumulation can actually consume.  Set it there, e.g.
+# `AMP=dict(ENABLED=True, INIT_SCALE=32768)`, not from a local batch4 result.
 SOLVER = dict(IMS_PER_BATCH=48, REFERENCE_BS=48, TOTAL_EPOCHS=40, MAX_TO_KEEP=10,
     OPTIMIZER_CFG=dict(_delete_=True, type='AdamW', lr=3e-4, weight_decay=.01,
                       betas=(.9, .999), eps=1e-8),

@@ -226,6 +226,9 @@ def main(args):
         devices=args.num_gpus,
         num_nodes=args.num_machines,
         precision=16 if cfg.SOLVER.AMP.ENABLED else 32,
+        # None unless SOLVER.AMP.INIT_SCALE is set, i.e. Lite keeps building its own
+        # GradScaler for every configuration that does not ask for a specific scale.
+        plugins=solver_utils.amp_precision_plugins(cfg),
     ).run(args, cfg)
 
 

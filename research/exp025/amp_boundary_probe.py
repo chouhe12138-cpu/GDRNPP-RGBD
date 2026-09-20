@@ -18,7 +18,7 @@ import torch
 
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer
 from .preflight import CONFIG, read_config
-from .runtime import metadata, real_batch, save_report, seed_all
+from .runtime import amp_init_scale, metadata, real_batch, save_report, seed_all
 
 FP16_MAX = 65504.
 
@@ -58,16 +58,20 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--load-batch', type=Path, required=True)
     parser.add_argument('--batch-size', type=int, default=4)
-    parser.add_argument('--amp-scale', type=float, default=65536.,
-                        help='scale whose fp16 backward the AMP arm must survive')
+    parser.add_argument('--amp-scale', type=float, default=None,
+                        help='scale whose fp16 backward the AMP arm must survive; defaults to '
+                             'SOLVER.AMP.INIT_SCALE when the config pins one, otherwise 65536')
     parser.add_argument('--device', default='cuda:0')
     args = parser.parse_args()
-    if args.batch_size < 1 or args.amp_scale < 1:
-        parser.error('Require a positive batch size and scale')
+    if args.batch_size < 1:
+        parser.error('Require a positive batch size')
     args.output.mkdir(parents=True, exist_ok=False)
     cfg = read_config(args.config, False, 'official_lmo')
     cfg.MODEL.DEVICE = args.device
     cfg.SOLVER.IMS_PER_BATCH = args.batch_size
+    args.amp_scale = amp_init_scale(cfg, args.amp_scale)
+    if args.amp_scale < 1:
+        parser.error(f'Require a positive amp scale, got {args.amp_scale}')
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING', batch_size=args.batch_size,
                   source_batch=str(args.load_batch), amp_scale=args.amp_scale, fp16_max=FP16_MAX,
                   interpretation='one-step numerical boundary probe, not a performance result')

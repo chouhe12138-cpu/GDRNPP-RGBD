@@ -43,6 +43,19 @@ def metadata(cfg):
                 training_kind='diagnostic', formal=False)
 
 
+def amp_init_scale(cfg, requested=None):
+    """The scale a diagnostic's own GradScaler starts from.
+
+    An explicit CLI value wins.  Otherwise the run follows `SOLVER.AMP.INIT_SCALE` when the
+    config pins one -- the same value production would hand to `LightningLite` -- and falls
+    back to the torch default (65536) that Lite builds when nothing is pinned.
+    """
+    if requested is not None:
+        return float(requested)
+    scale = cfg.SOLVER.get('AMP', {}).get('INIT_SCALE', None)
+    return 65536. if scale is None else float(scale)
+
+
 def save_report(output, report):
     with (output / 'report.json').open('w') as stream:
         json.dump(report, stream, indent=2)

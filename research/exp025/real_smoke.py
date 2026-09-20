@@ -12,8 +12,8 @@ import torch
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer
 from core.gdrn_modeling.models.heads.hierarchical_cad_attention_head import hierarchy_log_probabilities
 from .preflight import CONFIG, read_config, audit_optimizer
-from .runtime import (NonFiniteTrainingError, seed_all, real_batch, amp_step, metadata,
-                      save_last_good, save_report)
+from .runtime import (NonFiniteTrainingError, seed_all, real_batch, amp_init_scale, amp_step,
+                      metadata, save_last_good, save_report)
 
 
 def main():
@@ -26,8 +26,9 @@ def main():
     parser.add_argument('--renderer', choices=('cpp', 'egl'), default='cpp')
     parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--steps', type=int, default=8)
-    parser.add_argument('--amp-scale', type=float, default=65536.,
-                        help='initial GradScaler scale; the production default is 65536')
+    parser.add_argument('--amp-scale', type=float, default=None,
+                        help='initial GradScaler scale; defaults to SOLVER.AMP.INIT_SCALE '
+                             'when the config pins one, otherwise 65536')
     parser.add_argument('--load-batch', type=Path)
     parser.add_argument('--save-batch', type=Path)
     args = parser.parse_args()
@@ -35,6 +36,7 @@ def main():
         parser.error('Require steps >= 2 and positive batch size')
     args.output.mkdir(parents=True, exist_ok=False)
     cfg = read_config(args.config, args.train_backbone == 'yes', args.backbone_init)
+    args.amp_scale = amp_init_scale(cfg, args.amp_scale)
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING',
                   batch_source=str(args.load_batch or 'online'), renderer=args.renderer,
                   batch_size=args.batch_size, steps=args.steps, device=args.device,

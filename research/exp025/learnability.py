@@ -10,8 +10,8 @@ import torch
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer
 from core.gdrn_modeling.models.heads.hierarchical_cad_attention_head import hierarchy_log_probabilities, masked_mean
 from .preflight import CONFIG, read_config
-from .runtime import (NonFiniteTrainingError, seed_all, real_batch, amp_step, head_telemetry,
-                      metadata, save_last_good, save_report)
+from .runtime import (NonFiniteTrainingError, seed_all, real_batch, amp_init_scale, amp_step,
+                      head_telemetry, metadata, save_last_good, save_report)
 
 
 @torch.no_grad()
@@ -82,19 +82,24 @@ def main():
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--last-good-period', type=int, default=20,
                         help='steps between last-good checkpoints used for matched replay')
-    parser.add_argument('--amp-scale', type=float, default=65536.,
-                        help='initial GradScaler scale (production default); see '
-                             'amp_boundary_probe for where the current structure overflows')
+    parser.add_argument('--amp-scale', type=float, default=None,
+                        help='initial GradScaler scale; defaults to SOLVER.AMP.INIT_SCALE '
+                             'when the config pins one, otherwise 65536.  The current '
+                             'structure can overflow at 65536 on a single-step batch4 path -- '
+                             'see amp_boundary_probe for the measured boundary')
     parser.add_argument('--arms', default='residual_only,full')
     args = parser.parse_args()
     weights = dict(residual_only=0., full=1.)
     arms = tuple((name, weights[name]) for name in args.arms.split(',') if name in weights)
     if len(arms) != len(set(args.arms.split(','))) or args.steps < 1 or args.batch_size < 1 \
-            or args.last_good_period < 1 or args.amp_scale < 1:
-        parser.error(f'Require positive steps/batch size/last-good period/amp scale and arms within {tuple(weights)}')
+            or args.last_good_period < 1:
+        parser.error(f'Require positive steps/batch size/last-good period and arms within {tuple(weights)}')
     args.output.mkdir(parents=True, exist_ok=False)
     cfg = read_config(args.config, False, 'official_lmo')
     cfg.MODEL.DEVICE = args.device
+    args.amp_scale = amp_init_scale(cfg, args.amp_scale)
+    if args.amp_scale < 1:
+        parser.error(f'Require a positive amp scale, got {args.amp_scale}')
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING', steps=args.steps,
                   batch_size=args.batch_size, source_batch=str(args.load_batch), arms={},
                   last_good_period=args.last_good_period, amp_init_scale=args.amp_scale,

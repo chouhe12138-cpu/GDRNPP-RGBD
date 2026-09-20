@@ -1,13 +1,13 @@
 """Local accumulation smoke: physical batch 4 x accumulation 12, AMP, resume.
 
 The formal config trains at a real batch 48, so this local shape is carried by the smoke
-itself (`--batch-size 4 --reference-bs 48`) instead of being inherited from `train.py`.
-`smoke.py` runs REFERENCE_BS=4, so it never exercises accumulation at all.  This
-state-machine smoke repeats one saved batch (or the online loader with --online) and
-checks the counters and the LR a resumed run must continue -- optimizer step, scheduler
-epoch, accumulation boundaries, AMP scale -- against an uninterrupted run.  Tensor
-equality across sessions is not available on this GPU path, so it is judged against a
-noise floor measured in the same process instead.  Engineering behaviour only.
+itself (`--batch-size 4 --reference-bs 48`) instead of being inherited from `train.py`;
+`smoke.py` carries the same 4/48 shape for its own end-to-end run.  This state-machine
+smoke repeats one saved batch (or the online loader with --online) and checks the counters
+and the LR a resumed run must continue -- optimizer step, scheduler epoch, accumulation
+boundaries, AMP scale -- against an uninterrupted run.  Tensor equality across sessions is
+not available on this GPU path, so it is judged against a noise floor measured in the same
+process instead.  Engineering behaviour only.
 """
 from __future__ import annotations
 
@@ -40,7 +40,10 @@ def unwrapped_state(model):
 
 def make_session(cfg, args, total_updates, resume):
     (args.output / 'checkpoints').mkdir(parents=True, exist_ok=True)  # as engine.do_train does
-    lite = _Lite(accelerator='gpu', devices=1, precision=16 if args.amp else 32)
+    # The same precision plugin production builds, so a pinned SOLVER.AMP.INIT_SCALE is
+    # exercised here instead of being silently replaced by Lite's default scaler.
+    lite = _Lite(accelerator='gpu', devices=1, precision=16 if args.amp else 32,
+                 plugins=solver_utils.amp_precision_plugins(cfg) if args.amp else None)
     model, optimizer = build_model_optimizer(cfg)
     model, wrapper = lite.setup(model, optimizer)
     state_optimizer = my_checkpoint.unwrap_optimizer_for_checkpoint(wrapper)

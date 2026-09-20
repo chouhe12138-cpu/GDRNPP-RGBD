@@ -55,7 +55,8 @@ def parameter_delta(snapshot, model):
 def make_session(cfg, args, checkpoint, updates_per_epoch, accumulate):
     """The production object graph, restored to the recorded step-160 training state."""
     (args.output / 'checkpoints').mkdir(parents=True, exist_ok=True)  # as engine.do_train does
-    lite = _Lite(accelerator='gpu', devices=1, precision=args.precision)
+    lite = _Lite(accelerator='gpu', devices=1, precision=args.precision,
+                 plugins=solver_utils.amp_precision_plugins(cfg) if args.precision == 16 else None)
     model, optimizer = build_model_optimizer(cfg)
     model, wrapper = lite.setup(model, optimizer)
     state_optimizer = my_checkpoint.unwrap_optimizer_for_checkpoint(wrapper)

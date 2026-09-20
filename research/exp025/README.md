@@ -68,7 +68,8 @@ python -m pytest -q research/exp025/tests
 python -m research.exp025.preflight
 python -m research.exp025.real_smoke --output output/diagnostics/exp025_smoke_NEW --save-batch .local/exp025/batch_NEW.pt
 python -m research.exp025.amp_boundary_probe --output output/diagnostics/exp025_boundary_NEW --load-batch .local/exp025/batch_NEW.pt
-python -m research.exp025.learnability --output output/diagnostics/exp025_fixed_NEW --load-batch .local/exp025/batch_NEW.pt
+python -m research.exp025.learnability --output output/diagnostics/exp025_fixed_NEW \
+    --load-batch .local/exp025/batch_NEW.pt --amp-scale 16384
 python -m research.exp025.numerical_replay --output output/diagnostics/exp025_replay_NEW \
     --from-checkpoint output/diagnostics/exp025_fixed_NEW/full_last_good.pth \
     --load-batch .local/exp025/batch_NEW.pt
@@ -86,6 +87,22 @@ GradScaler scale，生产默认 65536）。它同时校验四级 Image-SA 的参
 `learnability` 固定官方冻结主干、同一 batch/seed/初始参数，分别执行 residual+mask
 与完整 loss 各200步，常数 lr，每20步记录；GT-path 仅用于隔离残差诊断，不是训练路由。
 不预设通用下降阈值，不用 fixed-batch 数值冒充泛化性能。
+**本地诊断不要用默认的 65536 起步**：当前结构在本机 batch4、无 accumulation 的单步路径上
+已在 65536 首步溢出（`amp_boundary_probe` 测得是 Mask 头缩放后的 fp16 边界），示例因此显式
+给 `--amp-scale 16384`。默认值本身仍是 65536，因为生产入口按 torch/Lite 的默认起步，
+只有在 `SOLVER.AMP.INIT_SCALE` 被显式设置时才改变；已测的通过/溢出是**本地固定 batch、
+当前初始状态**的结果，不能外推到 formal batch48。
+
+## AMP 初始 scale 配置（`SOLVER.AMP.INIT_SCALE`）
+
+`main_gdrn` 把 `SOLVER.AMP.INIT_SCALE` 交给 `LightningLite` 的 precision plugin
+（`solver_utils.amp_precision_plugins`）：设置后 Lite 使用该值创建 GradScaler，未设置时
+返回 `None`，所有历史实验继续使用 Lite 自己的默认 scaler（65536）。只改初始值——动态
+growth/backoff、scaler 的 checkpoint 保存/恢复、以及 GradScaler 跳步时 scheduler 不推进的
+逻辑都不变。要求 `SOLVER.AMP.ENABLED=True` 且值 ≥ 1，否则 fail-closed。
+EXP025 的 `train.py` **故意不设置**：最终用 65536/32768/16384 由服务器真实 batch48 +
+EGL gate 决定。本地 `real_smoke`/`learnability`/`amp_boundary_probe` 的 `--amp-scale`
+默认跟随该配置（未设置时仍是 65536）。
 
 ## 历史证据边界
 

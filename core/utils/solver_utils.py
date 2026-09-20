@@ -24,6 +24,7 @@ __all__ = [
     "build_lr_scheduler",
     "build_optimizer_with_params",
     "accumulation_window_size",
+    "amp_precision_plugins",
     "amp_scale",
     "get_accumulation_steps",
     "gradscaler_skipped_step",
@@ -78,6 +79,34 @@ def should_optimizer_step(
         or epoch_completed == int(iterations_per_epoch)
         or completed >= int(max_iterations)
     )
+
+
+def amp_precision_plugins(cfg):
+    """`LightningLite(plugins=...)` value that pins the GradScaler's initial scale.
+
+    `LightningLite(precision=16)` builds its own GradScaler, whose initial scale (65536)
+    is not necessarily what a model can consume on its first updates, and a config has no
+    handle on it.  With `SOLVER.AMP.INIT_SCALE` set, hand Lite a native AMP plugin that
+    owns a scaler created with that value; without it, return None so every existing
+    configuration keeps Lite's own default.  Only the initial value changes: the scaler's
+    growth/backoff, its `state_dict`/`load_state_dict` (scale included, which is what the
+    checkpointer saves and restores) and the engine's skipped-step scheduler gate are all
+    untouched.
+    """
+    amp = cfg.SOLVER.get("AMP", {})
+    scale = amp.get("INIT_SCALE", None)
+    if scale is None:
+        return None
+    if not bool(amp.get("ENABLED", False)):
+        raise ValueError("SOLVER.AMP.INIT_SCALE requires SOLVER.AMP.ENABLED")
+    scale = float(scale)
+    if scale < 1:
+        raise ValueError(f"SOLVER.AMP.INIT_SCALE must be >= 1, got {scale}")
+    # Imported lazily: only a run that explicitly pins the scale needs the plugin.
+    from pytorch_lightning.plugins.precision import NativeMixedPrecisionPlugin
+
+    return [NativeMixedPrecisionPlugin(precision=16, device="cuda",
+                                       scaler=torch.cuda.amp.GradScaler(init_scale=scale))]
 
 
 def amp_scale(precision_plugin) -> float:
