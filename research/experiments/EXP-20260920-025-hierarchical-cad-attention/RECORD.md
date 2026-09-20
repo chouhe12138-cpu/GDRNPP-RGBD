@@ -606,6 +606,60 @@ Gate A（production AMP）✔；Gate B（Residual V2）✔；Gate C（checkpoint
 Gate D（hierarchy identity）✔；Gate E 的服务器 EGL 一项未执行，因此 `FORMAL_READY` 保持
 `False`，未启动 40 epoch 正式训练。
 
+## Observed：服务器真实 batch48 + EGL gate（2026-09-20，lab0 与 lab1）
+
+两臂各在服务器上跑 `experiment.sh <machine> gate`（`real_smoke --renderer egl --batch-size 48
+--steps 8`），scale 按预注册顺序 65536 → 32768 测量。所有 run 的目录名、报告与 metadata 原样
+保存在 `evidence/`（见下节清单）。
+
+| 臂 | machine | scale | status | 失败/通过证据 |
+|---|---|---|---|---|
+| `official_frozen` | lab0 | 65536 | FAIL | `mask_predictor.weight` 非有限，step 1 |
+| `official_frozen` | lab0 | 32768 | **PASS** | `amp_skipped_steps=0`、`checkpoint_roundtrip=true` |
+| `imagenet_full` | lab1 | 65536 | FAIL | `mask_predictor.weight` 非有限，step 1 |
+| `imagenet_full` | lab1 | 32768 | **PASS** | `amp_skipped_steps=0`、`checkpoint_roundtrip=true` |
+
+**共同通过的最高 scale = 32768**（预注册口径：两臂共同通过的最高值）。两臂在 65536 上失败在
+**同一步、同一张量**，其余模块梯度有限（lab0 最大 0.482、lab1 0.499），五个 loss 分量有限，
+`t3_logits`/`mask_logit` 有限，`raw_residual` 恒为 0（末层零初始化生效）——属缩放后的 fp16
+边界，不是结构或 loss 发散。Derived：与重构轮 `amp_boundary_probe` 在 batch4 上测得的同机制
+边界一致（mask 头未缩放梯度元素最大 1.156，×65536 = 75,746 > fp16 上限 65,504）。
+
+Observed（两次通过 run 的原始字段，均 `source_commit=e3e0e651eac4…`、`source_tree_clean=true`、
+`image_ref=gdrnpp-research:torch220-cu121-sm89-e3e0e651eac4`、`hierarchy_sha256=02ce09…a373`）：
+
+- 协议实证：`renderer=egl`、`batch_size=48`、`device=cuda:0`、`steps=8`、`amp_skipped_steps=0`、
+  `checkpoint_roundtrip=true`。
+- 优化器：lab0 只有 `cad_head`（10,787,652 参数，lr 3e-4）；lab1 为 `cad_head` + `backbone`
+  （87,564,416 参数，lr 2.9999999999999997e-05）。lab1 这一 lr 是**本次 gate 时的旧值**，
+  下方 Decision 之后主干改为 3e-4 并重跑 gate。
+- Image-SA 覆盖：两臂都是 90/90 参数被更新，分级 18/18/28/26，每级都有有限非零梯度。
+- 资源：lab0 中位 334.5 ms/step、峰值 allocated/reserved 13.72/14.26 GB；lab1 中位
+  467.0 ms/step、峰值 22.60/23.26 GB。
+- loss 单调下降：lab0 `loss_cad_t3` 6.44→5.82、lab1 6.42→5.98（8 步，仅工程可训练性）。
+
+## Decision：全量训练臂的主干学习率（2026-09-20，formal 启动之前）
+
+用户提出主干 lr 可能过低。核查仓库内证据：
+
+- 官方 GDRNPP LM-O PBR 配方（同数据集、同 ImageNet ConvNeXt 初始化、`FREEZE=False`、40 epoch）
+  **不给主干加任何乘子**：`core/gdrn_modeling/models/GDRN_double_mask.py:912-914` 是
+  `{"params": backbone.parameters(), "lr": float(cfg.SOLVER.BASE_LR)}`，该配方 `lr=8e-4`（Ranger）。
+- EXP025 原有的 `BACKBONE_LR_MULT=.1` 继承自 LM13 的 GDR-Net 协议（Ranger 1e-4、主干 1e-5），
+  经 EXP024 传入 LM-O 臂；EXP024 从未跑过 formal（`CLOSED / SUPERSEDED_BY_EXP025`），
+  即 3e-5 在仓库内**没有实验证据支持**。
+- 结果是 lab1 臂在相同数据集上比官方配方低约 27 倍；若主干几乎不更新，"全量训练臂"会退化
+  成"换了初始化的冻结臂"，两臂对比的信息量随之下降。
+
+Decision：`train_imagenet_full.py` 的 `BACKBONE_LR_MULT` 由 `.1` 改为 `1.`，主干与头同为
+AdamW 3e-4。**只影响 lab1 臂**（冻结臂没有 backbone 参数组，两臂共享的头 lr 不变），
+优化器类型与调度不动（对齐官方的 Ranger 8e-4 属协议重做，不在本轮范围）。该决策在
+**未观察任何 formal 指标**的前提下做出，属预注册后、formal 前的协议修订。
+
+Derived：本次修订使 lab1 的 gate 记录（`optimizer_groups` 的 lr）与正式配置不再一致，
+lab1 必须在最终配置下重跑一次 gate；lab0 的配置未变（`SOLVER.AMP.INIT_SCALE` 与
+`--amp-scale` 同值，模型/loss/batch/LR 均未动），其 32768 PASS 继续作为该臂的有效证据。
+
 ## 证据文件
 
 `evidence/` 下：`exp025_amp_imagenet_a02.json`（ImageNet AMP 失败 + 逐步 telemetry）、
@@ -635,22 +689,34 @@ detached worktree 中用同一脚本、同一 batch 运行）、`exp025_refactor
 `exp025_init_scale_main_a01.json`（derived：真实入口带 `SOLVER.AMP.INIT_SCALE=2048` 的
 checkpoint 审计，`gradscaler.scale=2048`）。
 
-## 下一步（待用户确认）
+服务器 gate 轮新增（原始 report，来自各 run 的 `gate/report.json`）：
+`exp025_server_gate_official_frozen_a01.json`（lab0 @65536 FAIL）、
+`exp025_server_gate_official_frozen_a02.json` 与 `..._a02_metadata.json`（lab0 @32768 PASS，
+run `RUN-20260920-111840-gate-s42-a01`）、`exp025_server_gate_imagenet_full_a01.json`
+（lab1 @65536 FAIL）、`exp025_server_gate_imagenet_full_a02.json`（lab1 @32768 PASS，
+主干 lr 3e-5 的旧配置）。
 
-重构后（2026-09-20 交接包 v2）：
+## 下一步
 
-1. **服务器真实 batch48 与 EGL gate 未执行**：需在服务器用新 release 跑 `exp025_lmo`
-   profile 的 preflight、EGL 真实 batch48 前反向、optimizer update、checkpoint
-   save/resume 与峰值显存，并实测 batch48 下的 AMP/GradScaler 行为；通过前
-   `FORMAL_READY` 保持 `False`。
-2. **AMP 初始 scale**：本机固定 batch 的边界是 32768 通过、65536 在 step1 上溢（Mask 头）；
-   生产 engine 已按 GradScaler 语义跳过并降 scale，且现在可以通过
-   `SOLVER.AMP.INIT_SCALE` 显式固定起始值（见收口轮小节）。最终用哪个值要等服务器
-   真实 batch48 + EGL gate，当前**未设置**该字段。
-3. **机制复验**：新结构的 route/residual 响应需要重新做 fixed-batch 诊断（必要时再到
-   E5–E40）；重构前的 fixed-batch 数值与结论不能迁移到新结构。
+2026-09-20 gate 轮之后：
 
-以下 3 条为重构前结构遗留的问题，保留原文：
+1. **lab1 用最终配置重跑 gate**：主干 lr 由 3e-5 改为 3e-4（见上节 Decision），而 gate 报告会
+   记录 `optimizer_groups` 的 lr，因此 lab1 需要在 `train_imagenet_full.py` 的最终配置下重跑
+   一次 gate。scale 仍取 32768（已写入 `common.py` 的 `SOLVER.AMP.INIT_SCALE`）。若它在 32768
+   失败（失败点应与本次相同：Mask 头、step 1），按协议降到 16384 并同步改两臂共享的
+   `INIT_SCALE`，届时共同 scale 变为 16384。
+2. **启动两臂 formal**：lab0 `train_official_frozen.py`、lab1 `train_imagenet_full.py`，
+   各 `docker/l40/experiment.sh <machine> run <experiment> <config> formal`。本提交只改
+   config/测试/文档，不在 `native_input_paths` 内，**不需要重建镜像**；需要的是第二段
+   bundle/release 与容器替换。
+3. **formal 期间**：启动后 15–30 分钟首检数值/显存/吞吐，之后按固定 checkpoint 节点检查；
+   E5–E40 每个评价点记录聚合指标，不按中间结果选模、不追加 seed。formal 期间不 pull、
+   不改 release、不换镜像。
+4. **机制复验仍待做**：新结构的 route/residual 响应需要重新做 fixed-batch 诊断；重构前的
+   fixed-batch 数值与结论不能迁移到新结构。
+5. LM13 保持 `SERVER_NOT_ENABLED`，待 LM-O 完成后再独立开放。
+
+以下为重构前结构遗留的问题，保留原文：
 
 1. **诊断脚本的 guard 语义**：生产 engine 已按 GradScaler 的真实语义运行（跳过 + 降 scale +
    不推进 scheduler）；`runtime.amp_step` 仍然是"非有限即致命"的诊断口径，用于把失败钉在
@@ -661,5 +727,3 @@ checkpoint 审计，`gradscaler.scale=2048`）。
    未经确认不实施。
 3. **噪声底**：如需跨 run 逐张量比较（例如严格单变量消融），需要先隔离本机
    CUDA+AMP 不可复现的来源，或固定 `torch.use_deterministic_algorithms` 后重测。
-4. 正式训练、服务器 EGL、E5–E40 与完整 BOP/matched-PnP 评价均未执行；
-   `FORMAL_READY` 保持 `False`。

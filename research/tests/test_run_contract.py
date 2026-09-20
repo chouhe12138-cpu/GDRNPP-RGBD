@@ -10,11 +10,20 @@ CFG = ROOT / 'configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention'
 
 
 @pytest.mark.parametrize('name', ['train_official_frozen.py', 'train_imagenet_full.py'])
-def test_exp025_formal_stays_locked_before_server_gate(name):
+def test_exp025_formal_contract_is_fail_closed(name):
+    """The shipped arms are unlocked at the server-gated scale; the lock itself must still bite."""
     cfg = Config.fromfile(str(CFG / name))
     validate_research_run_config(cfg, mode='prepare')
+
+    locked = Config.fromfile(str(CFG / name))
+    locked.RESEARCH_PROTOCOL.FORMAL_READY = False
     with pytest.raises(ValueError, match='not ready'):
-        validate_research_run_config(cfg, mode='formal')
+        validate_research_run_config(locked, mode='formal')
+
+    unscaled = Config.fromfile(str(CFG / name))
+    del unscaled.SOLVER.AMP.INIT_SCALE
+    with pytest.raises(ValueError, match='server-gated AMP.INIT_SCALE'):
+        validate_research_run_config(unscaled, mode='formal')
 
 
 @pytest.mark.parametrize('name', ['train_official_frozen.py', 'train_imagenet_full.py'])

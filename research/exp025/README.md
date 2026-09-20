@@ -59,12 +59,14 @@ CUDA+CPP/AMP 三步 smoke 已通过；launcher 当前明确拒绝 `exp025_lm13`�
 服务器资源门和 EGL gate。
 
 LM-O PBR40/GT-box，seed42，AdamW lr3e-4、wd.01、betas(.9,.999)、eps1e-8；
-解冻主干 lr 乘 .1。**formal 是真实 batch48（`IMS_PER_BATCH=48`、`REFERENCE_BS=48`，
+解冻主干与头同为 3e-4（`BACKBONE_LR_MULT=1.`：官方 LM-O 配方对本干不加乘子，
+而继承自 LM13 协议的 .1 让主干只有 3e-5、无实验证据支持——见 RECORD 的 Decision）。
+**formal 是真实 batch48（`IMS_PER_BATCH=48`、`REFERENCE_BS=48`，
 accumulate=1，每 iteration 一次真实 optimizer update）**；AMP 显式开启；40epoch，
 warmup4%，cosine 到初始 lr 的 .01；E5–E40 定点评价，best checkpoint 关闭。
-`FORMAL_READY=False`。本机显存受限的 4×12 形状只存在于 `smoke.py`（4/48）与诊断脚本
-的显式参数里，不改 formal；engine 的梯度累计保留给这些本地路径。`smoke.py` 使用独立
-有界 8-image split，不能用于正式实验。
+`FORMAL_READY=True`，两臂共享 `SOLVER.AMP.INIT_SCALE=32768`。本机显存受限的 4×12 形状
+只存在于 `smoke.py`（4/48）与诊断脚本的显式参数里，不改 formal；engine 的梯度累计保留给
+这些本地路径。`smoke.py` 使用独立有界 8-image split，不能用于正式实验。
 
 从仓库根目录执行（每次使用新的 output 名称）：
 
@@ -103,9 +105,9 @@ GradScaler scale，生产默认 65536）。它同时校验四级 Image-SA 的参
 返回 `None`，所有历史实验继续使用 Lite 自己的默认 scaler（65536）。只改初始值——动态
 growth/backoff、scaler 的 checkpoint 保存/恢复、以及 GradScaler 跳步时 scheduler 不推进的
 逻辑都不变。要求 `SOLVER.AMP.ENABLED=True` 且值 ≥ 1，否则 fail-closed。
-两个正式配置均**故意不设置**：最终用 65536/32768/16384 由两台服务器真实 batch48 +
-EGL gate 决定，并固定两臂共同通过的最高值。本地 `real_smoke`/`learnability`/
-`amp_boundary_probe` 的 `--amp-scale`
+2026-09-20 服务器 gate 后，两个正式配置共享 `SOLVER.AMP.INIT_SCALE=32768`——65536 在
+两臂同一步、同一张量（Mask 头）缩放后溢出，32768 两臂均 PASS，按"共同通过的最高值"固定。
+本地 `real_smoke`/`learnability`/`amp_boundary_probe` 的 `--amp-scale`
 默认跟随该配置（未设置时仍是 65536）。
 
 ## 历史证据边界

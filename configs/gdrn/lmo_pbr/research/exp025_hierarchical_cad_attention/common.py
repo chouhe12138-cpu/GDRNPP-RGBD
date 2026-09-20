@@ -20,9 +20,9 @@ DATALOADER = dict(NUM_WORKERS=16)
 SOLVER = dict(IMS_PER_BATCH=48, REFERENCE_BS=48, TOTAL_EPOCHS=40, MAX_TO_KEEP=10,
     OPTIMIZER_CFG=dict(_delete_=True, type='AdamW', lr=3e-4, weight_decay=.01,
                       betas=(.9, .999), eps=1e-8),
-    AMP=dict(ENABLED=True), WARMUP_RATIO=.04, WARMUP_FACTOR=.001, WARMUP_METHOD='linear',
+    AMP=dict(ENABLED=True, INIT_SCALE=32768), WARMUP_RATIO=.04, WARMUP_FACTOR=.001, WARMUP_METHOD='linear',
     LR_SCHEDULER_NAME='flat_and_anneal', ANNEAL_METHOD='cosine', TARGET_LR_FACTOR=.01,
     BEST_CHECKPOINT=dict(ENABLED=False))
 TEST = dict(TEST_BBOX_TYPE='gt', USE_PNP=True, PNP_TYPE='ransac_pnp', EVAL_PERIOD=5)
 TRAIN_PROTOCOL = dict(NAME='exp025_lmo', DATA_DOMAIN='syn_pbr')
-RESEARCH_PROTOCOL = dict(SCHEDULE='configurable', FORMAL_READY=False)
+RESEARCH_PROTOCOL = dict(SCHEDULE='configurable', FORMAL_READY=True)

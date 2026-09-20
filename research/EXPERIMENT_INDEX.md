@@ -9,13 +9,15 @@ EXP025 取代。被清退入口的最终完整快照是 commit
 缺少精确 source 时从该快照定位，并使用独立 worktree。
 
 EXP025 当前拆为 lab0 `official_frozen` 与 lab1 `imagenet_full` 两条正式 arm；服务器真实
-batch48/EGL gate 未执行，两个配置均保持 `FORMAL_READY=False`。
+batch48/EGL gate 已完成：65536 在两臂同一步同一张量溢出，32768 两臂均通过，共同 scale
+写入 `SOLVER.AMP.INIT_SCALE`，`FORMAL_READY=True`。lab1 主干 lr 在 formal 前由 3e-5 改为
+3e-4（见 RECORD 的 Decision），需在最终配置下重跑一次 gate 后启动 formal。
 LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，保持 server-disabled，
 待 LM-O 完成后再独立开放。
 
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
-| EXP025 统一 T3 CAD attention | ACTIVE / LOCAL_SMOKE_PASS / SERVER_BATCH48_GATE_PENDING / FORMAL_NOT_READY | 四级 Image-SA 写回、统一 T3=512 与 Residual V2 已完成本地验证。正式比较为 lab0 原 GDRNPP 主干冻结臂与 lab1 ImageNet ConvNeXt 全量训练臂；真实 batch48、共同 AMP 初始 scale和 formal unlock 待服务器 gate | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | ACTIVE / SERVER_GATE_PASS_AT_32768 / FORMAL_READY / FORMAL_NOT_STARTED | 四级 Image-SA 写回、统一 T3=512 与 Residual V2 已完成本地验证。正式比较为 lab0 原 GDRNPP 主干冻结臂与 lab1 ImageNet ConvNeXt 全量训练臂；两臂 gate 均通过（65536 溢出、32768 PASS），lab1 主干 lr 在 formal 前由 3e-5 改为 3e-4 并需重跑一次 gate | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

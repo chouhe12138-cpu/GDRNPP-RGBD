@@ -144,7 +144,11 @@ lab1 使用同一代码块并把 `machine=lab1`；两台都必须绑定相同 so
 
 ## 真实 batch48 gate
 
-第一段 release 的两配置保持 `FORMAL_READY=False`。lab0：
+2026-09-20 这两条 gate 已在 lab0/lab1 执行：65536 在两臂同一步、同一张量
+（`cad_attention_head.mask_predictor.weight`）缩放后溢出，32768 两臂均 PASS，共同 scale
+定为 32768 并写入 `common.py`。此后 lab1 的主干 lr 由 3e-5 改为 3e-4（见 RECORD 的 Decision），
+因此 **lab1 需要在最终配置下再跑一次同一条 gate 命令**（scale 仍给 32768）；lab0 的配置未变，
+其 32768 结果继续有效。命令模板如下（把 `REPLACE_SHORT_SHA` 换成当次 release）。lab0：
 
 ```bash
 (
@@ -179,9 +183,11 @@ docker/l40/experiment.sh lab1 gate "${experiment}" "${config}" 65536
 backbone 冻结或更新、全部 Image-SA stage 更新、checkpoint roundtrip 和峰值显存。batch48
 OOM 或 16384 仍失败时停止，不启动 formal，不自行改梯度累积。
 
-gate 通过后把两份紧凑 `report.json` 同步回本地，记录进 EXP025 RECORD；随后在两个正式配置
-中设置相同 `SOLVER.AMP.INIT_SCALE` 和 `FORMAL_READY=True`，提交、push、tag，再生成第二段
-bundle/release并按上节替换容器。
+gate 通过后把紧凑 `report.json`（与 `run_metadata.json`）同步回本地，记录进 EXP025 RECORD
+的 evidence。两个正式配置现已共享 `SOLVER.AMP.INIT_SCALE=32768` 且 `FORMAL_READY=True`；
+后续只需按上节用第二段 bundle/release 替换容器，即可进入正式训练。若某臂在最终配置下
+失败在 32768（且失败点仍只是 Mask 头），按同一口径降到 16384 并同步改两臂共享的
+`INIT_SCALE`，届时共同 scale 变为 16384。
 
 ## 正式训练
 

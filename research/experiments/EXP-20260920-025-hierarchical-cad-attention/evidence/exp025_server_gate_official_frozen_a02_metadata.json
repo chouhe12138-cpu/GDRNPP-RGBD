@@ -1,0 +1,13 @@
+{
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py",
+  "created_utc": "2026-09-20T11:18:40.123431+00:00",
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "image_build_revision": "e3e0e651eac4690fc6d2a4b8ef68f37e437ffb23",
+  "image_id": "sha256:acc1526721828b36b01ef9501556fef740546ed3a10b35ebbf2e9e301a357270",
+  "image_ref": "gdrnpp-research:torch220-cu121-sm89-e3e0e651eac4",
+  "mode": "gate",
+  "run_id": "RUN-20260920-111840-gate-s42-a01",
+  "seed": 42,
+  "source_commit": "e3e0e651eac4690fc6d2a4b8ef68f37e437ffb23",
+  "source_tree_clean": true
+}

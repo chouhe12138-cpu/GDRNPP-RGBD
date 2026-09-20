@@ -1,0 +1,64 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py",
+  "source_commit": "e3e0e651eac4690fc6d2a4b8ef68f37e437ffb23",
+  "source_tree_dirty": false,
+  "hierarchy": "/home/gdrn/.cache/gdrnpp_datasets/exp025/consistent_v3.npz",
+  "hierarchy_sha256": "02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "gate",
+  "status": "PASS",
+  "batch_source": "online",
+  "renderer": "egl",
+  "batch_size": 48,
+  "steps": 8,
+  "device": "cuda:0",
+  "amp_init_scale": 32768.0,
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 10787652
+    }
+  ],
+  "losses": [
+    {"loss_cad_t1": 2.0720510482788086, "loss_cad_t2": 4.1944403648376465, "loss_cad_t3": 6.440589904785156, "loss_cad_residual": 0.14830386638641357, "loss_cad_mask": 0.8593411445617676},
+    {"loss_cad_t1": 2.041062831878662, "loss_cad_t2": 4.09005069732666, "loss_cad_t3": 6.377707481384277, "loss_cad_residual": 0.14754468202590942, "loss_cad_mask": 1.2858490943908691},
+    {"loss_cad_t1": 1.9933079481124878, "loss_cad_t2": 3.973475933074951, "loss_cad_t3": 6.219064712524414, "loss_cad_residual": 0.14737582206726074, "loss_cad_mask": 0.8539475798606873},
+    {"loss_cad_t1": 1.954221487045288, "loss_cad_t2": 3.9144701957702637, "loss_cad_t3": 6.138463497161865, "loss_cad_residual": 0.14734676480293274, "loss_cad_mask": 0.26887834072113037},
+    {"loss_cad_t1": 1.9098823070526123, "loss_cad_t2": 3.8526666164398193, "loss_cad_t3": 6.08944845199585, "loss_cad_residual": 0.14732831716537476, "loss_cad_mask": 0.43947726488113403},
+    {"loss_cad_t1": 1.8459504842758179, "loss_cad_t2": 3.765745162963867, "loss_cad_t3": 5.994082450866699, "loss_cad_residual": 0.14732632040977478, "loss_cad_mask": 0.2832295298576355},
+    {"loss_cad_t1": 1.7996082305908203, "loss_cad_t2": 3.6893813610076904, "loss_cad_t3": 5.9037981033325195, "loss_cad_residual": 0.14733219146728516, "loss_cad_mask": 0.23672914505004883},
+    {"loss_cad_t1": 1.735713005065918, "loss_cad_t2": 3.6050221920013428, "loss_cad_t3": 5.819753170013428, "loss_cad_residual": 0.14722275733947754, "loss_cad_mask": 0.2533896863460541}
+  ],
+  "timings": [
+    {"forward_ms": 495.4899400472641, "backward_and_update_ms": 384.1665252111852},
+    {"forward_ms": 137.90213083848357, "backward_and_update_ms": 196.5094623155892},
+    {"forward_ms": 139.08355310559273, "backward_and_update_ms": 196.3002597913146},
+    {"forward_ms": 137.9980631172657, "backward_and_update_ms": 195.91725198552012},
+    {"forward_ms": 139.54043481498957, "backward_and_update_ms": 202.9394991695881},
+    {"forward_ms": 137.85644993185997, "backward_and_update_ms": 196.51577528566122},
+    {"forward_ms": 138.14813969656825, "backward_and_update_ms": 195.52852911874652},
+    {"forward_ms": 138.37883528321981, "backward_and_update_ms": 196.3241919875145}
+  ],
+  "current_step": 8,
+  "amp_skipped_steps": 0,
+  "last_good": {"step": 8, "path": "last_good.pth"},
+  "step_median_ms": 334.53762624412775,
+  "peak_allocated_gb": 13.723153408,
+  "peak_reserved_gb": 14.2606336,
+  "total_parameters": 98352068,
+  "checkpoint": "smoke_checkpoint.pth",
+  "image_stages": {
+    "total_parameters": 90,
+    "updated_parameters": 90,
+    "updates_by_stage": {"0": 18, "1": 18, "2": 28, "3": 26},
+    "finite_nonzero_gradient_by_stage": {"0": true, "1": true, "2": true, "3": true}
+  },
+  "timing_scope": "fixed batch; excludes repeated loader/render",
+  "checkpoint_roundtrip": true
+}

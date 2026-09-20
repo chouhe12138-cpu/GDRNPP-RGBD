@@ -38,7 +38,8 @@ SOLVER = dict(
     IMS_PER_BATCH=4, REFERENCE_BS=24, TOTAL_EPOCHS=160,
     CHECKPOINT_PERIOD=20, CHECKPOINT_BY_EPOCH=True, MAX_TO_KEEP=8,
     OPTIMIZER_CFG=dict(_delete_=True, type='Ranger', lr=1e-4, weight_decay=0),
-    AMP=dict(ENABLED=True), LR_SCHEDULER_NAME='flat_and_anneal',
+    # _delete_ drops the LM-O gate's INIT_SCALE: this arm's scale comes from its own gate.
+    AMP=dict(_delete_=True, ENABLED=True), LR_SCHEDULER_NAME='flat_and_anneal',
     WARMUP_RATIO=None, WARMUP_FACTOR=.001, WARMUP_ITERS=1000, WARMUP_METHOD='linear',
     ANNEAL_METHOD='cosine', ANNEAL_POINT=.72, TARGET_LR_FACTOR=0.,
     BEST_CHECKPOINT=dict(ENABLED=False))

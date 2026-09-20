@@ -19,9 +19,13 @@ def test_two_exp025_arms_are_explicit_and_matched():
     for key in ('IMS_PER_BATCH', 'REFERENCE_BS', 'TOTAL_EPOCHS'):
         assert frozen.SOLVER[key] == full.SOLVER[key]
     assert frozen.SOLVER.IMS_PER_BATCH == frozen.SOLVER.REFERENCE_BS == 48
-    assert not frozen.RESEARCH_PROTOCOL.FORMAL_READY
-    assert not full.RESEARCH_PROTOCOL.FORMAL_READY
-    assert 'INIT_SCALE' not in frozen.SOLVER.AMP and 'INIT_SCALE' not in full.SOLVER.AMP
+    assert frozen.RESEARCH_PROTOCOL.FORMAL_READY and full.RESEARCH_PROTOCOL.FORMAL_READY
+    # One server-gated scale for both arms: 65536 overflowed the mask head at step 1 on both
+    # machines, 32768 passed on both.
+    assert frozen.SOLVER.AMP.INIT_SCALE == full.SOLVER.AMP.INIT_SCALE == 32768
+    # The full-training arm adapts the ImageNet backbone at the head LR; the frozen arm has
+    # no backbone parameter group, so its multiplier is inert.
+    assert full.BACKBONE_LR_MULT == 1.
     assert '/exp025/consistent_v3.npz' in '/' + frozen.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH
 
 

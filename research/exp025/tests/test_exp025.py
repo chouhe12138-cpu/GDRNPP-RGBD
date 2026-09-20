@@ -139,8 +139,11 @@ def test_modes_and_batch_contract(train, init):
     assert cfg.MODEL.WEIGHTS == ''
     from research.run_contract import validate_research_run_config
     validate_research_run_config(cfg, mode='prepare')
-    with pytest.raises(ValueError, match='not ready'):
-        validate_research_run_config(cfg, mode='formal')
+    # The shipped arms are unlocked at the server-gated scale, so every mode combination
+    # has to satisfy the formal contract too (`test_exp025_formal_contract_is_fail_closed`
+    # covers the lock and the missing scale).
+    result = validate_research_run_config(cfg, mode='formal')
+    assert result['batch_size'] == 48 and result['evaluation_period'] == 5
 
 
 @pytest.mark.parametrize('train,init', [(False, 'official_lmo'), (True, 'imagenet')])
