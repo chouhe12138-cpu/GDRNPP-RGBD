@@ -23,12 +23,23 @@ def rng_state():
                 cuda=torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None)
 
 
+def restore_rng(state):
+    """Undo `rng_state()` so a run continues from the recorded stream."""
+    random.setstate(state['python'])
+    np.random.set_state(state['numpy'])
+    torch.set_rng_state(state['torch'])
+    if state.get('cuda') is not None and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(state['cuda'])
+
+
 def metadata(cfg):
+    from .configuration import require_consistent_v3
+    hierarchy = cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH
     return dict(experiment_id=cfg.EXPERIMENT_ID, seed=42, backbone_init=cfg.BACKBONE_INIT,
                 train_backbone=bool(cfg.TRAIN_BACKBONE), config=cfg.filename,
                 source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
                 source_tree_dirty=bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()),
-                hierarchy=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH,
+                hierarchy=hierarchy, hierarchy_sha256=require_consistent_v3(hierarchy),
                 training_kind='diagnostic', formal=False)
 
 
@@ -67,6 +78,8 @@ def head_telemetry(head, diagnostics):
     stats['t3_logits'] = tensor_stats(diagnostics['t3_logits'])
     stats['mask_logit'] = tensor_stats(diagnostics['mask_logit'])
     stats['raw_residual'] = raw_residual_stats(diagnostics['raw_residual'])
+    if 'soft_t3_context' in diagnostics:  # residual V2 conditioning
+        stats['soft_t3_context_token_norm'] = token_norm_stats(diagnostics['soft_t3_context'])
     stats['bounded_residual_norm_max'] = float(diagnostics['residual'].detach().float().norm(dim=1).max())
     stats['t3_classifier_weight_abs_max'] = float(head.t3_classifier.weight.detach().abs().max())
     return stats
@@ -96,11 +109,23 @@ def grad_norm_stats(model):
                 non_finite_parameters=bad)
 
 
-def save_last_good(path, model, optimizer, scaler, step, extra=None):
-    """Model/optimizer/scaler plus RNG so a failure can be replayed from this state."""
-    torch.save(dict(model=model.state_dict(), optimizer=optimizer.state_dict(),
-                    gradscaler=None if scaler is None else scaler.state_dict(), step=int(step),
-                    rng=rng_state(), extra=extra or {}), path)
+def save_last_good(path, model, optimizer, scaler, step, extra=None, probe=None):
+    """Model/optimizer/scaler plus RNG so a failure can be replayed from this state.
+
+    A diagnostic probe that owns parameters the model does not carry (the residual
+    probe's conditioning branch) must be saved alongside, or the state is incomplete.
+    """
+    state = dict(model=model.state_dict(), optimizer=optimizer.state_dict(),
+                 gradscaler=None if scaler is None else scaler.state_dict(), step=int(step),
+                 rng=rng_state(), extra=extra or {})
+    if probe is not None:
+        state['probe'] = probe.state_dict()
+    torch.save(state, path)
+
+
+def load_last_good(path):
+    """Read a last-good checkpoint written by `save_last_good`."""
+    return torch.load(path, map_location='cpu')
 
 
 class NonFiniteTrainingError(RuntimeError):

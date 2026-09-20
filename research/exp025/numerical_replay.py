@@ -7,26 +7,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import random
 from pathlib import Path
 
-import numpy as np
 import torch
 
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer
 from .preflight import CONFIG, read_config
 from .runtime import (NonFiniteTrainingError, amp_step, grad_norm_stats,
-                      metadata, real_batch, save_report)
+                      metadata, real_batch, restore_rng, save_report)
 
 ARMS = ('amp_current', 'amp_low_scale', 'fp32')
-
-
-def restore_rng(rng):
-    random.setstate(rng['python'])
-    np.random.set_state(rng['numpy'])
-    torch.set_rng_state(rng['torch'])
-    if rng['cuda'] is not None and torch.cuda.is_available():
-        torch.cuda.set_rng_state_all(rng['cuda'])
 
 
 def arm_report(name, cfg, args, batch, checkpoint):

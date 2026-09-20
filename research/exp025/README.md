@@ -24,7 +24,19 @@
 - residual 为 `tanh` 后投影到单位球，SmoothL1 beta=.1，权重1；可见 mask
   BCE 权重1。推理只用 `argmax(T3 logits)`，取 leaf anchor/radius 加 bounded
   residual 解码 XYZ，不使用 marginal argmax（两者的祖先可能不同）。
-- 几何 buffer 非持久化，checkpoint 之外必须保留相同 hierarchy artifact。
+- Residual V2：残差回归目标 `(XYZ-anchor_T3)/radius_T3` 依赖 T3 identity，因此预测器
+  额外读取 **预测** T3 分布——`logits → FP32 softmax → detach` 概率对投影到 64 维的 T3
+  CAD token 求期望（`[B,P,512]×[B,512,64]`），与 image token 拼接后过
+  `Linear(D+64,D)+GELU+Linear(D,3)`；最后一层权重与 bias 零初始化，初始残差恰为 0，
+  即从 T3 anchor 出发。不用 GT id、不做 top-k、train/infer 同一 forward；detach 使
+  residual loss 不反向改写已稳定的 T3 分类器（该分支只经 image token 影响它）。
+- 几何 buffer 非持久化，checkpoint 之外必须保留相同 hierarchy artifact：EXP025 固定
+  `consistent_v3.npz` SHA256 `02ce0909…1a373`，`dataset_context`/preflight/每个 report
+  都校验并记录该摘要（同一进程只 hash 一次）。
+- `BACKBONE_INIT` 只负责主干初始化；`MODEL.WEIGHTS` 只表示**完整 GDRN_CAD checkpoint**，
+  因此 fresh train 为 `""`，resume 仍走 output 目录 + `--resume`。`--eval-only`（或
+  `SAVE_RESULTS_ONLY`）在缺少完整 checkpoint（t3_classifier / residual predictor /
+  mask predictor / backbone 任一缺失）时 fail-closed，不会用随机 head 打分。
 
 ## 配置与入口
 
@@ -72,15 +84,26 @@ python -m research.exp025.accumulation_smoke --output output/diagnostics/exp025_
 - `numerical_replay` 从某个 last-good state 出发，用同一 batch 跑 A 当前 AMP /
   B 指定低 scale AMP（`--scale`）/ C FP32（`amp_step(..., scaler=None)`）三臂，报告每臂
   首个非有限步、首个坏参数与该步梯度范数；只做重放，不改 loss/结构/协议。
-- `residual_probe` 有三个诊断臂（`--arms` 可选）：`baseline_residual_only`（正式残差
-  路径）、`zero_init_residual`（最后一层零初始化的同路径对照）、`gt_t3_conditioned`
-  （image token 与 GT T3 CAD token 拼接后过 `Linear(2D,D)+GELU+Linear(D,3)`）。三臂
-  同 batch/seed/steps/lr 且 route weight 0，用于判断 residual 是否可学、以及是否缺
-  T3 conditioning；GT T3 不进入正式模型、损失或推理。
+- `residual_probe` 有两个诊断臂（`--arms` 可选）：`baseline_residual_only`（正式残差
+  路径）与 `gt_t3_conditioned`（image token 与 GT T3 CAD token 拼接后过
+  `Linear(2D,D)+GELU+Linear(D,3)`）。两臂同 batch/seed/steps/lr 且 route weight 0，
+  用于判断 residual 是否可学、以及是否缺 T3 identity 输入；GT T3 不进入正式模型、
+  损失或推理。第一轮的 `zero_init_residual` 对照已成为正式初始化（Residual V2），
+  不再是独立臂，其历史结果保留在旧报告里。conditioned 臂的 last-good 额外保存
+  `probe_state_dict`，并在跑完后重建 model+probe+optimizer 重载做 roundtrip 校验
+  （`roundtrip.status=MATCH` 表示记录指标可逐项复现）。
 - `accumulation_smoke` 覆盖正式形状（physical batch4、effective48、accumulate12）的状态机：
-  optimizer step 只在 accumulation 边界发生、scheduler 与 update 一一对应、AMP 无跳步、
-  save+resume 后与不间断训练逐张量一致。它复用 `solver_utils` 的
-  `accumulation_window_size`/`should_optimizer_step` 与 `MyCheckpointer`。
+  optimizer step 只在 accumulation 边界发生、scheduler 只在真实 update 上推进、AMP 无跳步、
+  save+resume 后与不间断训练在**无噪声计数与 LR 轨迹上逐项相等**。CUDA+AMP 同一配置两次运行
+  本就有约 1e-3 量级 run-to-run 噪声（carried SDPA backward 在 CUDA 上是 atomic），
+  因此张量差只相对同进程内测得的 noise floor 判断（阈值 3×noise floor），不做逐位相等断言；
+  硬判据是 optimizer step / scheduler epoch / LR 序列 / accumulation 边界 / scaler。
+  它复用 `solver_utils` 的 `accumulation_window_size`/`should_optimizer_step` 与
+  `MyCheckpointer`。
+- `amp_recovery_smoke` 走真实生产对象（`LightningLite(precision=16)`、precision plugin 的
+  `GradScaler`、Lite optimizer wrapper、进入 fp16 autocast 的 `_LiteModule`），从同一
+  full arm last-good 继续，逐 update 记录 scale/内部 optimizer step/scheduler epoch/参数
+  delta/是否继续；`--unguarded-scheduler` 复现修复前"skip 也推进 scheduler"的循环作对照。
 
 Optimizer 恢复边界属共享框架修复（`core/utils/my_checkpoint.py` +
 `engine.do_train`）：LightningLite wrapper 继承 `torch.optim.Optimizer.load_state_dict`，

@@ -24,7 +24,9 @@ __all__ = [
     "build_lr_scheduler",
     "build_optimizer_with_params",
     "accumulation_window_size",
+    "amp_scale",
     "get_accumulation_steps",
+    "gradscaler_skipped_step",
     "optimizer_updates_per_training",
     "should_optimizer_step",
 ]
@@ -76,6 +78,27 @@ def should_optimizer_step(
         or epoch_completed == int(iterations_per_epoch)
         or completed >= int(max_iterations)
     )
+
+
+def amp_scale(precision_plugin) -> float:
+    """The precision plugin's current GradScaler scale, or None when it has no scaler."""
+
+    scaler = getattr(precision_plugin, "scaler", None)
+    return None if scaler is None else float(scaler.get_scale())
+
+
+def gradscaler_skipped_step(scale_before, scale_after) -> bool:
+    """Whether the GradScaler refused the optimizer step it was just handed.
+
+    `GradScaler.update()` halves the scale on the update that follows a non-finite
+    gradient and never lowers it on any other path, so a decrease between the two reads
+    that sandwich `optimizer.step()` is the exact signal that the parameters were left
+    untouched.  A missing scaler (fp32) means every step is applied.
+    """
+
+    if scale_before is None or scale_after is None:
+        return False
+    return float(scale_after) < float(scale_before)
 
 
 def optimizer_updates_per_training(

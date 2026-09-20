@@ -75,19 +75,23 @@ def run_iterations(session, cfg, args, batch, start_iter, iterations, accumulate
             if not all(torch.isfinite(p.grad).all() for p in accumulated):
                 raise RuntimeError(f'Non-finite gradient at iteration {iteration}')
             before = session['optimizer'].param_groups[0]['lr']
-            if session['scaler'] is not None and session['scaler'].is_enabled():
-                scale_before = session['scaler'].get_scale()
+            steps_before = update_count(session['optimizer'])
+            scale_before = solver_utils.amp_scale(session['lite']._precision_plugin)
             session['wrapper'].step()
             session['wrapper'].zero_grad(set_to_none=True)
-            trace.append(dict(iteration=iteration, micro_step=iteration % iters_per_epoch + 1,
-                              accumulation_divisor=divisor, lr=before,
-                              total_loss=float(total.detach()),
-                              optimizer_steps=update_count(session['optimizer']),
-                              scheduler_last_epoch=session['scheduler'].last_epoch,
-                              amp_scale=None if session['scaler'] is None else session['scaler'].get_scale(),
-                              amp_scale_dropped=False if session['scaler'] is None
-                              else session['scaler'].get_scale() < scale_before))
-            session['scheduler'].step()
+            scale_after = solver_utils.amp_scale(session['lite']._precision_plugin)
+            # The engine's scheduler gate: a skipped update must not consume a tick.
+            skipped = solver_utils.gradscaler_skipped_step(scale_before, scale_after)
+            entry = dict(iteration=iteration, micro_step=iteration % iters_per_epoch + 1,
+                         accumulation_divisor=divisor, lr=before, total_loss=float(total.detach()),
+                         optimizer_steps=update_count(session['optimizer']),
+                         scheduler_last_epoch_before=session['scheduler'].last_epoch,
+                         updated=update_count(session['optimizer']) != steps_before,
+                         amp_scale=scale_after, amp_scale_dropped=skipped)
+            if not skipped:
+                session['scheduler'].step()
+            entry['scheduler_advanced'] = session['scheduler'].last_epoch > entry['scheduler_last_epoch_before']
+            trace.append(entry)
     return trace
 
 
@@ -251,8 +255,10 @@ def main():
         report['resume_matches_continuous'] = (
             report['resume_state_delta']['worst']['delta']
             <= max(3*report['run_to_run_noise_floor']['worst']['delta'], 1e-6))
+        report['scheduler_advanced_only_on_updates'] = all(
+            entry['scheduler_advanced'] == entry['updated'] for entry in reference_trace)
         for name in ('optimizer_steps_match', 'scheduler_epoch_matches', 'lr_trajectory_matches',
-                     'resume_matches_continuous'):
+                     'resume_matches_continuous', 'scheduler_advanced_only_on_updates'):
             assert report[name], (name, report[name])
         assert not report['amp_scale_dropped'], 'AMP silently lowered the scale'
         report['status'] = 'PASS'
@@ -266,7 +272,8 @@ def main():
                        'optimizer_step_boundaries', 'continuous_final', 'split_saved', 'resume_start',
                        'resumed_final', 'optimizer_steps_match', 'scheduler_epoch_matches',
                        'lr_trajectory_matches', 'amp_scale_dropped', 'resume_state_delta',
-                       'run_to_run_noise_floor', 'resume_matches_continuous') if key in report}, indent=2))
+                       'run_to_run_noise_floor', 'resume_matches_continuous',
+                       'scheduler_advanced_only_on_updates') if key in report}, indent=2))
 
 
 if __name__ == '__main__':

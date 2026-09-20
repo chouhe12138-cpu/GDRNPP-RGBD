@@ -9,9 +9,14 @@
 `engine.do_train` 训练）与非有限梯度定位；仅新增诊断工具与测试，未改模型、loss、
 层级或协议，未启动 formal。
 
+2026-09-20（收口轮）：EXP025 按收口指导包完成生产路径 AMP recovery 验证与 engine
+scheduler gate（skip 不再推进 LR 计划）、正式 Residual V2（预测 soft-T3 conditioning +
+零初始化，loss/层级/协议不变）、`BACKBONE_INIT`/`MODEL.WEIGHTS` 语义拆分与 eval
+fail-closed、consistent_v3 SHA256 固定，并修正 residual probe telemetry。未启动 formal。
+
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
-| EXP025 统一 T3 CAD attention | IMPLEMENTED / DIAGNOSED / FORMAL_NOT_STARTED | resume 边界已修复；非有限梯度定位为 AMP 缩放后 fp16 梯度上溢（scale 阈值在 16384 与 32768 之间），非 loss/结构发散 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | IMPLEMENTED / DIAGNOSED / CLOSURE_VERIFIED / FORMAL_NOT_STARTED | resume 边界已修复；非有限梯度定位为 AMP 缩放后 fp16 反向上溢（scale 阈值在 16384 与 32768 之间），非 loss/结构发散；生产路径 skip 语义已验证且 scheduler gate 已收紧；正式 residual 改为预测 soft-T3 conditioning + 零初始化（固定 batch：residual-only 200 步 0.5404→0.1238、无饱和，full 臂 route 不劣于旧实现） | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

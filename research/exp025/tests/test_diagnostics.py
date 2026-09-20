@@ -6,8 +6,10 @@ import torch
 from torch import nn
 
 from research.exp025.runtime import (NonFiniteTrainingError, amp_step, grad_norm_stats,
-                                     head_telemetry, raw_residual_stats, token_norm_stats)
-from research.exp025.residual_probe import GTT3ConditionedResidual, probe_prediction
+                                     head_telemetry, load_last_good, raw_residual_stats,
+                                     save_last_good, token_norm_stats)
+from research.exp025.residual_probe import (GTT3ConditionedResidual, load_conditioned_state,
+                                            probe_optimizer, probe_prediction)
 from core.utils import solver_utils
 
 
@@ -30,7 +32,8 @@ def test_head_telemetry_is_json_safe(head):
     values = head_telemetry(head, diagnostics)
     json.dumps(values)  # the report writer must accept it verbatim
     for key in ('image_tokens_token_norm', 'cad_tokens_token_norm', 't3_logits', 'raw_residual',
-                'bounded_residual_norm_max', 't3_classifier_weight_abs_max'):
+                'bounded_residual_norm_max', 't3_classifier_weight_abs_max',
+                'soft_t3_context_token_norm'):
         assert key in values
     assert values['bounded_residual_norm_max'] <= 1.00001
     assert set(values['raw_residual']) == {'abs_max', 'fraction_abs_gt_5', 'fraction_abs_gt_9',
@@ -114,6 +117,67 @@ def test_probe_loss_equals_the_head_residual_term(head):
     assert prediction['residual'].norm(dim=1).max() <= 1.00001
     assert torch.isfinite(probe_loss)
     assert stats['cad_valid_points'] > 0
+
+
+def test_probe_telemetry_keeps_the_true_pre_tanh_raw(head):
+    """`raw_residual` must be the predictor output, not the bounded value it is derived from."""
+    torch.manual_seed(0)
+    probe = GTT3ConditionedResidual(token_dim=16)
+    with torch.no_grad():  # saturate the tanh so raw and bounded provably differ
+        probe.net[-1].weight.fill_(20.)
+        probe.net[-1].bias.fill_(0.)
+    feature = torch.randn(2, 1024, 8, 8)
+    classes = torch.tensor([0, 0])  # one symmetry branch: telemetry is the selected branch
+    xyz, mask = torch.rand(2, 3, 64, 64), torch.ones(2, 1, 64, 64)
+    diagnostics = {}
+    probe_prediction(head, feature, classes, probe, xyz, mask, diagnostics)
+    raw = diagnostics['raw_residual']
+    assert raw.shape == (2, 3, 64, 64)
+    assert raw.abs().max() > 1.0  # a bounded value could never leave the unit ball
+    assert not torch.allclose(raw, diagnostics['residual'])
+    assert diagnostics['residual'].norm(dim=1).max() <= 1.00001
+    # The telemetry the runner reduces is the raw one, so saturation is visible again.
+    stats = raw_residual_stats(raw)
+    assert stats['abs_max'] > 1.0 and stats['tanh_exact_saturation'] > 0
+
+
+def test_probe_last_good_roundtrips_model_probe_and_optimizer(head, tmp_path):
+    """A conditioned checkpoint is only complete if the probe reloads with it."""
+    torch.manual_seed(0)
+    model = nn.Module()
+    model.cad_attention_head = head
+    feature = torch.randn(2, 1024, 8, 8)
+    classes = torch.tensor([0, 0])
+    xyz, mask = torch.rand(2, 3, 64, 64), torch.ones(2, 1, 64, 64)
+    optimizer_cfg = dict(lr=3e-4, weight_decay=.05, betas=(.9, .999), eps=1e-8)
+
+    probe = GTT3ConditionedResidual(16)
+    optimizer = probe_optimizer(model, probe, optimizer_cfg)
+    _, loss = probe_prediction(head, feature, classes, probe, xyz, mask)
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
+    # The checkpoint holds the post-step parameters, so the metric to reproduce is the
+    # one measured after the update.
+    _, reference_loss = probe_prediction(head, feature, classes, probe, xyz, mask)
+    path = tmp_path / 'gt_t3_conditioned_last_good.pth'
+    save_last_good(path, model, optimizer, None, 7, dict(arm='gt_t3_conditioned'), probe=probe)
+
+    state = load_last_good(path)
+    assert state['step'] == 7 and state['extra']['arm'] == 'gt_t3_conditioned'
+    rebuilt = GTT3ConditionedResidual(16)
+    rebuilt_optimizer = probe_optimizer(model, rebuilt, optimizer_cfg)
+    with pytest.raises(ValueError, match='no probe state'):
+        load_conditioned_state({key: value for key, value in state.items() if key != 'probe'},
+                               model, rebuilt, rebuilt_optimizer)
+    load_conditioned_state(state, model, rebuilt, rebuilt_optimizer)
+    for name, parameter in probe.state_dict().items():
+        assert torch.equal(rebuilt.state_dict()[name], parameter)
+    # Training metrics must reproduce, not merely the tensors: one more forward on the
+    # same input has to give the same loss.
+    _, replay_loss = probe_prediction(head, feature, classes, rebuilt, xyz, mask)
+    assert torch.equal(replay_loss, reference_loss)
+    assert rebuilt_optimizer.state_dict()['state'].keys() == optimizer.state_dict()['state'].keys()
 
 
 def test_probe_conditioning_uses_the_selected_t3_token():

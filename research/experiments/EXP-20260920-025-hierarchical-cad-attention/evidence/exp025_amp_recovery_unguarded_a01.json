@@ -1,0 +1,515 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "c0facbdde8f57571d647b690b19e7c793a2a1c09",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_amp_recovery_unguarded_a01",
+  "status": "PASS",
+  "steps": 20,
+  "batch_size": 4,
+  "source_batch": ".local/exp025/fixed_batch4_a01.pt",
+  "from_checkpoint": "output/diagnostics/exp025_fixed200_a02/full_last_good.pth",
+  "precision": 16,
+  "accumulation": 1,
+  "scheduler": "advanced unconditionally (pre-fix control)",
+  "interpretation": "production-path AMP recovery probe, not a performance result",
+  "start_step": 160,
+  "amp_scale": 65536.0,
+  "forward_precision": {
+    "autocast": true,
+    "input_dtype": "torch.float16"
+  },
+  "updates": [
+    {
+      "iteration": 160,
+      "total_loss": 0.21518731117248535,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0003,
+      "scale_before": 65536.0,
+      "scale_after": 65536.0,
+      "optimizer_step_before": [
+        160
+      ],
+      "optimizer_step_after": [
+        161
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 0,
+      "parameter_delta": 0.00029414519667625427,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 1,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 161,
+      "total_loss": 0.2124674916267395,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0002999204912402403,
+      "scale_before": 65536.0,
+      "scale_after": 65536.0,
+      "optimizer_step_before": [
+        161
+      ],
+      "optimizer_step_after": [
+        162
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 1,
+      "parameter_delta": 0.00026727974181994796,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 2,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 162,
+      "total_loss": 0.2253665179014206,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.00029714661413987966,
+      "scale_before": 65536.0,
+      "scale_after": 65536.0,
+      "optimizer_step_before": [
+        162
+      ],
+      "optimizer_step_after": [
+        163
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 2,
+      "parameter_delta": 0.00033611757680773735,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 3,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 163,
+      "total_loss": 0.27922818064689636,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0002904820301234628,
+      "scale_before": 65536.0,
+      "scale_after": 65536.0,
+      "optimizer_step_before": [
+        163
+      ],
+      "optimizer_step_after": [
+        164
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 3,
+      "parameter_delta": 0.00037299428367987275,
+      "changed_parameter": "_module.cad_attention_head.decoder.2.block.3.weight",
+      "scheduler_last_epoch_after": 4,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 164,
+      "total_loss": 0.3881862163543701,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0002801047724619891,
+      "scale_before": 65536.0,
+      "scale_after": 65536.0,
+      "optimizer_step_before": [
+        164
+      ],
+      "optimizer_step_after": [
+        165
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 4,
+      "parameter_delta": 0.00044178497046232224,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 5,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 165,
+      "total_loss": 0.5504971742630005,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0002662920523243664,
+      "scale_before": 65536.0,
+      "scale_after": 65536.0,
+      "optimizer_step_before": [
+        165
+      ],
+      "optimizer_step_after": [
+        166
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 5,
+      "parameter_delta": 0.0004624552093446255,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 6,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 166,
+      "total_loss": 1.1286317110061646,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0002494128535423602,
+      "scale_before": 65536.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        166
+      ],
+      "optimizer_step_after": [
+        166
+      ],
+      "updated": false,
+      "scheduler_last_epoch_before": 6,
+      "parameter_delta": 0.0,
+      "changed_parameter": null,
+      "scheduler_last_epoch_after": 7,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 167,
+      "total_loss": 1.1286317110061646,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.00022991807582157964,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        166
+      ],
+      "optimizer_step_after": [
+        167
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 7,
+      "parameter_delta": 0.0004462413489818573,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 8,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 168,
+      "total_loss": 1.2221341133117676,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.00020832848970621582,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        167
+      ],
+      "optimizer_step_after": [
+        168
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 8,
+      "parameter_delta": 0.00040391460061073303,
+      "changed_parameter": "_module.cad_attention_head.image_attention.1.qkv.weight",
+      "scheduler_last_epoch_after": 9,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 169,
+      "total_loss": 0.8910355567932129,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0001852208250606044,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        168
+      ],
+      "optimizer_step_after": [
+        169
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 9,
+      "parameter_delta": 0.00036548543721437454,
+      "changed_parameter": "_module.cad_attention_head.cross_attention.1.attention.in_proj_weight",
+      "scheduler_last_epoch_after": 10,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 170,
+      "total_loss": 0.7533672451972961,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.0001612123646906763,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        169
+      ],
+      "optimizer_step_after": [
+        170
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 10,
+      "parameter_delta": 0.00034247059375047684,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 11,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 171,
+      "total_loss": 0.6658530235290527,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.00013694445466106025,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        170
+      ],
+      "optimizer_step_after": [
+        171
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 11,
+      "parameter_delta": 0.00030145421624183655,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 12,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 172,
+      "total_loss": 0.6028223037719727,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 0.00011306537180227564,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        171
+      ],
+      "optimizer_step_after": [
+        172
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 12,
+      "parameter_delta": 0.0002529378980398178,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 13,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 173,
+      "total_loss": 0.5193683505058289,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 9.021300607404738e-05,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        172
+      ],
+      "optimizer_step_after": [
+        173
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 13,
+      "parameter_delta": 0.00019668042659759521,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 14,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 174,
+      "total_loss": 0.46087661385536194,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 6.899782039658911e-05,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        173
+      ],
+      "optimizer_step_after": [
+        174
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 14,
+      "parameter_delta": 0.00014769285917282104,
+      "changed_parameter": "_module.cad_attention_head.image_attention.0.qkv.weight",
+      "scheduler_last_epoch_after": 15,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 175,
+      "total_loss": 0.42608293890953064,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 4.99865431496036e-05,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        174
+      ],
+      "optimizer_step_after": [
+        175
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 15,
+      "parameter_delta": 0.00010745041072368622,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 16,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 176,
+      "total_loss": 0.40136921405792236,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 3.368702896675159e-05,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        175
+      ],
+      "optimizer_step_after": [
+        176
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 16,
+      "parameter_delta": 7.539428770542145e-05,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 17,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 177,
+      "total_loss": 0.38016608357429504,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 2.053469224426929e-05,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        176
+      ],
+      "optimizer_step_after": [
+        177
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 17,
+      "parameter_delta": 4.710257053375244e-05,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 18,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 178,
+      "total_loss": 0.36478331685066223,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 1.0880875769976821e-05,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        177
+      ],
+      "optimizer_step_after": [
+        178
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 18,
+      "parameter_delta": 2.5296583771705627e-05,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 19,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 179,
+      "total_loss": 0.3552422523498535,
+      "loss_finite": true,
+      "accumulation_divisor": 1,
+      "lr_before": 4.983465185395471e-06,
+      "scale_before": 32768.0,
+      "scale_after": 32768.0,
+      "optimizer_step_before": [
+        178
+      ],
+      "optimizer_step_after": [
+        179
+      ],
+      "updated": true,
+      "scheduler_last_epoch_before": 19,
+      "parameter_delta": 1.165829598903656e-05,
+      "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+      "scheduler_last_epoch_after": 20,
+      "scheduler_advanced": true
+    }
+  ],
+  "final": {
+    "optimizer_steps": [
+      179
+    ],
+    "scheduler_last_epoch": 20,
+    "amp_scale": 32768.0
+  },
+  "overflow_steps": [
+    166
+  ],
+  "scheduler_mismatch_steps": [
+    166
+  ],
+  "overflow_observed": true,
+  "skip_event": {
+    "iteration": 166,
+    "total_loss": 1.1286317110061646,
+    "loss_finite": true,
+    "accumulation_divisor": 1,
+    "lr_before": 0.0002494128535423602,
+    "scale_before": 65536.0,
+    "scale_after": 32768.0,
+    "optimizer_step_before": [
+      166
+    ],
+    "optimizer_step_after": [
+      166
+    ],
+    "updated": false,
+    "scheduler_last_epoch_before": 6,
+    "parameter_delta": 0.0,
+    "changed_parameter": null,
+    "scheduler_last_epoch_after": 7,
+    "scheduler_advanced": true
+  },
+  "skip_scale_dropped": true,
+  "skip_left_parameters_untouched": true,
+  "skip_left_optimizer_counter": true,
+  "process_continued": true,
+  "recovery": {
+    "iteration": 167,
+    "total_loss": 1.1286317110061646,
+    "loss_finite": true,
+    "accumulation_divisor": 1,
+    "lr_before": 0.00022991807582157964,
+    "scale_before": 32768.0,
+    "scale_after": 32768.0,
+    "optimizer_step_before": [
+      166
+    ],
+    "optimizer_step_after": [
+      167
+    ],
+    "updated": true,
+    "scheduler_last_epoch_before": 7,
+    "parameter_delta": 0.0004462413489818573,
+    "changed_parameter": "_module.cad_attention_head.t3_classifier.weight",
+    "scheduler_last_epoch_after": 8,
+    "scheduler_advanced": true
+  },
+  "recovered_after_skip": true,
+  "scheduler_gate_holds": false,
+  "control_scheduler_mismatch": [
+    166
+  ]
+}

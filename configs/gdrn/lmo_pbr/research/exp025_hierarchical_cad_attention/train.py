@@ -19,7 +19,8 @@ MODEL['POSE_NET'].update(dict(
     CAD_ATTENTION_HEAD=dict(ENABLED=True, HIERARCHY_PATH=os.path.join(
         os.environ.get('GDRN_DATASET_CACHE_DIR', '.local/dataset_cache'), 'exp022', 'consistent_v3.npz'),
         INIT_CFG=dict(token_dim=256, num_heads=8, route_weight=1., residual_weight=1.,
-                      mask_weight=1., residual_beta=.1)),
+                      mask_weight=1., residual_beta=.1, residual_context_dim=64,
+                      residual_detach_route=True)),
     LOSS_CFG=dict(MASK_LOSS_TYPE='BCE')))
 DATALOADER = dict(NUM_WORKERS=16)
 SOLVER = dict(IMS_PER_BATCH=4, REFERENCE_BS=48, TOTAL_EPOCHS=40, MAX_TO_KEEP=10,

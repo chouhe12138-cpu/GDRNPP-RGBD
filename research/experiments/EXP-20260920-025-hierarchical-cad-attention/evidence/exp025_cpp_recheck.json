@@ -1,0 +1,132 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "c0facbdde8f57571d647b690b19e7c793a2a1c09",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "hierarchy_sha256": "02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_cpp_RECHECK",
+  "status": "PASS",
+  "batch_source": "online",
+  "renderer": "cpp",
+  "batch_size": 4,
+  "steps": 8,
+  "device": "cuda:0",
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 8217796
+    }
+  ],
+  "losses": [
+    {
+      "loss_cad_t1": 2.070434808731079,
+      "loss_cad_t2": 4.156582832336426,
+      "loss_cad_t3": 6.407712936401367,
+      "loss_cad_residual": 0.15346482396125793,
+      "loss_cad_mask": 0.629355251789093
+    },
+    {
+      "loss_cad_t1": 2.0068089962005615,
+      "loss_cad_t2": 3.94755220413208,
+      "loss_cad_t3": 6.136388778686523,
+      "loss_cad_residual": 0.15235736966133118,
+      "loss_cad_mask": 1.4137139320373535
+    },
+    {
+      "loss_cad_t1": 1.9220845699310303,
+      "loss_cad_t2": 3.710216522216797,
+      "loss_cad_t3": 5.842320919036865,
+      "loss_cad_residual": 0.15151667594909668,
+      "loss_cad_mask": 0.7405110001564026
+    },
+    {
+      "loss_cad_t1": 1.8311333656311035,
+      "loss_cad_t2": 3.542618751525879,
+      "loss_cad_t3": 5.72968864440918,
+      "loss_cad_residual": 0.15114909410476685,
+      "loss_cad_mask": 0.20459426939487457
+    },
+    {
+      "loss_cad_t1": 1.705951452255249,
+      "loss_cad_t2": 3.3457858562469482,
+      "loss_cad_t3": 5.596999168395996,
+      "loss_cad_residual": 0.15090490877628326,
+      "loss_cad_mask": 0.33398258686065674
+    },
+    {
+      "loss_cad_t1": 1.5556395053863525,
+      "loss_cad_t2": 3.1328911781311035,
+      "loss_cad_t3": 5.443046569824219,
+      "loss_cad_residual": 0.15065161883831024,
+      "loss_cad_mask": 0.25703272223472595
+    },
+    {
+      "loss_cad_t1": 1.3980627059936523,
+      "loss_cad_t2": 2.9325110912323,
+      "loss_cad_t3": 5.310708999633789,
+      "loss_cad_residual": 0.1502407342195511,
+      "loss_cad_mask": 0.1816766858100891
+    },
+    {
+      "loss_cad_t1": 1.269840121269226,
+      "loss_cad_t2": 2.7496023178100586,
+      "loss_cad_t3": 5.17478084564209,
+      "loss_cad_residual": 0.14974375069141388,
+      "loss_cad_mask": 0.1810421198606491
+    }
+  ],
+  "timings": [
+    {
+      "forward_ms": 853.1915419989673,
+      "backward_and_update_ms": 334.96156700130086
+    },
+    {
+      "forward_ms": 61.204752999401535,
+      "backward_and_update_ms": 110.16837600072904
+    },
+    {
+      "forward_ms": 52.13612099942111,
+      "backward_and_update_ms": 102.90206000172475
+    },
+    {
+      "forward_ms": 53.013159000329324,
+      "backward_and_update_ms": 109.56703000010748
+    },
+    {
+      "forward_ms": 51.42417900060536,
+      "backward_and_update_ms": 104.34120899844856
+    },
+    {
+      "forward_ms": 47.717714000100386,
+      "backward_and_update_ms": 98.845947000882
+    },
+    {
+      "forward_ms": 47.134354999798234,
+      "backward_and_update_ms": 102.66484400017362
+    },
+    {
+      "forward_ms": 41.72027400090883,
+      "backward_and_update_ms": 104.19654299948888
+    }
+  ],
+  "current_step": 8,
+  "amp_skipped_steps": 0,
+  "last_good": {
+    "step": 8,
+    "path": "last_good.pth"
+  },
+  "step_median_ms": 152.41869000055885,
+  "peak_allocated_gb": 1.5234432,
+  "peak_reserved_gb": 1.7825792,
+  "total_parameters": 95782212,
+  "checkpoint": "smoke_checkpoint.pth",
+  "timing_scope": "fixed batch; excludes repeated loader/render",
+  "checkpoint_roundtrip": true
+}

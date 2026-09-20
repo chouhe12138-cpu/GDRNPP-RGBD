@@ -82,15 +82,21 @@ def main():
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--last-good-period', type=int, default=20,
                         help='steps between last-good checkpoints used for matched replay')
+    parser.add_argument('--amp-scale', type=float, default=65536.,
+                        help='initial GradScaler scale; the recorded sweep fails above 32768')
+    parser.add_argument('--arms', default='residual_only,full')
     args = parser.parse_args()
-    if args.steps < 1 or args.batch_size < 1 or args.last_good_period < 1:
-        parser.error('Require positive steps/batch size/last-good period')
+    weights = dict(residual_only=0., full=1.)
+    arms = tuple((name, weights[name]) for name in args.arms.split(',') if name in weights)
+    if len(arms) != len(set(args.arms.split(','))) or args.steps < 1 or args.batch_size < 1 \
+            or args.last_good_period < 1 or args.amp_scale < 1:
+        parser.error(f'Require positive steps/batch size/last-good period/amp scale and arms within {tuple(weights)}')
     args.output.mkdir(parents=True, exist_ok=False)
     cfg = read_config(args.config, False, 'official_lmo')
     cfg.MODEL.DEVICE = args.device
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING', steps=args.steps,
                   batch_size=args.batch_size, source_batch=str(args.load_batch), arms={},
-                  last_good_period=args.last_good_period,
+                  last_good_period=args.last_good_period, amp_init_scale=args.amp_scale,
                   schedule='constant 3e-4, no formal warmup', interpretation='fixed-batch diagnostic, not generalization')
     save_report(args.output, report)
     try:
@@ -98,10 +104,10 @@ def main():
             raise RuntimeError('BLOCKED: P2 requires CUDA')
         torch.set_num_threads(4)
         batch = real_batch(cfg, args.device, args.batch_size, 'cpp', load_batch=args.load_batch)
-        for name, weight in (('residual_only', 0.), ('full', 1.)):
+        for name, weight in arms:
             seed_all(42)
             model, optimizer = build_model_optimizer(cfg)
-            scaler = torch.cuda.amp.GradScaler()
+            scaler = torch.cuda.amp.GradScaler(init_scale=args.amp_scale)
             history = [dict(step=0, **measure(model, batch, weight))]
             report['arms'][name] = history
             last_good = args.output / f'{name}_last_good.pth'
@@ -122,7 +128,8 @@ def main():
                     save_last_good(last_good, model, optimizer, scaler, step, dict(arm=name, route_weight=weight))
                     report['arms'][name + '_last_good'] = dict(step=step, path=last_good.name)
                 if step % 20 == 0 or step == args.steps:
-                    history.append(dict(step=step, **measure(model, batch, weight)))
+                    history.append(dict(step=step, amp_scale=float(scaler.get_scale()),
+                                        **measure(model, batch, weight)))
                     save_report(args.output, report)
                     print(json.dumps(dict(arm=name, **history[-1])), flush=True)
             torch.save(dict(model=model.state_dict(), optimizer=optimizer.state_dict(), iteration=args.steps-1),

@@ -492,12 +492,20 @@ class GDRN_Lite(LightningLite):
                         for param in model.parameters():
                             if param.grad is not None:
                                 nan_to_num(param.grad, nan=0, posinf=1e5, neginf=-1e5, out=param.grad)
+                    # The scaler halves its scale exactly when it refuses the step, so
+                    # the two reads around `optimizer.step()` say whether this iteration
+                    # reached the parameters.  A skipped step must not consume an LR
+                    # schedule tick: the schedule is indexed by real updates.
+                    amp_scale_before = solver_utils.amp_scale(self._precision_plugin)
                     optimizer.step()
                     optimizer.zero_grad(set_to_none=True)
                     if ema is not None:
                         ema.update(model)
                     storage.put_scalar("lr", state_optimizer.param_groups[0]["lr"], smoothing_hint=False)
-                    scheduler.step()
+                    if not solver_utils.gradscaler_skipped_step(
+                        amp_scale_before, solver_utils.amp_scale(self._precision_plugin)
+                    ):
+                        scheduler.step()
                 if self.is_global_zero:
                     log_first_n(logging.INFO, "iteration {} backward finished.".format(iteration), n=2)
 

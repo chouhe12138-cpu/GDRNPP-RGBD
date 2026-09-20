@@ -45,10 +45,54 @@ def masked_mean(values, valid):
     return torch.where(valid, values, torch.zeros_like(values)).sum(-1) / valid.sum(-1).clamp_min(1)
 
 
+class SoftT3ResidualPredictor(nn.Module):
+    """Bounded residual read off the predicted T3 distribution and the image token.
+
+    The regression target `(XYZ - anchor_T3) / radius_T3` only means something once the
+    T3 node is known, so the predictor receives the classifier's own belief about it:
+    the soft expectation of the T3 CAD tokens under the (FP32, detached) T3
+    probability.  Detaching keeps this a conditioning input -- the residual loss cannot
+    rewrite the T3 distribution it is conditioned on.  No ground-truth id, no top-k.
+    """
+
+    def __init__(self, token_dim=256, context_dim=64, detach_route=True, num_classes=512):
+        super().__init__()
+        self.num_classes, self.context_dim = int(num_classes), int(context_dim)
+        self.detach_route = bool(detach_route)
+        self.context_projection = nn.Linear(token_dim, context_dim)
+        self.fuse = nn.Linear(token_dim + context_dim, token_dim)
+        self.final = nn.Linear(token_dim, 3)
+        # Initial residual is exactly zero: decoding starts from the T3 anchor instead of
+        # a random offset, which is what keeps the predictor out of tanh saturation.
+        nn.init.zeros_(self.final.weight)
+        nn.init.zeros_(self.final.bias)
+
+    def context(self, t3_tokens, t3_logits_tokens):
+        """Expected T3 CAD token under the predicted distribution, plus that distribution."""
+        if t3_logits_tokens.shape[-1] != self.num_classes or t3_tokens.shape[1] != self.num_classes:
+            raise ValueError(f'EXP025 residual V2 requires {self.num_classes} T3 classes')
+        # FP32: the expectation is a weighted sum of 512 entries, and it must stay exact
+        # under AMP.  `t3_tokens` is [B,512,D], the logits are [B,P,512].
+        with torch.autocast(device_type=t3_logits_tokens.device.type, enabled=False):
+            probabilities = F.softmax(t3_logits_tokens.float(), dim=-1)
+            if self.detach_route:
+                probabilities = probabilities.detach()
+            projected = self.context_projection(t3_tokens.float())
+            context = torch.bmm(probabilities, projected)
+        return context, probabilities
+
+    def forward(self, image_tokens, t3_tokens, t3_logits_tokens):
+        context, probabilities = self.context(t3_tokens, t3_logits_tokens)
+        fused = torch.cat((image_tokens, context.to(image_tokens.dtype)), dim=-1)
+        raw = self.final(F.gelu(self.fuse(fused)))
+        return raw, context, probabilities
+
+
 class HierarchicalCADAttentionHead(nn.Module):
     def __init__(self, hierarchy_path, token_dim=256, num_heads=8,
                  expected_object_ids=None, dataset_key='lmo', route_weight=1.,
-                 residual_weight=1., mask_weight=1., residual_beta=.1):
+                 residual_weight=1., mask_weight=1., residual_beta=.1,
+                 residual_context_dim=64, residual_detach_route=True):
         super().__init__()
         hierarchy = load_cad_hierarchy(hierarchy_path, expected_object_ids=expected_object_ids,
                                        dataset_key=dataset_key)
@@ -72,7 +116,8 @@ class HierarchicalCADAttentionHead(nn.Module):
                                             WindowAttentionBlock(token_dim, num_heads, shift=4))
         self.cross_attention = nn.ModuleList(AttentionBlock(token_dim, num_heads) for _ in range(4))
         self.t3_classifier = nn.Linear(token_dim, 512)
-        self.residual_predictor = nn.Linear(token_dim, 3)
+        self.residual_predictor = SoftT3ResidualPredictor(token_dim, residual_context_dim,
+                                                          residual_detach_route)
         self.mask_predictor = nn.Linear(token_dim, 1)
 
     def token_banks(self, classes):
@@ -106,8 +151,10 @@ class HierarchicalCADAttentionHead(nn.Module):
         tokens, banks = self.encode(feature, classes)
         b = len(feature)
         dense = lambda x: x.transpose(1, 2).reshape(b, -1, 64, 64)
-        raw = dense(self.residual_predictor(tokens))
-        prediction = dict(t3_logits=dense(self.t3_classifier(tokens)),
+        t3_logits_tokens = self.t3_classifier(tokens)
+        raw_tokens, context, probabilities = self.residual_predictor(tokens, banks[3], t3_logits_tokens)
+        raw = dense(raw_tokens)
+        prediction = dict(t3_logits=dense(t3_logits_tokens),
                           residual=bounded_residual(raw),
                           mask_logit=dense(self.mask_predictor(tokens)))
         if diagnostics is not None:
@@ -115,7 +162,8 @@ class HierarchicalCADAttentionHead(nn.Module):
             diagnostics.update(image_tokens=tokens.detach(), cad_tokens=banks[3].detach(),
                                t3_logits=prediction['t3_logits'].detach(),
                                mask_logit=prediction['mask_logit'].detach(),
-                               raw_residual=raw.detach(), residual=prediction['residual'].detach())
+                               raw_residual=raw.detach(), residual=prediction['residual'].detach(),
+                               soft_t3_context=context.detach(), t3_probabilities=probabilities.detach())
         return prediction
 
     def decode(self, prediction, classes, ids=None):

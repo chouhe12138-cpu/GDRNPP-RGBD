@@ -17,7 +17,41 @@ from research.exp022.dataset_context import resolve_dataset_context
 
 def dataset_context(cfg):
     # Explicit path extension; the shared resolver's legacy default is unchanged.
-    return resolve_dataset_context(cfg, hierarchy_path=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)
+    context = resolve_dataset_context(
+        cfg, hierarchy_path=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)
+    # Every EXP025 entry point resolves the dataset, so the artifact identity is checked
+    # here: nothing downstream can train or score against a different hierarchy.
+    from research.exp025.configuration import require_consistent_v3
+    require_consistent_v3(context.hierarchy_path)
+    return context
+
+
+EXP025_CHECKPOINT_TENSORS = ('cad_attention_head.t3_classifier.weight',
+                             'cad_attention_head.residual_predictor.final.weight',
+                             'cad_attention_head.mask_predictor.weight')
+
+
+def require_full_checkpoint(weights):
+    """Reject anything that cannot restore every EXP025 component.
+
+    The hierarchy buffers are non-persistent and the head is built from random
+    initialization, so an evaluation pointed at a legacy backbone-only checkpoint would
+    score a random head without reporting anything unusual.  Fail instead.
+    """
+    path = str(weights or '')
+    if not path:
+        raise ValueError('EXP025 requires a complete GDRN_CAD checkpoint in MODEL.WEIGHTS, got an empty path')
+    if not Path(path).is_file():
+        raise FileNotFoundError(f'EXP025 checkpoint not found: {path}')
+    state = torch.load(path, map_location='cpu')
+    state = state.get('model', state.get('state_dict', state))
+    keys = {key[len('_module.'):] if key.startswith('_module.') else key for key in state}
+    missing = [name for name in EXP025_CHECKPOINT_TENSORS if name not in keys]
+    if not any(key.startswith('backbone.') for key in keys):
+        missing.append('backbone.*')
+    if missing:
+        raise ValueError(f'{path} is not a complete EXP025 checkpoint; missing {missing}')
+    return path
 
 
 def load_official_backbone(model, path):
@@ -76,6 +110,10 @@ def build_model_optimizer(cfg, is_test=False):
     net = cfg.MODEL.POSE_NET
     if net.NAME != 'GDRN_CAD' or cfg.INPUT.WITH_DEPTH or not net.CAD_ATTENTION_HEAD.ENABLED:
         raise ValueError('EXP025 requires RGB GDRN_CAD')
+    if is_test or bool(cfg.TEST.get('SAVE_RESULTS_ONLY', False)):
+        # Evaluation is the one path that never trains the head: it must be told where a
+        # complete checkpoint is, and fail before anything is scored.
+        require_full_checkpoint(cfg.MODEL.WEIGHTS)
     if bool(net.BACKBONE.FREEZE) == bool(cfg.TRAIN_BACKBONE):
         raise ValueError('Backbone controls disagree; edit train.py or use the tool mode override')
     context = dataset_context(cfg)

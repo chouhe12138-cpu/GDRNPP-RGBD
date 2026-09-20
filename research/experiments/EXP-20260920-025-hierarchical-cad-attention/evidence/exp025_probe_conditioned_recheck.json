@@ -1,0 +1,627 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "c0facbdde8f57571d647b690b19e7c793a2a1c09",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_probe_conditioned_RECHECK",
+  "status": "COMPLETE",
+  "steps": 200,
+  "batch_size": 4,
+  "source_batch": ".local/exp025/fixed_batch4_a01.pt",
+  "arms": {
+    "gt_t3_conditioned": {
+      "arm": "gt_t3_conditioned",
+      "steps": [
+        {
+          "step": 0,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.2194955050945282,
+          "loss_cad_mask": 0.5308449268341064,
+          "cad_route_sum": 12.63473129272461,
+          "cad_symmetry_branch": 0.25,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.1091172844171524,
+          "t1_nll": 2.070434808731079,
+          "t2_marginal_accuracy": 0.014767698012292385,
+          "t2_nll": 4.156582832336426,
+          "t3_marginal_accuracy": 0.0007950981962494552,
+          "t3_nll": 6.407712936401367,
+          "predicted_t3_ancestor_t1_accuracy": 0.12627051770687103,
+          "predicted_t3_ancestor_t2_accuracy": 0.01744743064045906,
+          "gt_path_xyz_error_mm": 7.943696975708008,
+          "predicted_path_xyz_error_mm": 83.35749053955078,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 15.962579727172852,
+            "p95": 17.880538940429688,
+            "max": 23.345273971557617
+          },
+          "cad_tokens_token_norm": {
+            "mean": 19.941076278686523,
+            "p95": 20.816909790039062,
+            "max": 21.632282257080078
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.45153799653053284,
+            "abs_max": 2.806640625
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 0.7725905179977417,
+            "abs_max": 1.712890625
+          },
+          "raw_residual": {
+            "abs_max": 0.830078125,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.7681367993354797,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 20,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.2071276754140854,
+          "loss_cad_mask": 0.04973296821117401,
+          "cad_route_sum": 12.822086334228516,
+          "cad_symmetry_branch": 0.25,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.16069048643112183,
+          "t1_nll": 2.056640863418579,
+          "t2_marginal_accuracy": 0.024975290521979332,
+          "t2_nll": 4.172801971435547,
+          "t3_marginal_accuracy": 0.0031968620605766773,
+          "t3_nll": 6.592642784118652,
+          "predicted_t3_ancestor_t1_accuracy": 0.1358041614294052,
+          "predicted_t3_ancestor_t2_accuracy": 0.020376605913043022,
+          "gt_path_xyz_error_mm": 7.800642013549805,
+          "predicted_path_xyz_error_mm": 65.19642639160156,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 24.07354736328125,
+            "p95": 25.991775512695312,
+            "max": 36.737342834472656
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.6140079498291,
+            "p95": 21.986852645874023,
+            "max": 22.72827911376953
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.673391580581665,
+            "abs_max": 4.98046875
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 6.994976043701172,
+            "abs_max": 9.3203125
+          },
+          "raw_residual": {
+            "abs_max": 1.185546875,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.8744871616363525,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 40,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.1292458027601242,
+          "loss_cad_mask": 0.025098029524087906,
+          "cad_route_sum": 13.272082328796387,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.1043967604637146,
+          "t1_nll": 2.121340751647949,
+          "t2_marginal_accuracy": 0.0036261079367250204,
+          "t2_nll": 4.311558246612549,
+          "t3_marginal_accuracy": 0.00040290088509209454,
+          "t3_nll": 6.839183807373047,
+          "predicted_t3_ancestor_t1_accuracy": 0.10355959087610245,
+          "predicted_t3_ancestor_t2_accuracy": 0.0036261079367250204,
+          "gt_path_xyz_error_mm": 5.147173881530762,
+          "predicted_path_xyz_error_mm": 75.59626770019531,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 27.997283935546875,
+            "p95": 34.10498809814453,
+            "max": 44.20558547973633
+          },
+          "cad_tokens_token_norm": {
+            "mean": 21.98914337158203,
+            "p95": 23.41904640197754,
+            "max": 24.178146362304688
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.7779704332351685,
+            "abs_max": 5.31640625
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 8.973365783691406,
+            "abs_max": 11.1015625
+          },
+          "raw_residual": {
+            "abs_max": 0.56103515625,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.5671795606613159,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 60,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.1183541864156723,
+          "loss_cad_mask": 0.014830921776592731,
+          "cad_route_sum": 13.428417205810547,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.10719974339008331,
+          "t1_nll": 2.1350936889648438,
+          "t2_marginal_accuracy": 0.007191940676420927,
+          "t2_nll": 4.354040145874023,
+          "t3_marginal_accuracy": 0.0008110641501843929,
+          "t3_nll": 6.939283847808838,
+          "predicted_t3_ancestor_t1_accuracy": 0.07639333605766296,
+          "predicted_t3_ancestor_t2_accuracy": 0.009335131384432316,
+          "gt_path_xyz_error_mm": 4.786551475524902,
+          "predicted_path_xyz_error_mm": 85.9599380493164,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 29.69198226928711,
+            "p95": 36.78755187988281,
+            "max": 47.30587387084961
+          },
+          "cad_tokens_token_norm": {
+            "mean": 21.929067611694336,
+            "p95": 23.106937408447266,
+            "max": 24.151351928710938
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.8235228657722473,
+            "abs_max": 6.15234375
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 10.486384391784668,
+            "abs_max": 13.359375
+          },
+          "raw_residual": {
+            "abs_max": 0.67236328125,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.7015572786331177,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 80,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.10923337936401367,
+          "loss_cad_mask": 0.012758588418364525,
+          "cad_route_sum": 13.281574249267578,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.11449480801820755,
+          "t1_nll": 2.1235690116882324,
+          "t2_marginal_accuracy": 0.008948017843067646,
+          "t2_nll": 4.311896324157715,
+          "t3_marginal_accuracy": 0.001012514578178525,
+          "t3_nll": 6.8461079597473145,
+          "predicted_t3_ancestor_t1_accuracy": 0.08795282244682312,
+          "predicted_t3_ancestor_t2_accuracy": 0.011564241722226143,
+          "gt_path_xyz_error_mm": 4.497963905334473,
+          "predicted_path_xyz_error_mm": 86.21565246582031,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 28.287601470947266,
+            "p95": 34.78424835205078,
+            "max": 45.08665466308594
+          },
+          "cad_tokens_token_norm": {
+            "mean": 21.12747573852539,
+            "p95": 22.32779312133789,
+            "max": 23.26329231262207
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.7906105518341064,
+            "abs_max": 5.84765625
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 9.965752601623535,
+            "abs_max": 13.1328125
+          },
+          "raw_residual": {
+            "abs_max": 0.74658203125,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.7830883264541626,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 100,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.09988568723201752,
+          "loss_cad_mask": 0.008016147650778294,
+          "cad_route_sum": 13.289764404296875,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.11220366507768631,
+          "t1_nll": 2.1284103393554688,
+          "t2_marginal_accuracy": 0.010146195068955421,
+          "t2_nll": 4.312471866607666,
+          "t3_marginal_accuracy": 0.001012514578178525,
+          "t3_nll": 6.848881721496582,
+          "predicted_t3_ancestor_t1_accuracy": 0.06761783361434937,
+          "predicted_t3_ancestor_t2_accuracy": 0.008317354135215282,
+          "gt_path_xyz_error_mm": 4.190213680267334,
+          "predicted_path_xyz_error_mm": 88.58406066894531,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 29.58851432800293,
+            "p95": 34.90705490112305,
+            "max": 44.91704177856445
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.59390640258789,
+            "p95": 22.220458984375,
+            "max": 23.004037857055664
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.8259769678115845,
+            "abs_max": 6.00390625
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 11.349050521850586,
+            "abs_max": 14.3515625
+          },
+          "raw_residual": {
+            "abs_max": 0.97119140625,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.9739145040512085,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 120,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.09443191438913345,
+          "loss_cad_mask": 0.01112382486462593,
+          "cad_route_sum": 13.091734886169434,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.1157267689704895,
+          "t1_nll": 2.101053237915039,
+          "t2_marginal_accuracy": 0.008575782179832458,
+          "t2_nll": 4.262443542480469,
+          "t3_marginal_accuracy": 0.001213965006172657,
+          "t3_nll": 6.728238582611084,
+          "predicted_t3_ancestor_t1_accuracy": 0.0817941352725029,
+          "predicted_t3_ancestor_t2_accuracy": 0.008500207215547562,
+          "gt_path_xyz_error_mm": 3.999418258666992,
+          "predicted_path_xyz_error_mm": 85.42581176757812,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 27.056591033935547,
+            "p95": 31.555940628051758,
+            "max": 42.197940826416016
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.241111755371094,
+            "p95": 22.281431198120117,
+            "max": 22.96145248413086
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.7637342214584351,
+            "abs_max": 5.44140625
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 10.103151321411133,
+            "abs_max": 13.1953125
+          },
+          "raw_residual": {
+            "abs_max": 0.97265625,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.8943360447883606,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 140,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.0829208567738533,
+          "loss_cad_mask": 0.00910487025976181,
+          "cad_route_sum": 13.144542694091797,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.1129089742898941,
+          "t1_nll": 2.11155104637146,
+          "t2_marginal_accuracy": 0.009583034552633762,
+          "t2_nll": 4.275635719299316,
+          "t3_marginal_accuracy": 0.001213965006172657,
+          "t3_nll": 6.757356643676758,
+          "predicted_t3_ancestor_t1_accuracy": 0.07075461745262146,
+          "predicted_t3_ancestor_t2_accuracy": 0.008973241783678532,
+          "gt_path_xyz_error_mm": 3.608649492263794,
+          "predicted_path_xyz_error_mm": 83.72786712646484,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 29.521163940429688,
+            "p95": 33.13276290893555,
+            "max": 43.9752311706543
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.30515480041504,
+            "p95": 22.831907272338867,
+            "max": 23.36365509033203
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.8337531089782715,
+            "abs_max": 5.77734375
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 11.757956504821777,
+            "abs_max": 15.0859375
+          },
+          "raw_residual": {
+            "abs_max": 1.376953125,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 1.0,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 160,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.07422824949026108,
+          "loss_cad_mask": 0.005274828523397446,
+          "cad_route_sum": 13.110889434814453,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.11503279954195023,
+          "t1_nll": 2.1086630821228027,
+          "t2_marginal_accuracy": 0.007565898355096579,
+          "t2_nll": 4.268849849700928,
+          "t3_marginal_accuracy": 0.001012514578178525,
+          "t3_nll": 6.733376979827881,
+          "predicted_t3_ancestor_t1_accuracy": 0.06782382726669312,
+          "predicted_t3_ancestor_t2_accuracy": 0.007898487150669098,
+          "gt_path_xyz_error_mm": 3.307910919189453,
+          "predicted_path_xyz_error_mm": 84.72342681884766,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 29.752765655517578,
+            "p95": 32.92543029785156,
+            "max": 43.043434143066406
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.334369659423828,
+            "p95": 23.11223030090332,
+            "max": 23.96454620361328
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.845001757144928,
+            "abs_max": 5.76171875
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 12.045183181762695,
+            "abs_max": 15.8203125
+          },
+          "raw_residual": {
+            "abs_max": 1.4111328125,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 1.0000001192092896,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 180,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.08337623625993729,
+          "loss_cad_mask": 0.004341821651905775,
+          "cad_route_sum": 13.08285140991211,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.1162862777709961,
+          "t1_nll": 2.1037511825561523,
+          "t2_marginal_accuracy": 0.0073644486255943775,
+          "t2_nll": 4.260186672210693,
+          "t3_marginal_accuracy": 0.0012165962252765894,
+          "t3_nll": 6.718913555145264,
+          "predicted_t3_ancestor_t1_accuracy": 0.07879089564085007,
+          "predicted_t3_ancestor_t2_accuracy": 0.005679901223629713,
+          "gt_path_xyz_error_mm": 3.6181139945983887,
+          "predicted_path_xyz_error_mm": 83.51626586914062,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 30.899789810180664,
+            "p95": 34.59389877319336,
+            "max": 42.8970832824707
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.453330993652344,
+            "p95": 23.36003303527832,
+            "max": 24.52053451538086
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.8805515766143799,
+            "abs_max": 5.78515625
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 12.81263542175293,
+            "abs_max": 16.859375
+          },
+          "raw_residual": {
+            "abs_max": 1.3916015625,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 1.0000001192092896,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        },
+        {
+          "step": 200,
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.057927921414375305,
+          "loss_cad_mask": 0.0040876311250030994,
+          "cad_route_sum": 13.04251766204834,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.12493985891342163,
+          "t1_nll": 2.0959930419921875,
+          "t2_marginal_accuracy": 0.0074878716841340065,
+          "t2_nll": 4.251867294311523,
+          "t3_marginal_accuracy": 0.00040553207509219646,
+          "t3_nll": 6.694657325744629,
+          "predicted_t3_ancestor_t1_accuracy": 0.08989442884922028,
+          "predicted_t3_ancestor_t2_accuracy": 0.006362458225339651,
+          "gt_path_xyz_error_mm": 2.7127671241760254,
+          "predicted_path_xyz_error_mm": 81.8609848022461,
+          "oracle_error_mm": 0.00034789019264280796,
+          "image_tokens_token_norm": {
+            "mean": 30.61317253112793,
+            "p95": 34.37269592285156,
+            "max": 42.52790832519531
+          },
+          "cad_tokens_token_norm": {
+            "mean": 20.549087524414062,
+            "p95": 23.505844116210938,
+            "max": 24.896398544311523
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 0.8758381605148315,
+            "abs_max": 5.83984375
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 12.599624633789062,
+            "abs_max": 16.859375
+          },
+          "raw_residual": {
+            "abs_max": 1.5244140625,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 1.0000001192092896,
+          "t3_classifier_weight_abs_max": 0.06249965727329254
+        }
+      ],
+      "status": "COMPLETE",
+      "last_good": {
+        "step": 180,
+        "path": "gt_t3_conditioned_last_good.pth"
+      },
+      "roundtrip": {
+        "status": "MATCH",
+        "step": 180,
+        "metrics": 20,
+        "probe_parameters": 132099,
+        "optimizer_step": [
+          180
+        ],
+        "worst_relative_delta": 0.0,
+        "worst_metric": "loss_cad_t1",
+        "reloaded_metrics": {
+          "loss_cad_t1": 0.0,
+          "loss_cad_t2": 0.0,
+          "loss_cad_t3": 0.0,
+          "loss_cad_residual": 0.08337623625993729,
+          "loss_cad_mask": 0.004341821651905775,
+          "cad_route_sum": 13.08285140991211,
+          "cad_symmetry_branch": 0.0,
+          "cad_valid_points": 3829.0,
+          "cad_target_outside": 0.0004835590079892427,
+          "t1_marginal_accuracy": 0.1162862777709961,
+          "t1_nll": 2.1037511825561523,
+          "t2_marginal_accuracy": 0.0073644486255943775,
+          "t2_nll": 4.260186672210693,
+          "t3_marginal_accuracy": 0.0012165962252765894,
+          "t3_nll": 6.718913555145264,
+          "predicted_t3_ancestor_t1_accuracy": 0.07879089564085007,
+          "predicted_t3_ancestor_t2_accuracy": 0.005679901223629713,
+          "gt_path_xyz_error_mm": 3.6181139945983887,
+          "predicted_path_xyz_error_mm": 83.51626586914062,
+          "oracle_error_mm": 0.00034789019264280796
+        }
+      }
+    }
+  },
+  "schedule": "constant 3e-4, no formal warmup",
+  "interpretation": "fixed-batch residual diagnostic, not generalization",
+  "current_arm": "gt_t3_conditioned",
+  "current_step": 200
+}

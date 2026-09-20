@@ -13,7 +13,7 @@ from core.gdrn_modeling.models.heads.hierarchical_cad_attention_head import hier
 from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
 from research.cad_hierarchy.diagnostics import hierarchy_sanity
 from research.run_contract import validate_research_run_config
-from .configuration import set_mode
+from .configuration import CONSISTENT_V3_SHA256, require_consistent_v3, set_mode
 
 CONFIG = Path('configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py')
 
@@ -53,6 +53,8 @@ def run(cfg):
     sanity = hierarchy_sanity({d: v for d, v in h.numpy_levels().items() if d <= 3}, context.object_ids)
     if sanity['result'] != 'PASS':
         raise RuntimeError(sanity)
+    # Identity, not just shape: the geometry buffers do not travel with a checkpoint.
+    hierarchy_sha256 = require_consistent_v3(context.hierarchy_path)
     cfg.MODEL.DEVICE = 'cpu'
     torch.manual_seed(42)
     model, optimizer = build_model_optimizer(cfg)
@@ -89,7 +91,8 @@ def run(cfg):
                 total_parameters=sum(p.numel() for p in model.parameters()),
                 backbone_parameters=sum(p.numel() for p in model.backbone.parameters()),
                 head_parameters=sum(p.numel() for p in model.cad_attention_head.parameters()),
-                hierarchy=str(context.hierarchy_path), hierarchy_sanity=sanity,
+                hierarchy=str(context.hierarchy_path), hierarchy_sha256=hierarchy_sha256,
+                hierarchy_sha_match=hierarchy_sha256 == CONSISTENT_V3_SHA256, hierarchy_sanity=sanity,
                 losses={k: float(v.detach()) for k, v in losses.items()}, formal_ready=False)
 
 

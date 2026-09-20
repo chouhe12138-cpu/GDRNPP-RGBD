@@ -61,12 +61,12 @@ def _weights(model):
     return {key.replace("_module.", ""): value for key, value in model.state_dict().items()}
 
 
-def _build(initial_state=None):
+def _build(initial_state=None, lite=None):
     model = _raw_model()
     if initial_state is not None:
         model.load_state_dict(initial_state)
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=.01)
-    lite = _Lite(accelerator="cpu", devices=1)
+    lite = _Lite(accelerator="cpu", devices=1) if lite is None else lite
     model, wrapper = lite.setup(model, optimizer)
     state_optimizer = unwrap_optimizer_for_checkpoint(wrapper)
     scheduler = solver_utils.build_lr_scheduler(_solver_cfg(), state_optimizer, total_iters=TOTAL_UPDATES)
@@ -195,3 +195,101 @@ def test_engine_binds_scheduler_and_checkpointer_to_state_optimizer():
     assert unwrap < source.index("solver_utils.build_lr_scheduler(cfg, state_optimizer")
     assert unwrap < source.index("optimizer=state_optimizer,")
     assert source.index("checkpointer.resume_or_load(") < source.index("my_checkpoint.resync_wrapped_optimizer(optimizer)")
+
+
+class _ScaleStub:
+    """A GradScaler stand-in that refuses the steps the plugin marks as non-finite."""
+
+    def __init__(self):
+        self.scale = 8.0
+        self.refuse = False
+
+    def get_scale(self):
+        return self.scale
+
+    def unscale_(self, optimizer):
+        pass
+
+    def step(self, optimizer):
+        if self.refuse:
+            self.scale /= 2
+            return
+        optimizer.step()
+
+    def update(self):
+        pass
+
+
+class _AlternatingPlugin:
+    """Precision plugin that refuses every second step, like an overflow would."""
+
+    def __init__(self):
+        self.scaler = _ScaleStub()
+        self.calls = 0
+
+    def optimizer_step(self, model, optimizer, opt_idx, closure, **kwargs):
+        self.calls += 1
+        self.scaler.refuse = self.calls % 2 == 0
+        self.scaler.unscale_(optimizer)
+        self.scaler.step(optimizer)
+        self.scaler.update()
+
+
+def _drive_with_gate(model, wrapper, state_optimizer, scheduler, plugin, batch):
+    """The engine's step/scheduler sequence, including its GradScaler gate."""
+    inputs, targets = batch
+    wrapper.zero_grad(set_to_none=True)
+    torch.nn.functional.mse_loss(model(inputs), targets).backward()
+    scale_before = solver_utils.amp_scale(plugin)
+    wrapper.step()
+    if not solver_utils.gradscaler_skipped_step(scale_before, solver_utils.amp_scale(plugin)):
+        scheduler.step()
+
+
+def test_skipped_optimizer_update_does_not_advance_the_scheduler():
+    lite = _Lite(accelerator="cpu", devices=1)
+    model, wrapper, state_optimizer, scheduler = _build(lite=lite)
+    plugin = _AlternatingPlugin()
+    lite._precision_plugin = lite._strategy.precision_plugin = plugin
+    started = scheduler.last_epoch
+    for _ in range(6):
+        _drive_with_gate(model, wrapper, state_optimizer, scheduler, plugin, _batch())
+    assert plugin.calls == 6
+    # Three of the six updates were refused: the schedule must have ticked three times.
+    assert _steps(state_optimizer) == [3]
+    assert scheduler.last_epoch == started + 3
+
+    # Without the gate the same sequence overshoots, which is what it protects against.
+    lite2 = _Lite(accelerator="cpu", devices=1)
+    model2, wrapper2, state2, scheduler2 = _build(lite=lite2)
+    plugin2 = _AlternatingPlugin()
+    lite2._precision_plugin = lite2._strategy.precision_plugin = plugin2
+    started2 = scheduler2.last_epoch
+    for _ in range(6):
+        inputs, targets = _batch()
+        wrapper2.zero_grad(set_to_none=True)
+        torch.nn.functional.mse_loss(model2(inputs), targets).backward()
+        wrapper2.step()
+        scheduler2.step()
+    assert _steps(state2) == [3]
+    assert scheduler2.last_epoch == started2 + 6
+
+
+def test_gradscaler_skipped_step_only_reads_a_scale_drop():
+    assert solver_utils.amp_scale(_AlternatingPlugin()) == 8.0
+    assert solver_utils.amp_scale(object()) is None  # fp32 plugins have no scaler
+    assert not solver_utils.gradscaler_skipped_step(8.0, 8.0)
+    assert not solver_utils.gradscaler_skipped_step(8.0, 16.0)  # growth is not a skip
+    assert solver_utils.gradscaler_skipped_step(8.0, 4.0)
+    assert not solver_utils.gradscaler_skipped_step(None, None)
+    assert not solver_utils.gradscaler_skipped_step(None, 4.0)
+
+
+def test_engine_gates_the_scheduler_on_the_optimizer_step():
+    """The engine must read the scale around `optimizer.step()` and gate the tick on it."""
+    engine = Path(__file__).resolve().parents[2] / "core/gdrn_modeling/engine/engine.py"
+    source = engine.read_text(encoding="utf-8")
+    read_before = source.index("amp_scale_before = solver_utils.amp_scale(self._precision_plugin)")
+    step = source.index("optimizer.step()", read_before)
+    gate = source.index("if not solver_utils.gradscaler_skipped_step(")
+    assert read_before < step < gate < source.index("scheduler.step()", gate)

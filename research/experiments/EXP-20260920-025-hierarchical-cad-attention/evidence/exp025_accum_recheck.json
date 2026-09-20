@@ -1,0 +1,563 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "c0facbdde8f57571d647b690b19e7c793a2a1c09",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "hierarchy_sha256": "02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_accum_RECHECK",
+  "status": "PASS",
+  "batch_size": 4,
+  "iters_per_epoch": 25,
+  "epochs": 5,
+  "split_epoch": 2,
+  "accumulate_iter": 12,
+  "total_optimizer_updates": 15,
+  "amp": true,
+  "batch_source": ".local/exp025/fixed_batch4_a01.pt",
+  "interpretation": "engineering state-machine smoke, not a performance result",
+  "continuous": [
+    {
+      "iteration": 11,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 3e-07,
+      "total_loss": 13.417357444763184,
+      "optimizer_steps": [
+        1
+      ],
+      "scheduler_last_epoch_before": 0,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 23,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 0.0002994349126666242,
+      "total_loss": 13.412145614624023,
+      "optimizer_steps": [
+        2
+      ],
+      "scheduler_last_epoch_before": 1,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 24,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 0.0002931269671861117,
+      "total_loss": 13.652631759643555,
+      "optimizer_steps": [
+        3
+      ],
+      "scheduler_last_epoch_before": 2,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 36,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 0.0002801047724619891,
+      "total_loss": 12.822408676147461,
+      "optimizer_steps": [
+        4
+      ],
+      "scheduler_last_epoch_before": 3,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 48,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 0.0002609856845163034,
+      "total_loss": 11.800118446350098,
+      "optimizer_steps": [
+        5
+      ],
+      "scheduler_last_epoch_before": 4,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 49,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 0.0002366761007981303,
+      "total_loss": 11.332149505615234,
+      "optimizer_steps": [
+        6
+      ],
+      "scheduler_last_epoch_before": 5,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 61,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 0.00020832848970621582,
+      "total_loss": 11.060884475708008,
+      "optimizer_steps": [
+        7
+      ],
+      "scheduler_last_epoch_before": 6,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 73,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 0.0001772867543835391,
+      "total_loss": 10.669205665588379,
+      "optimizer_steps": [
+        8
+      ],
+      "scheduler_last_epoch_before": 7,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 74,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 0.00014502252097624757,
+      "total_loss": 10.288010597229004,
+      "optimizer_steps": [
+        9
+      ],
+      "scheduler_last_epoch_before": 8,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 86,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 0.00011306537180227564,
+      "total_loss": 9.995160102844238,
+      "optimizer_steps": [
+        10
+      ],
+      "scheduler_last_epoch_before": 9,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 98,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 8.29303309345975e-05,
+      "total_loss": 9.786012649536133,
+      "optimizer_steps": [
+        11
+      ],
+      "scheduler_last_epoch_before": 10,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 99,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 5.60460399615489e-05,
+      "total_loss": 9.636021614074707,
+      "optimizer_steps": [
+        12
+      ],
+      "scheduler_last_epoch_before": 11,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 111,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 3.368702896675159e-05,
+      "total_loss": 9.53055191040039,
+      "optimizer_steps": [
+        13
+      ],
+      "scheduler_last_epoch_before": 12,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 123,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 1.6913293625057484e-05,
+      "total_loss": 9.462873458862305,
+      "optimizer_steps": [
+        14
+      ],
+      "scheduler_last_epoch_before": 13,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 124,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 6.520042942689895e-06,
+      "total_loss": 9.42647933959961,
+      "optimizer_steps": [
+        15
+      ],
+      "scheduler_last_epoch_before": 14,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    }
+  ],
+  "continuous_final": {
+    "lr": 2.9999999999999997e-06,
+    "optimizer_steps": [
+      15
+    ],
+    "scheduler_last_epoch": 15
+  },
+  "split": [
+    {
+      "iteration": 11,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 3e-07,
+      "total_loss": 13.417357444763184,
+      "optimizer_steps": [
+        1
+      ],
+      "scheduler_last_epoch_before": 0,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 23,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 0.0002994349126666242,
+      "total_loss": 13.412175178527832,
+      "optimizer_steps": [
+        2
+      ],
+      "scheduler_last_epoch_before": 1,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 24,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 0.0002931269671861117,
+      "total_loss": 13.652693748474121,
+      "optimizer_steps": [
+        3
+      ],
+      "scheduler_last_epoch_before": 2,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 36,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 0.0002801047724619891,
+      "total_loss": 12.822427749633789,
+      "optimizer_steps": [
+        4
+      ],
+      "scheduler_last_epoch_before": 3,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 48,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 0.0002609856845163034,
+      "total_loss": 11.800073623657227,
+      "optimizer_steps": [
+        5
+      ],
+      "scheduler_last_epoch_before": 4,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 49,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 0.0002366761007981303,
+      "total_loss": 11.332079887390137,
+      "optimizer_steps": [
+        6
+      ],
+      "scheduler_last_epoch_before": 5,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    }
+  ],
+  "split_saved": {
+    "lr": 0.00020832848970621582,
+    "optimizer_steps": [
+      6
+    ],
+    "scheduler_last_epoch": 6
+  },
+  "run_to_run_noise_floor": {
+    "model": 0.0017827083356678486,
+    "optimizer": 7.466226816177368e-05,
+    "scheduler": 0.0,
+    "lr": 0.0,
+    "optimizer_steps": 0.0,
+    "gradscaler": 0.0,
+    "worst": {
+      "delta": 0.0017827083356678486,
+      "path": "state.model.cad_attention_head.cross_attention.1.attention.in_proj_bias"
+    }
+  },
+  "resume_start": {
+    "iteration": 49,
+    "optimizer_steps": [
+      6
+    ],
+    "scheduler_last_epoch": 6,
+    "lr": 0.00020832848970621582
+  },
+  "resumed": [
+    {
+      "iteration": 61,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 0.00020832848970621582,
+      "total_loss": 11.06085205078125,
+      "optimizer_steps": [
+        7
+      ],
+      "scheduler_last_epoch_before": 6,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 73,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 0.0001772867543835391,
+      "total_loss": 10.669156074523926,
+      "optimizer_steps": [
+        8
+      ],
+      "scheduler_last_epoch_before": 7,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 74,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 0.00014502252097624757,
+      "total_loss": 10.287938117980957,
+      "optimizer_steps": [
+        9
+      ],
+      "scheduler_last_epoch_before": 8,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 86,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 0.00011306537180227564,
+      "total_loss": 9.995166778564453,
+      "optimizer_steps": [
+        10
+      ],
+      "scheduler_last_epoch_before": 9,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 98,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 8.29303309345975e-05,
+      "total_loss": 9.785935401916504,
+      "optimizer_steps": [
+        11
+      ],
+      "scheduler_last_epoch_before": 10,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 99,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 5.60460399615489e-05,
+      "total_loss": 9.635976791381836,
+      "optimizer_steps": [
+        12
+      ],
+      "scheduler_last_epoch_before": 11,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 111,
+      "micro_step": 12,
+      "accumulation_divisor": 12,
+      "lr": 3.368702896675159e-05,
+      "total_loss": 9.530529022216797,
+      "optimizer_steps": [
+        13
+      ],
+      "scheduler_last_epoch_before": 12,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 123,
+      "micro_step": 24,
+      "accumulation_divisor": 12,
+      "lr": 1.6913293625057484e-05,
+      "total_loss": 9.462874412536621,
+      "optimizer_steps": [
+        14
+      ],
+      "scheduler_last_epoch_before": 13,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    },
+    {
+      "iteration": 124,
+      "micro_step": 25,
+      "accumulation_divisor": 1,
+      "lr": 6.520042942689895e-06,
+      "total_loss": 9.42647647857666,
+      "optimizer_steps": [
+        15
+      ],
+      "scheduler_last_epoch_before": 14,
+      "updated": true,
+      "amp_scale": 65536.0,
+      "amp_scale_dropped": false,
+      "scheduler_advanced": true
+    }
+  ],
+  "resumed_final": {
+    "lr": 2.9999999999999997e-06,
+    "optimizer_steps": [
+      15
+    ],
+    "scheduler_last_epoch": 15
+  },
+  "resume_state_delta": {
+    "model": 0.0028193159960210323,
+    "optimizer": 4.9170106649398804e-05,
+    "scheduler": 0.0,
+    "lr": 0.0,
+    "optimizer_steps": 0.0,
+    "gradscaler": 0.0,
+    "worst": {
+      "delta": 0.0028193159960210323,
+      "path": "state.model.cad_attention_head.cross_attention.1.attention.in_proj_bias"
+    }
+  },
+  "optimizer_step_boundaries": [
+    11,
+    23,
+    24,
+    36,
+    48,
+    49,
+    61,
+    73,
+    74,
+    86,
+    98,
+    99,
+    111,
+    123,
+    124
+  ],
+  "updates_per_epoch": [
+    3,
+    3,
+    3,
+    3,
+    3
+  ],
+  "amp_scale_dropped": false,
+  "lr_trajectory_matches": true,
+  "optimizer_steps_match": true,
+  "scheduler_epoch_matches": true,
+  "resume_matches_continuous": true,
+  "scheduler_advanced_only_on_updates": true
+}

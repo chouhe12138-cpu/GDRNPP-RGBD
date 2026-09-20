@@ -192,14 +192,17 @@ scale sweep（同一起点、同一 batch、40 步、单臂）：65536 与 32768
 从 0.210 升到 0.558 的瞬态，低 scale 下随后回落到约 0.35。
 
 Derived：失败不是 loss/激活发散——失败步的 loss、logits、token norm、raw residual 全部有限；
-它是 **AMP 缩放后的 fp16 梯度上溢**：`GradScaler` 以 `scale` 放大 loss 后反传，任何真实梯度
-元素超过 `65504/scale` 就会在 fp16 中变成 ±inf（本窗内 `scale=32768` 失败、
-`scale=16384` 通过，故该瞬态的梯度元素量级在 **(2.0, 4.0]**，与 step166 观测到的 0.75
-同阶、方向一致）。当前训练循环把任何非有限梯度视为致命错误（`amp_step` 与原代码的
-`NonFiniteTrainingError`/`RuntimeError`），因此 GradScaler 本应"减半 scale 并跳过该步"
-的正常恢复路径被拦截。**未**加 gradient clipping、未关 AMP、未全局降 LR、未改
-`SET_NAN_GRAD_TO_ZERO`，也未改 loss/结构/初始化；是否放宽该 guard 属训练策略决定，
-留给用户确认。
+它是 **AMP 缩放后的 fp16 反向传播上溢**：`GradScaler` 以 `scale` 放大 loss 后反传，fp16
+反向链路上任一量（最终 parameter gradient 或中间激活梯度）超过 fp16 上限 65504 就会变成
+±inf。scale 扫描给出的是一个**量级窗口**：`scale=32768` 失败、`scale=16384` 通过，等价于
+溢出量在缩放后跨过 65504、未缩放时约在 (2.0, 4.0] 量级。这里说法保持为窗口而非定值：
+scale=32768 记录到的最终（未缩放）梯度元素只有 0.754（`residual_predictor`）与 0.708
+（`decoder`），若溢出发生在中间量上，最终梯度不必落进该区间；本轮未逐层记录 fp16
+中间量，因此不能断言"最终 parameter gradient 必然在 (2.0, 4.0]"。当前诊断循环把任何
+非有限梯度视为致命错误（`runtime.amp_step` 的 `NonFiniteTrainingError`），因此
+GradScaler 本应"减半 scale 并跳过该步"的正常恢复路径被它拦截——**这是诊断脚本语义，
+不是 engine 语义**，见下一节的生产路径验证。**未**加 gradient clipping、未关 AMP、
+未全局降 LR、未改 `SET_NAN_GRAD_TO_ZERO`，也未改 loss/结构/初始化。
 
 ## Observed：固定 batch 可学习性（a02 复现）与 residual 条件化诊断（2026-09-20）
 
@@ -289,6 +292,159 @@ AMP 无跳步），张量比较只作为"不超过实测噪声底的 3 倍"的�
 隔离验证，只能确认它不是 resume 引入的；也不改变 fixed-batch 读数的可复现性
 （a01 与 a02 的逐点均值一致到 6–9 位小数）。
 
+## Observed：生产路径 AMP recovery 与 scheduler gate（2026-09-20）
+
+上一节的"非有限即致命"是 **诊断脚本** `runtime.amp_step` 的语义；`engine.do_train` 没有这个
+guard，它把 `lite.backward` 与 Lite optimizer wrapper 交给 precision plugin 的 `GradScaler`。
+`amp_recovery_smoke` 因此用生产对象复跑：`LightningLite(precision=16)` + `lite.setup` 得到的
+`_LiteModule`/Lite wrapper + plugin 的 `GradScaler`，从同一 `full_last_good.pth`（step160）继续。
+
+| 运行 | 结果 |
+|---|---|
+| `exp025_amp_recovery_RECHECK`（新 gate，20 update） | **PASS**；`forward_precision={autocast: true, input_dtype: float16}` |
+| `exp025_amp_recovery_unguarded_a01`（`--unguarded-scheduler`，修复前循环） | PASS，但 `scheduler_mismatch_steps=[166]` |
+
+skip 事件（两臂都发生在同一处）：
+
+| 项 | 值 |
+|---|---|
+| iteration | 166（自 step160 起的第 7 次 update，即历史记录的 step 167） |
+| loss | 1.138556（有限） |
+| scale | 65536 → **32768** |
+| 内部 optimizer step | 166 → **166**（不增加） |
+| 参数 delta | **0.0**（无参数更新） |
+| 进程 | 继续；下一 update（167）optimizer step 167、参数 delta 4.86e-4、scheduler 6→7 |
+
+对照：去掉 gate 后同一位置 scheduler 仍然前进（`last_epoch` 6→7），终点 optimizer step **179**
+而 `scheduler.last_epoch` **20**——LR 计划白吃了一个 tick；加上 gate 后终点是 19，与真实
+update 数一致。因此 `engine.do_train` 现在读 `solver_utils.amp_scale(self._precision_plugin)`
+夹住 `optimizer.step()`，用 `solver_utils.gradscaler_skipped_step` 判断这次 update 是否真的
+落到参数上，只有真的落到才 `scheduler.step()`。回归测试见
+`research/tests/test_lite_optimizer_resume.py`（含一个用真实 Lite wrapper + 交替拒绝的 stub
+plugin 驱动的行为测试：6 次调用里 3 次被拒 → scheduler 只前进 3；去掉 gate 则前进 6）。
+
+附注：`_LiteModule.forward` 会自动进入 precision plugin 的 fp16 autocast 并把浮点输入 cast 成
+fp16，确认了**生产路径确实是 fp16 autocast 推理 + 缩放反传**；诊断脚本用的是"fp32 输入 +
+autocast"的近似，两者不完全相同（这解释了为何本 smoke 的失败位置与 `learnability` 相差 0
+步，但 loss 数值不完全一致）。
+
+## Observed：Residual V2 实现与 fixed-batch 复验（2026-09-20）
+
+正式残差路径按诊断结论改为：T3 logits → FP32 softmax → detach 概率 → 对投影到 64 维的 T3
+CAD token 求期望（`[B,P,512]×[B,512,64]`）→ 与 image token 拼接 → `Linear(320,256)+GELU+
+Linear(256,3)`（**最后一层权重与 bias 零初始化**）→ bounded residual。不使用 GT T3、不做
+top-k、loss 定义（SmoothL1 beta .1、权重 1）与 route target 不变、train/infer 同一 forward。
+
+固定 batch 复验（同 batch、seed42、官方冻结主干、常数 lr3e-4）。residual-only 臂（route
+weight 0）在**同一 AMP scale 65536** 下 V2 走完 200 步（V1 同臂走完 200 步）：
+
+| step | 0 | 20 | 100 | 160 | 200 |
+|---|---:|---:|---:|---:|---:|
+| V1 residual | 0.418296 | 0.540440 | 0.540440 | 0.540440 | 0.540440 |
+| **V2 residual** | 0.147610 | 0.143590 | 0.136480 | 0.127300 | **0.123810** |
+| V2 GT-path XYZ mm | 5.6881 | 5.6089 | 5.3768 | 5.0193 | **4.8974** |
+| V2 raw abs max | 0.000 | 0.130 | 0.424 | 0.603 | 0.645 |
+| V2 tanh 饱和 | 0 | 0 | 0 | 0 | **0** |
+
+V2 的 step0（0.147610 / 5.6881 mm）与第一轮 zero-init 对照（0.147614 / 5.6881）一致，说明
+零初始化按预期生效、初始残差恰为 T3 anchor。
+
+full 臂在**同一 scale 65536** 下两代都跑到 step100（V2 在 step104 因同一 fp16 上溢中止，
+见下），逐点对照：
+
+| step | 0 | 20 | 40 | 60 | 80 | 100 |
+|---|---:|---:|---:|---:|---:|---:|
+| V1 route sum | 12.6347 | 4.8162 | 2.0633 | 1.1244 | 0.5665 | 0.4468 |
+| V2 route sum | 12.6347 | 4.8464 | 2.0293 | 0.9828 | 0.5397 | **0.2625** |
+| V1 T3 NLL | 6.4077 | 3.4146 | 1.5548 | 0.8537 | 0.4502 | 0.3465 |
+| V2 T3 NLL | 6.4077 | 3.4279 | 1.5402 | 0.7675 | 0.4310 | **0.2146** |
+| V1 residual | 0.41830 | 0.49326 | 0.29642 | 0.19233 | 0.14569 | 0.13951 |
+| V2 residual | 0.15346 | 0.14639 | 0.14054 | 0.13387 | 0.12438 | **0.11149** |
+| V1 GT-path mm | 13.1545 | 15.1232 | 10.2734 | 6.9053 | 5.5040 | 5.3125 |
+| V2 GT-path mm | 5.7389 | 5.5993 | 5.4272 | 5.2290 | 4.9123 | **4.4830** |
+
+route 侧两边在 step20 相差 +0.6%、step40 起 V2 更好（step100 好 41%），**没有出现
+"residual 改善但 route 崩坏"**。V2 full 臂在 65536 于 step104 出现与 V1 同类的 fp16 上溢
+（`decoder.3.block.0.weight`，loss 全有限），因此用 `--amp-scale 16384`（scale 扫描已确认
+该档通过）把 200 步跑完：
+
+| V2 full arm @16384 | 0 | 40 | 80 | 120 | 160 | 200 |
+|---|---:|---:|---:|---:|---:|---:|
+| residual | 0.15346 | 0.14054 | 0.12438 | 0.11493 | 0.08608 | **0.06995** |
+| GT-path mm | 5.7389 | 5.4272 | 4.9123 | 4.5832 | 3.6145 | **3.0799** |
+| predicted-path mm | 83.4377 | 7.4437 | 5.2137 | 4.9379 | 3.6158 | **3.0794** |
+| T1/T2/T3 acc | .109/.000/.001 | .979/.485/.586 | .995/.918/.893 | .988/.974/.860 | 1./1./.998 | **1./1./.9998** |
+| route sum | 12.6347 | 2.0293 | 0.5627 | 0.5892 | 0.0801 | **0.0290** |
+| raw abs max / 饱和 | 0.000 / 0 | 0.295 / 0 | 0.469 / 0 | 0.693 / 0 | 0.711 / 0 | **0.812 / 0** |
+| context token norm（均值） | 4.42 | 6.54 | 10.68 | 18.57 | 18.91 | 19.01 |
+| AMP scale | 16384 | 16384 | 16384 | 16384 | 16384 | 16384（无跳步） |
+
+跨 scale 的读数需要分开看：V2@16384 在 step160 的 route 0.0801 / T3 NLL 0.0677 比
+V1@65536 的 0.0751 / 0.0614 略差（+6.7% / +10%），而 residual（0.0861 对 0.1157）与
+GT-path XYZ（3.61 对 4.57 mm）明显更好。匹配对照（同 scale）以 step0–100 那两行为准。
+
+Gate B 对照：predicted soft-T3 conditioning 已接入正式 head ✔；概率默认 detach ✔
+（配置 `residual_detach_route=True`）；context 投影 64 维 ✔；最后一层 zero-init ✔；
+正式 forward/推理无 GT T3 ✔；loss 定义未变 ✔；200 步 route 未崩 ✔；raw 不再随机饱和 ✔。
+
+**兼容性**：V2 改了 `residual_predictor` 的子模块结构（`weight/bias` → `context_projection/
+fuse/final`），因此 c0facbd 及之前产生的 last-good/diagnostic checkpoint 不能加载进新 head
+（`require_full_checkpoint` 的 key 检查也会因此拒绝旧格式），这些文件只作为历史证据保留。
+
+## Observed：residual probe telemetry 修复与 conditioned 臂重跑（2026-09-20）
+
+诊断脚本自身有两个缺陷：conditioned 臂把 **bounded** residual 当成 `raw_residual` 记录
+（因此该臂此前的"raw abs max / 饱和"不能作为 raw predictor 证据），且 conditioned 臂的
+last-good 不含 probe 参数。已修：每个 symmetry 分支同时保留 raw 与 bounded，用同一个
+`choice` 选支；last-good 追加 `probe_state_dict`；跑完重建 model+probe+optimizer 重载做
+roundtrip 校验。重跑 `exp025_probe_conditioned_RECHECK`（只跑 conditioned 臂）：
+
+| 项 | 值 |
+|---|---|
+| 训练轨迹 | step0 0.219496 / 7.9437 mm → step200 **0.057928 / 2.7128 mm**（与 a02 的 0.056706 / 2.6669 同值域，确认修复未改动训练路径） |
+| raw_residual（修复后） | abs max 1.524、`abs(tanh)==1` 比例 **0**（修复前记录的是 bounded 值 0.893） |
+| roundtrip | `status=MATCH`，step 180，20 个指标最大相对差 **0.0**，probe 参数 132099，optimizer 内部 step `[180]` |
+
+`zero_init_residual` 臂已随 V2 成为正式初始化，不再作为独立诊断臂；其第一轮结果保留在
+`exp025_probe200_a03/a04.json`。
+
+## Observed：初始化/checkpoint 语义与 hierarchy SHA（2026-09-20）
+
+- `BACKBONE_INIT` 与 `MODEL.WEIGHTS` 拆开：`backbone_settings()` 不再填 legacy
+  `MODEL.WEIGHTS`，fresh train 为 `""`（`resume_or_load("")` 走到 "Initializing model from
+  scratch"），`set_mode()` 不再改写用户显式给出的 `MODEL.WEIGHTS`；主干初始化仍由
+  `load_official_backbone`（official_lmo）或 `BACKBONE.INIT_CFG.checkpoint_path`（imagenet）
+  负责。
+- `--eval-only` / `TEST.SAVE_RESULTS_ONLY` 现在 fail-closed：`require_full_checkpoint` 要求
+  checkpoint 的 model keys 同时含 `backbone.*`、`cad_attention_head.t3_classifier.weight`、
+  `cad_attention_head.residual_predictor.final.weight`、`cad_attention_head.mask_predictor.weight`，
+  否则报错而不是用随机 head 打分；resume 的 `last_checkpoint` 机制未改。
+- hierarchy 身份固定为 `consistent_v3.npz` 的 SHA256
+  `02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373`：
+  `research/exp025/configuration.py` 保存该常量 + streaming hash（`lru_cache`），
+  `GDRN_CAD.dataset_context()`、preflight 与所有报告的 `metadata()` 都校验；本机实测
+  `hierarchy_sha_match=true`（preflight PASS）。
+
+## 验证与回归（2026-09-20 收口）
+
+| 命令 | 结果 |
+|---|---|
+| `pytest -q research/exp025/tests` | **42 passed**（原 39：+3 V2 单测文件新增 8 项，减去已合并的 5 项旧用例重排） |
+| `pytest -q research/tests/test_lite_optimizer_resume.py` | **8 passed**（新增 scheduler gate 行为测试与 helper 单测） |
+| `pytest -q research` | **370 passed**（上一轮记录 354；历史 `338 passed / 3 failed` 的三项 exp022 `test_lm_protocol` 在本机未复现） |
+| `python -m research.exp025.preflight` | **PASS**，`hierarchy_sha_match=true`，head 参数 8,217,796 |
+| CPU preflight（official_lmo/unfrozen、imagenet/trainable） | PASS（见证据文件） |
+| `amp_recovery_smoke`（CUDA，生产对象） | **PASS** + 修复前对照（见本节上文） |
+| `fixed200_v2_a01` / `fixed200_v2_scale16384_a01`（CUDA） | 前者两臂 @65536（full 在 step104 中止），后者 full 臂 200 步完成 |
+| `probe_conditioned_RECHECK`（CUDA） | COMPLETE，roundtrip MATCH |
+| `accum_RECHECK`（CUDA） | **PASS**，`scheduler_advanced_only_on_updates=true`，resume 与连续训练 LR 轨迹逐 update 相等，无 AMP 跳步 |
+| `cpp_RECHECK`（CUDA，在线 CPP） | **PASS**，8/8 步、无跳步、checkpoint roundtrip true、整步中位数 152.4 ms、峰值 allocated/reserved 1.523/1.783 GB |
+| 服务器 EGL smoke | **未执行**（仅由用户在服务器运行） |
+
+Gate A（production AMP）✔；Gate B（Residual V2）✔；Gate C（checkpoint 语义）✔；
+Gate D（hierarchy identity）✔；Gate E 的服务器 EGL 一项未执行，因此 `FORMAL_READY` 保持
+`False`，未启动 40 epoch 正式训练。
+
 ## 证据文件
 
 `evidence/` 下：`exp025_amp_imagenet_a02.json`（ImageNet AMP 失败 + 逐步 telemetry）、
@@ -300,17 +456,23 @@ AMP 无跳步），张量比较只作为"不超过实测噪声底的 3 倍"的�
 `exp025_probe200_a01/a02/a03/a04.json`（residual 三臂与评分规则对照；a01 的 conditioned
 臂因诊断脚本自身 bug 中止，`status=FAIL`，其 baseline 臂有效且与 a03/a04 逐点一致）、
 `exp025_accum_a03.json`（formal-path smoke）、`exp025_main_resume_a03.json`
-（derived：真实入口 resume 的 checkpoint 审计）。checkpoint 与完整日志仍外置。
+（derived：真实入口 resume 的 checkpoint 审计）。本轮新增：`exp025_amp_recovery_recheck.json`
+（生产路径 AMP recovery，新 gate）、`exp025_amp_recovery_unguarded_a01.json`（修复前循环对照）、
+`exp025_fixed200_v2_a01.json`（V2 两臂 @65536，full 臂在 step104 中止）、
+`exp025_fixed200_v2_scale16384_a01.json`（V2 full 臂 @16384 走完 200 步）、
+`exp025_probe_conditioned_recheck.json`（conditioned 臂 telemetry 修复后重跑 + roundtrip）、
+`exp025_cpp_recheck.json`（CPP real smoke）、`exp025_accum_recheck.json`（带 scheduler gate 的
+accumulation smoke）。checkpoint 与完整日志仍外置。
 
 ## 下一步（待用户确认）
 
-1. **训练策略**：是否允许 GradScaler 的正常恢复（非有限梯度时降 scale 并跳过该步），
-   或把初始 scale 调低到 16384 及以下。两者都会改变现有"非有限即致命"的 guard 语义，
+1. **诊断脚本的 guard 语义**：生产 engine 已按 GradScaler 的真实语义运行（跳过 + 降 scale +
+   不推进 scheduler）；`runtime.amp_step` 仍然是"非有限即致命"的诊断口径，用于把失败钉在
+   具体 step/参数上。是否让诊断脚本也接受 GradScaler 的正常恢复（或固定用 16384），由用户
+   决定；本轮未改诊断语义，也未在正式配置里改 AMP scale。
+2. **V2 的 65536 上溢**：V2 full 臂在 scale 65536 于 step104 出现与 V1 同类的 fp16 上溢
+   （不同步数、同一机制，`decoder` 侧）。是否把正式初始 scale 调低到 16384 及以下属训练策略，
    未经确认不实施。
-2. **正式 residual 头**：诊断支持两条独立改动——按预测 T3 分布做 soft conditioning
-   （`T3 probability -> soft expected CAD token -> concat(image token, soft CAD token)`，
-   不用 GT teacher forcing），以及最后一层零/小初始化。是否修改、以及是否作为单变量
-   对照分臂，由用户决定；本轮未动正式路径。
 3. **噪声底**：如需跨 run 逐张量比较（例如严格单变量消融），需要先隔离本机
    CUDA+AMP 不可复现的来源，或固定 `torch.use_deterministic_algorithms` 后重测。
 4. 正式训练、服务器 EGL、E5–E40 与完整 BOP/matched-PnP 评价均未执行；

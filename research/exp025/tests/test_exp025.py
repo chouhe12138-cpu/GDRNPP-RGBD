@@ -134,13 +134,50 @@ def test_transition_and_window():
 def test_modes_and_batch_contract(train, init):
     cfg = set_mode(read_config(), train, init)
     assert cfg.MODEL.POSE_NET.BACKBONE.FREEZE == (not train)
-    assert cfg.MODEL.WEIGHTS == ('' if init == 'imagenet' else 'pretrained_models/lmo_pbr/model_final_wo_optim.pth')
+    # `MODEL.WEIGHTS` names a complete GDRN_CAD checkpoint, so a fresh run leaves it
+    # empty whatever the backbone initialization is.
+    assert cfg.MODEL.WEIGHTS == ''
     from research.run_contract import validate_research_run_config
     from core.gdrn_modeling.models.GDRN_CAD import dataset_context
     assert dataset_context(cfg).hierarchy_path.name == 'consistent_v3.npz'
     validate_research_run_config(cfg, mode='prepare')
     with pytest.raises(ValueError, match='not ready'):
         validate_research_run_config(cfg, mode='formal')
+
+
+@pytest.mark.parametrize('train,init', [(False, 'official_lmo'), (True, 'imagenet')])
+def test_set_mode_never_rewrites_an_explicit_checkpoint(train, init):
+    cfg = read_config()
+    cfg.MODEL.WEIGHTS = 'output/experiments/EXP-20260920-025-hierarchical-cad-attention/run/model_final.pth'
+    assert set_mode(cfg, train, init).MODEL.WEIGHTS.endswith('run/model_final.pth')
+
+
+def test_eval_requires_a_complete_exp025_checkpoint(tmp_path):
+    """A legacy backbone-only checkpoint must be refused, not silently scored."""
+    from core.gdrn_modeling.models.GDRN_CAD import require_full_checkpoint
+    with pytest.raises(ValueError, match='empty path'):
+        require_full_checkpoint('')
+    missing = tmp_path / 'absent.pth'
+    with pytest.raises(FileNotFoundError, match='not found'):
+        require_full_checkpoint(str(missing))
+
+    head = ('cad_attention_head.t3_classifier.weight', 'cad_attention_head.residual_predictor.final.weight',
+            'cad_attention_head.mask_predictor.weight')
+    legacy = tmp_path / 'legacy_official.pth'
+    torch.save({'model': {'backbone.stem.weight': torch.zeros(1), 'pnet.conv.weight': torch.zeros(1)}}, legacy)
+    with pytest.raises(ValueError, match='not a complete EXP025 checkpoint') as caught:
+        require_full_checkpoint(str(legacy))
+    assert all(name in str(caught.value) for name in head)
+
+    partial = tmp_path / 'partial.pth'
+    torch.save({'model': {'backbone.stem.weight': torch.zeros(1), head[0]: torch.zeros(1)}}, partial)
+    with pytest.raises(ValueError, match='is not a complete EXP025 checkpoint'):
+        require_full_checkpoint(str(partial))
+
+    complete = tmp_path / 'complete.pth'
+    torch.save({'_module.backbone.stem.weight': torch.zeros(1),
+                **{f'_module.{name}': torch.zeros(1) for name in head}}, complete)
+    assert require_full_checkpoint(str(complete)) == str(complete)
 
 
 def test_wrapper_grad_range(head):

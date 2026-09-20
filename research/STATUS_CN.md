@@ -2,11 +2,34 @@
 
 最后核对：2026-09-20。
 
-## EXP025 统一 T3 分类（2026-09-20，第二轮：修复与诊断）
+## EXP025 统一 T3 分类（2026-09-20，第三轮：生产 AMP 与 Residual V2 收口）
 
-根据新交接与用户修订建立独立 GDRN_CAD：仅输出 T3=512 logits，经 FP32
-log_softmax/logsumexp 得到 T2/T1；三个 NLL 等权相加，nested target、bounded
-residual、mask 和无 GT feature routing。初始化来源与 backbone 冻结开关独立。
+**生产路径 AMP recovery 已验证**：`amp_recovery_smoke` 用 `LightningLite(precision=16)` 的
+真实对象（`_LiteModule` 进入 fp16 autocast 并把输入 cast 成 fp16、plugin 的 `GradScaler`、
+Lite optimizer wrapper）从 full 臂 step160 last-good 继续，在 iteration 166（历史记录的
+step 167）复现上溢：loss 有限、scale 65536→32768、内部 optimizer step 不增加、参数 delta
+恰为 0、进程继续，下一 update 正常。**engine 的 scheduler gate 因此收紧**：只有
+GradScaler 真正落到参数上的 update 才推进 LR 计划（修复前对照 `--unguarded-scheduler`
+在同一位置让 scheduler 多走一个 tick，终点 179 次 update 却到 `last_epoch=20`）。
+
+**Residual V2 已接入正式 head**：`T3 logits → FP32 softmax → detach 概率 → 对 64 维投影的
+T3 CAD token 求期望 → 与 image token 拼接 → Linear+GELU+Linear(3)（末层零初始化）→
+bounded residual`；不用 GT T3、不 top-k、loss 与 route target 不变、train/infer 同一
+forward。固定 batch @65536 匹配对照：residual-only 臂 200 步 0.5404→0.1238（V1 0.4183→
+0.5404）、无饱和、raw ≤0.71；full 臂 0–100 步 route 不劣于 V1（step100 route 0.2625 对
+0.4468、T3 NLL 0.2146 对 0.3465），@16384 走完 200 步后 residual 0.0700、GT-path XYZ
+3.08 mm、T3 accuracy 0.9998、饱和 0。V2 full 臂在 65536 于 step104 出现与 V1 同类的 fp16
+上溢（不同步数、同一机制）。
+
+**初始化与身份收口**：`BACKBONE_INIT` 只管主干初始化，`MODEL.WEIGHTS` 只表示完整
+GDRN_CAD checkpoint（fresh train 为 `""`，`set_mode` 不再覆盖它），`--eval-only`/
+`SAVE_RESULTS_ONLY` 缺完整 checkpoint 时 fail-closed；EXP025 固定 consistent_v3 SHA256
+`02ce0909…1a373`，`dataset_context`/preflight/所有报告都校验并记录（本机 preflight PASS、
+`hierarchy_sha_match=true`）。诊断脚本 `residual_probe` 的 raw telemetry 与 probe checkpoint
+缺陷已修（conditioned 臂重跑 0.0579 / 2.71 mm，roundtrip MATCH）。`FORMAL_READY=False`；
+正式训练、服务器 EGL、E5–E40 均未执行。细节与证据见 RECORD。
+
+### 第二轮（修复与诊断）
 
 **Resume 边界已定位并修复**：本机 `pytorch_lightning 1.6.4` 的 `_LiteOptimizer` 通过
 动态多继承使 `isinstance(wrapper, torch.optim.Optimizer)` 为真，其 `state_dict()` 委托底层
@@ -22,10 +45,11 @@ checkpointer 并在 load 后重同步；确定性的 13+resume13==连续26 逐�
 fixed-batch full 臂在 **step167** 失败，两处该步全部 loss、token norm、logits、raw residual
 都有限；从 step160 last-good 的 matched replay 为 A 当前 AMP(65536) 在 167 失败、
 B 低 scale AMP(1024) 与 C FP32 都跑到 200 且末步一致（0.3479/0.3484）。scale sweep：
-65536/32768 失败、16384 及以下全部通过，故该瞬态梯度元素量级在 (2.0, 4.0]——是
-**AMP 缩放后 fp16 梯度上溢**，而当前训练循环把 GradScaler 本应"降 scale 并跳过该步"的
-恢复路径当作致命错误。未加 clip、未关 AMP、未降 LR、未改 loss/结构/初始化；是否放宽该
-guard 属训练策略，待用户确认。
+65536/32768 失败、16384 及以下全部通过，即溢出量在缩放后跨过 fp16 上限，未缩放时约在
+(2.0, 4.0] 量级（这是**量级窗口**，不等于"最终 parameter gradient 必然在该区间"；中间量
+可能先溢出）——是 **AMP 缩放后 fp16 反向上溢**，而当时诊断循环把 GradScaler 本应
+"降 scale 并跳过该步"的恢复路径当作致命错误（生产 engine 无此 guard，第三轮已单独验证）。
+未加 clip、未关 AMP、未降 LR、未改 loss/结构/初始化。
 
 **residual 平台定位**：同一固定 batch、seed、200 步、route weight 0 下，正式残差路径
 （随机初始化）从 0.4183 退化到 0.5404 并在 9 位小数上停住、raw residual 涨到 ±12 且
