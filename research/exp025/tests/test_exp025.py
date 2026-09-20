@@ -145,14 +145,19 @@ def test_modes_and_batch_contract(train, init):
 
 @pytest.mark.parametrize('train,init', [(False, 'official_lmo'), (True, 'imagenet')])
 def test_modes_resolve_the_hierarchy_artifact(train, init):
-    """The dataset cache is a run-time mount, so the image build has no artifact to resolve."""
-    from core.gdrn_modeling.models.GDRN_CAD import dataset_context
+    """The dataset tree and the artifact cache are run-time mounts, so an image build has neither.
+
+    Registering the training split asserts on its dataset root and the resolver asserts the
+    artifact, so the split is only resolvable where the launcher has mounted both paths.
+    """
+    import ref
     cfg = set_mode(read_config(), train, init)
-    try:
-        context = dataset_context(cfg)
-    except FileNotFoundError:
-        pytest.skip('EXP025 hierarchy artifact is not installed here')
-    assert context.hierarchy_path.name == 'consistent_v3.npz'
+    artifact = Path(str(cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH))
+    train_root = Path(ref.lm_full.dataset_root) / 'train_pbr'
+    if not artifact.is_file() or not train_root.is_dir():
+        pytest.skip(f'EXP025 run-time data is not installed: {artifact} / {train_root}')
+    from core.gdrn_modeling.models.GDRN_CAD import dataset_context
+    assert dataset_context(cfg).hierarchy_path.name == 'consistent_v3.npz'
 
 
 @pytest.mark.parametrize('train,init', [(False, 'official_lmo'), (True, 'imagenet')])
