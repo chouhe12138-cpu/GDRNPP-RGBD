@@ -5,9 +5,13 @@
 2026-09-19：EXP022 新增公共 CAD hierarchy 整理与 sanity 纠正记录；不新增实验 ID，
 不改变下表 formal 状态。新公共 API 见 [说明](cad_hierarchy/README.md)。
 
+2026-09-20：EXP025 按修复指导包完成 resume 边界修复（共享框架，影响所有
+`engine.do_train` 训练）与非有限梯度定位；仅新增诊断工具与测试，未改模型、loss、
+层级或协议，未启动 formal。
+
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
-| EXP025 统一 T3 CAD attention | IMPLEMENTED / NUMERICAL_REVIEW / FORMAL_NOT_STARTED | 官方冻结/解冻 smoke 通过；fixed-batch 和 ImageNet AMP 存在数值问题 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | IMPLEMENTED / DIAGNOSED / FORMAL_NOT_STARTED | resume 边界已修复；非有限梯度定位为 AMP 缩放后 fp16 梯度上溢（scale 阈值在 16384 与 32768 之间），非 loss/结构发散 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

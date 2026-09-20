@@ -2,17 +2,46 @@
 
 最后核对：2026-09-20。
 
-## EXP025 统一 T3 分类（2026-09-20）
+## EXP025 统一 T3 分类（2026-09-20，第二轮：修复与诊断）
 
 根据新交接与用户修订建立独立 GDRN_CAD：仅输出 T3=512 logits，经 FP32
 log_softmax/logsumexp 得到 T2/T1；三个 NLL 等权相加，nested target、bounded
 residual、mask 和无 GT feature routing。初始化来源与 backbone 冻结开关独立。
-冻结/未冻结官方主干的 CUDA/CPP/AMP 8-step smoke 与 checkpoint 回读通过。
-固定 batch 两臂诊断发现 residual-only 平台，full 在 step160 后非有限梯度停止；
-ImageNet 解冻 smoke 也触发非有限梯度。不能将工程接线通过视为可学习性通过。
-真实入口有界smoke与续跑均退出0，但续跑optimizer step未累计，完整恢复待查。
-`FORMAL_READY=False`，暂不改变既定网络设计，等待数值问题 review。
-实现、验证范围与未完成项见 [EXP025 README](exp025/README.md) 和
+
+**Resume 边界已定位并修复**：本机 `pytorch_lightning 1.6.4` 的 `_LiteOptimizer` 通过
+动态多继承使 `isinstance(wrapper, torch.optim.Optimizer)` 为真，其 `state_dict()` 委托底层
+optimizer（保存正确），但 `load_state_dict` 落到 `torch.optim.Optimizer` 版本，只恢复
+wrapper 自身，真正 step 的底层 optimizer 状态与 scheduler 的 LR 写入都会脱钩。
+`core/utils/my_checkpoint.py` 新增 fail-closed 的 `unwrap_optimizer_for_checkpoint` 与
+`resync_wrapped_optimizer`，`engine.do_train` 用底层 optimizer 建 scheduler/注册
+checkpointer 并在 load 后重同步；确定性的 13+resume13==连续26 逐步相等 contract 测试已加入
+`research/tests/test_lite_optimizer_resume.py`（修复前同 fixture 停在 step 13、权重最大差
+1.42e-3）。该修复作用于所有经 `engine.do_train` 的训练，不只 EXP025。
+
+**非有限梯度已定位**：不是 loss/激活发散。ImageNet 8-step 在 **step3**、official frozen
+fixed-batch full 臂在 **step167** 失败，两处该步全部 loss、token norm、logits、raw residual
+都有限；从 step160 last-good 的 matched replay 为 A 当前 AMP(65536) 在 167 失败、
+B 低 scale AMP(1024) 与 C FP32 都跑到 200 且末步一致（0.3479/0.3484）。scale sweep：
+65536/32768 失败、16384 及以下全部通过，故该瞬态梯度元素量级在 (2.0, 4.0]——是
+**AMP 缩放后 fp16 梯度上溢**，而当前训练循环把 GradScaler 本应"降 scale 并跳过该步"的
+恢复路径当作致命错误。未加 clip、未关 AMP、未降 LR、未改 loss/结构/初始化；是否放宽该
+guard 属训练策略，待用户确认。
+
+**residual 平台定位**：同一固定 batch、seed、200 步、route weight 0 下，正式残差路径
+（随机初始化）从 0.4183 退化到 0.5404 并在 9 位小数上停住、raw residual 涨到 ±12 且
+tanh 饱和 5–9%；最后一层零初始化的同路径单调降到 0.1258（GT-path XYZ 5.69→4.94 mm、
+全程无饱和），GT-T3-conditioned 诊断臂降到 0.0567（2.67 mm）。即 residual regression
+本身可学，平台来自初始化/缺少 T3 身份输入，而不是"不可学"。
+
+**新增诊断工具**（`research/exp025/`）：`amp_step` 失败时带 step/scale/loss 分量/
+token/raw residual/逐模块梯度范数与元素最大值，`learnability`/`real_smoke` 每 20 步写
+last-good checkpoint；`numerical_replay` 做 AMP/低scale/FP32 matched 重放；
+`residual_probe` 做 baseline/zero-init/GT-T3-conditioned 三臂对照；
+`accumulation_smoke` 覆盖 batch4×accumulate12 的状态机与 resume，真实入口
+`main_gdrn --resume` 已复验 optimizer step 2→4 与 scheduler 同步累计。本机 CUDA+AMP
+路径不能逐位复现（两次相同运行权重最大差 1.56e-3），跨 run 的严格张量比较需先解决该噪声。
+`FORMAL_READY=False` 仍不变，正式训练、服务器 EGL 与 E5–E40 均未执行。
+实现与未完成项见 [EXP025 README](exp025/README.md) 和
 [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md)。
 下方“尚未建立 EXP025 / 等待安排”等为 09-19 及以前历史状态，本段为最新安排。
 

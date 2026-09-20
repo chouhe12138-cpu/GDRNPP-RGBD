@@ -89,20 +89,34 @@ class HierarchicalCADAttentionHead(nn.Module):
             descriptors.append(torch.cat((anchor/extent, normal, relative/extent, radius[..., None]/diameter), -1))
         return tuple(bank[inverse] for bank in self.geometry(descriptors))
 
-    def forward(self, feature, classes):
+    def encode(self, feature, classes):
+        """Image tokens after self-attention and the T0/T1/T2/T3 cross-attention ladder."""
+        tokens = self.image_projection(self.decoder(feature)).flatten(2).transpose(1, 2)
+        tokens = self.image_attention(tokens)
+        banks = self.token_banks(classes)
+        for block, bank in zip(self.cross_attention, banks):
+            tokens = block(tokens, bank)
+        return tokens, banks
+
+    def forward(self, feature, classes, diagnostics=None):
         if feature.ndim != 4 or feature.shape[1:] != (1024, 8, 8):
             raise ValueError('EXP025 requires [B,1024,8,8] backbone features')
         if classes.shape != (len(feature),) or torch.any((classes < 0) | (classes >= self.num_objects)):
             raise ValueError('Invalid EXP025 ROI classes')
-        tokens = self.image_projection(self.decoder(feature)).flatten(2).transpose(1, 2)
-        tokens = self.image_attention(tokens)
-        for block, bank in zip(self.cross_attention, self.token_banks(classes)):
-            tokens = block(tokens, bank)
+        tokens, banks = self.encode(feature, classes)
         b = len(feature)
         dense = lambda x: x.transpose(1, 2).reshape(b, -1, 64, 64)
-        return dict(t3_logits=dense(self.t3_classifier(tokens)),
-                    residual=bounded_residual(dense(self.residual_predictor(tokens))),
-                    mask_logit=dense(self.mask_predictor(tokens)))
+        raw = dense(self.residual_predictor(tokens))
+        prediction = dict(t3_logits=dense(self.t3_classifier(tokens)),
+                          residual=bounded_residual(raw),
+                          mask_logit=dense(self.mask_predictor(tokens)))
+        if diagnostics is not None:
+            # Detached tensors only; statistics live in the diagnostic runners.
+            diagnostics.update(image_tokens=tokens.detach(), cad_tokens=banks[3].detach(),
+                               t3_logits=prediction['t3_logits'].detach(),
+                               mask_logit=prediction['mask_logit'].detach(),
+                               raw_residual=raw.detach(), residual=prediction['residual'].detach())
+        return prediction
 
     def decode(self, prediction, classes, ids=None):
         """Optional IDs are for isolated diagnostics only; forward never consumes GT."""

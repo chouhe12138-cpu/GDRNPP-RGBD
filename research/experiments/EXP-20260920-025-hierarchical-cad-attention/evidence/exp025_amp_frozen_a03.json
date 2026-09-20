@@ -1,0 +1,131 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "f2f735fb935d3f5980b415d68dc818e44126a675",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_amp_frozen_a03",
+  "status": "PASS",
+  "batch_source": "online",
+  "renderer": "cpp",
+  "batch_size": 4,
+  "steps": 8,
+  "device": "cuda:0",
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 8119172
+    }
+  ],
+  "losses": [
+    {
+      "loss_cad_t1": 2.070434808731079,
+      "loss_cad_t2": 4.156582832336426,
+      "loss_cad_t3": 6.407712936401367,
+      "loss_cad_residual": 0.41829627752304077,
+      "loss_cad_mask": 0.5308449268341064
+    },
+    {
+      "loss_cad_t1": 2.002500057220459,
+      "loss_cad_t2": 3.9655346870422363,
+      "loss_cad_t3": 6.177475452423096,
+      "loss_cad_residual": 0.5459396243095398,
+      "loss_cad_mask": 0.43402379751205444
+    },
+    {
+      "loss_cad_t1": 1.9199929237365723,
+      "loss_cad_t2": 3.742511749267578,
+      "loss_cad_t3": 5.992876052856445,
+      "loss_cad_residual": 0.5459468364715576,
+      "loss_cad_mask": 0.4032791554927826
+    },
+    {
+      "loss_cad_t1": 1.802642822265625,
+      "loss_cad_t2": 3.5151829719543457,
+      "loss_cad_t3": 5.814419746398926,
+      "loss_cad_residual": 0.5459457635879517,
+      "loss_cad_mask": 0.21198570728302002
+    },
+    {
+      "loss_cad_t1": 1.6698546409606934,
+      "loss_cad_t2": 3.309713125228882,
+      "loss_cad_t3": 5.630681991577148,
+      "loss_cad_residual": 0.5459439754486084,
+      "loss_cad_mask": 0.27032122015953064
+    },
+    {
+      "loss_cad_t1": 1.5221935510635376,
+      "loss_cad_t2": 3.114914655685425,
+      "loss_cad_t3": 5.463878631591797,
+      "loss_cad_residual": 0.545941174030304,
+      "loss_cad_mask": 0.22847941517829895
+    },
+    {
+      "loss_cad_t1": 1.3623971939086914,
+      "loss_cad_t2": 2.9249649047851562,
+      "loss_cad_t3": 5.336971282958984,
+      "loss_cad_residual": 0.545934796333313,
+      "loss_cad_mask": 0.1774650514125824
+    },
+    {
+      "loss_cad_t1": 1.2062959671020508,
+      "loss_cad_t2": 2.7313103675842285,
+      "loss_cad_t3": 5.21809720993042,
+      "loss_cad_residual": 0.5459127426147461,
+      "loss_cad_mask": 0.16847524046897888
+    }
+  ],
+  "timings": [
+    {
+      "forward_ms": 613.7605759995495,
+      "backward_and_update_ms": 279.32610800053226
+    },
+    {
+      "forward_ms": 51.08001799999329,
+      "backward_and_update_ms": 105.9361869993154
+    },
+    {
+      "forward_ms": 50.63058300038392,
+      "backward_and_update_ms": 109.97141099960572
+    },
+    {
+      "forward_ms": 69.92386799993255,
+      "backward_and_update_ms": 123.61949400019512
+    },
+    {
+      "forward_ms": 49.655069000436924,
+      "backward_and_update_ms": 103.55727499973
+    },
+    {
+      "forward_ms": 41.32539100010035,
+      "backward_and_update_ms": 101.29493399927014
+    },
+    {
+      "forward_ms": 43.25812099978066,
+      "backward_and_update_ms": 103.26779100068961
+    },
+    {
+      "forward_ms": 43.48222299995541,
+      "backward_and_update_ms": 97.5675620002221
+    }
+  ],
+  "current_step": 8,
+  "amp_skipped_steps": 0,
+  "last_good": {
+    "step": 8,
+    "path": "last_good.pth"
+  },
+  "step_median_ms": 149.8691280003186,
+  "peak_allocated_gb": 1.465472,
+  "peak_reserved_gb": 1.725956096,
+  "total_parameters": 95683588,
+  "checkpoint": "smoke_checkpoint.pth",
+  "timing_scope": "fixed batch; excludes repeated loader/render",
+  "checkpoint_roundtrip": true
+}

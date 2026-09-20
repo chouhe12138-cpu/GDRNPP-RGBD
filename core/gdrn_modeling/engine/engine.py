@@ -36,6 +36,7 @@ from lib.torch_utils.torch_utils import ModelEMA
 from lib.torch_utils.misc import nan_to_num
 from core.utils import solver_utils
 import core.utils.my_comm as comm
+from core.utils import my_checkpoint
 from core.utils.my_checkpoint import MyCheckpointer
 from core.utils.my_writer import (
     EpochJSONWriter,
@@ -308,11 +309,15 @@ class GDRN_Lite(LightningLite):
             cfg.SOLVER.TOTAL_EPOCHS,
             accumulate_iter,
         )
-        scheduler = solver_utils.build_lr_scheduler(cfg, optimizer, total_iters=optimizer_updates)
+        # A LightningLite wrapper inherits `torch.optim.Optimizer.load_state_dict`, which
+        # never reaches the optimizer it steps.  The scheduler and the checkpointer must
+        # both be bound to the optimizer that owns the training state.
+        state_optimizer = my_checkpoint.unwrap_optimizer_for_checkpoint(optimizer)
+        scheduler = solver_utils.build_lr_scheduler(cfg, state_optimizer, total_iters=optimizer_updates)
 
         # resume or load model ===================================
         extra_ckpt_dict = dict(
-            optimizer=optimizer,
+            optimizer=state_optimizer,
             scheduler=scheduler,
         )
         if hasattr(self._precision_plugin, "scaler"):
@@ -327,6 +332,9 @@ class GDRN_Lite(LightningLite):
             **extra_ckpt_dict,
         )
         checkpoint_state = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume)
+        # The restored optimizer replaced its own state/param_groups; the wrapper used
+        # for stepping must see the resumed objects, not the ones from construction.
+        my_checkpoint.resync_wrapped_optimizer(optimizer)
         start_iter = checkpoint_state.get("iteration", -1) + 1
 
         # Exponential moving average (NOTE: initialize ema after loading weights) ========================
@@ -488,7 +496,7 @@ class GDRN_Lite(LightningLite):
                     optimizer.zero_grad(set_to_none=True)
                     if ema is not None:
                         ema.update(model)
-                    storage.put_scalar("lr", optimizer.param_groups[0]["lr"], smoothing_hint=False)
+                    storage.put_scalar("lr", state_optimizer.param_groups[0]["lr"], smoothing_hint=False)
                     scheduler.step()
                 if self.is_global_zero:
                     log_first_n(logging.INFO, "iteration {} backward finished.".format(iteration), n=2)
@@ -501,8 +509,8 @@ class GDRN_Lite(LightningLite):
                     and (iteration + 1) >= periodic_checkpointer.max_iter
                 )
                 if checkpoint_due:
-                    if hasattr(optimizer, "consolidate_state_dict"):  # for ddp_sharded
-                        optimizer.consolidate_state_dict()
+                    if hasattr(state_optimizer, "consolidate_state_dict"):  # for ddp_sharded
+                        state_optimizer.consolidate_state_dict()
                 if structured_checkpoints:
                     if checkpoint_due and self.is_global_zero:
                         checkpoint_name = f"model_epoch_{int(epoch):03d}"

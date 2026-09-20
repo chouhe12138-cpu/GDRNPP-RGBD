@@ -1,5 +1,6 @@
 import pickle
 import os
+import torch
 from detectron2.utils.file_io import PathManager
 from detectron2.checkpoint import DetectionCheckpointer
 from mmcv.runner.checkpoint import (
@@ -25,6 +26,74 @@ from fairscale.nn.data_parallel.sharded_ddp import ShardedDataParallel
 _logger = logging.getLogger(__name__)
 
 
+# `_LiteOptimizer.__init__` builds `Lite<Class>` from `(_LiteOptimizer, <optimizer
+# class>)` and exposes the wrapped optimizer through `_optimizer` plus an
+# `optimizer` property.  Both names are probed because only the local environment
+# can prove which one exists; anything else is refused instead of guessed.
+_WRAPPER_OPTIMIZER_ATTRIBUTES = ("_optimizer", "optimizer")
+
+
+def _wrapped_optimizers(optimizer):
+    """Distinct torch optimizers reachable through known LightningLite attributes."""
+    found = []
+    for name in _WRAPPER_OPTIMIZER_ATTRIBUTES:
+        candidate = getattr(optimizer, name, None)
+        if isinstance(candidate, torch.optim.Optimizer) and candidate is not optimizer:
+            if all(candidate is not other for other in found):
+                found.append(candidate)
+    return found
+
+
+def unwrap_optimizer_for_checkpoint(optimizer):
+    """Return the optimizer that owns the state a checkpoint must restore.
+
+    A LightningLite-wrapped optimizer passes `isinstance(..., torch.optim.Optimizer)`
+    because its dynamic class inherits the wrapped class, but the wrapper is not the
+    object that trains: `step()` delegates to `_optimizer`.  The wrapper overrides
+    `state_dict` while inheriting `torch.optim.Optimizer.load_state_dict`, which
+    restores onto the wrapper's own `__dict__` and never reaches the inner optimizer.
+    Registering the wrapper therefore saves correct state but silently discards it on
+    resume: the training optimizer keeps fresh momentum and a reset step counter.
+    Plain optimizers are returned unchanged.
+    """
+    wrapped = _wrapped_optimizers(optimizer)
+    if not wrapped:
+        if isinstance(optimizer, torch.optim.Optimizer):
+            return optimizer
+        raise TypeError(f"Cannot checkpoint {type(optimizer)!r}: neither a torch optimizer nor a known wrapper")
+    if len(wrapped) != 1:
+        raise TypeError(
+            f"Ambiguous optimizer wrapper {type(optimizer)!r}: "
+            f"candidates={[type(candidate).__name__ for candidate in wrapped]}"
+        )
+    inner = wrapped[0]
+    outer_groups = getattr(optimizer, "param_groups", None)
+    if outer_groups is not None:
+        outer_ids = [id(param) for group in outer_groups for param in group["params"]]
+        inner_ids = [id(param) for group in inner.param_groups for param in group["params"]]
+        if outer_ids != inner_ids:
+            raise RuntimeError("wrapper and inner optimizer param_groups disagree")
+    return inner
+
+
+def resync_wrapped_optimizer(optimizer):
+    """Re-share state with the wrapped optimizer after a checkpoint load.
+
+    The wrapper starts out holding the wrapped optimizer's own `state` and
+    `param_groups` objects.  Loading a checkpoint into the inner optimizer replaces
+    them, which detaches the wrapper: LR reads through the wrapper (and writes from a
+    scheduler holding the wrapper) would then use stale groups.  Re-point the wrapper
+    at the inner objects.  No-op for plain optimizers.
+    """
+    wrapped = _wrapped_optimizers(optimizer)
+    if not wrapped:
+        return
+    if len(wrapped) != 1:
+        raise TypeError(f"Ambiguous optimizer wrapper {type(optimizer)!r}")
+    optimizer.state = wrapped[0].state
+    optimizer.param_groups = wrapped[0].param_groups
+
+
 class MyCheckpointer(DetectionCheckpointer):
     """https://github.com/aim-
     uofa/AdelaiDet/blob/master/adet/checkpoint/adet_checkpoint.py Same as
@@ -35,6 +104,18 @@ class MyCheckpointer(DetectionCheckpointer):
         # HACK: deal with lite model
         while isinstance(model, (DistributedDataParallel, DataParallel, _LiteModule, ShardedDataParallel)):
             model = model.module
+
+        # Same treatment for the optimizer: a LightningLite wrapper cannot restore
+        # the state it saves, so checkpoint the optimizer that actually trains.
+        if checkpointables.get("optimizer") is not None:
+            registered = unwrap_optimizer_for_checkpoint(checkpointables["optimizer"])
+            if registered is not checkpointables["optimizer"]:
+                _logger.info(
+                    "Checkpointing inner optimizer %s instead of wrapper %s",
+                    type(registered).__name__,
+                    type(checkpointables["optimizer"]).__name__,
+                )
+            checkpointables["optimizer"] = registered
 
         super().__init__(
             model,

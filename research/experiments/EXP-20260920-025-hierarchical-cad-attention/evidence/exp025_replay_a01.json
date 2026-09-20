@@ -1,0 +1,1328 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "f2f735fb935d3f5980b415d68dc818e44126a675",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_replay_a01",
+  "status": "COMPLETE",
+  "steps": 40,
+  "batch_size": 4,
+  "source_batch": ".local/exp025/fixed_batch4_a01.pt",
+  "from_checkpoint": "output/diagnostics/exp025_fixed200_a02/full_last_good.pth",
+  "arms": {
+    "amp_current": {
+      "arm": "amp_current",
+      "start_step": 160,
+      "status": "NON_FINITE",
+      "steps": [
+        {
+          "step": 161,
+          "total_loss": 0.200128436088562,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.222055724980095,
+            "cad_attention_head.decoder": 2.541559076505552,
+            "cad_attention_head.geometry": 0.6909418168538292,
+            "cad_attention_head.image_attention": 1.0939300338747702,
+            "cad_attention_head.image_projection": 0.5771956319602706,
+            "cad_attention_head.mask_predictor": 0.023341021420353828,
+            "cad_attention_head.residual_predictor": 5.515905788477003,
+            "cad_attention_head.t3_classifier": 0.09239568828160935
+          }
+        },
+        {
+          "step": 162,
+          "total_loss": 0.20246528089046478,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.3651937931198925,
+            "cad_attention_head.decoder": 3.3941755780326686,
+            "cad_attention_head.geometry": 0.7922082187732654,
+            "cad_attention_head.image_attention": 1.2798340221586615,
+            "cad_attention_head.image_projection": 0.6995567671539981,
+            "cad_attention_head.mask_predictor": 0.025601268635883027,
+            "cad_attention_head.residual_predictor": 5.287503106641082,
+            "cad_attention_head.t3_classifier": 0.11185794783526011
+          }
+        },
+        {
+          "step": 163,
+          "total_loss": 0.20979204773902893,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.5204917933268027,
+            "cad_attention_head.decoder": 5.8490828097253225,
+            "cad_attention_head.geometry": 0.8543823260792848,
+            "cad_attention_head.image_attention": 1.4315535409513591,
+            "cad_attention_head.image_projection": 0.8090793446120397,
+            "cad_attention_head.mask_predictor": 0.028508205682474357,
+            "cad_attention_head.residual_predictor": 5.602912979787225,
+            "cad_attention_head.t3_classifier": 0.17743641219142722
+          }
+        },
+        {
+          "step": 164,
+          "total_loss": 0.300127238035202,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.609196347202444,
+            "cad_attention_head.decoder": 13.749325729447948,
+            "cad_attention_head.geometry": 0.899115195002461,
+            "cad_attention_head.image_attention": 1.7651955906773706,
+            "cad_attention_head.image_projection": 1.027998900289541,
+            "cad_attention_head.mask_predictor": 0.0953561297777036,
+            "cad_attention_head.residual_predictor": 5.910663319510182,
+            "cad_attention_head.t3_classifier": 0.5530020817895293
+          }
+        },
+        {
+          "step": 165,
+          "total_loss": 0.4002355635166168,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.4957784257307822,
+            "cad_attention_head.decoder": 15.533843258514889,
+            "cad_attention_head.geometry": 0.9206613779208861,
+            "cad_attention_head.image_attention": 2.069493857208339,
+            "cad_attention_head.image_projection": 1.4883826714347859,
+            "cad_attention_head.mask_predictor": 0.17379757042408014,
+            "cad_attention_head.residual_predictor": 5.835395173709987,
+            "cad_attention_head.t3_classifier": 0.8537052914332284
+          }
+        },
+        {
+          "step": 166,
+          "total_loss": 0.5566321611404419,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.1602577183536673,
+            "cad_attention_head.decoder": 30.671045888989706,
+            "cad_attention_head.geometry": 1.4619925992222422,
+            "cad_attention_head.image_attention": 3.695341262673311,
+            "cad_attention_head.image_projection": 2.8577272482743803,
+            "cad_attention_head.mask_predictor": 0.2106650079047031,
+            "cad_attention_head.residual_predictor": 6.383558231065167,
+            "cad_attention_head.t3_classifier": 1.3969621486782817
+          }
+        }
+      ],
+      "amp_scale": 65536.0,
+      "non_finite_parameters": [],
+      "first_bad_step": 167,
+      "error": "Non-finite gradient (AMP): ['cad_attention_head.decoder.2.block.3.weight', 'cad_attention_head.decoder.3.block.0.weight', 'cad_attention_head.decoder.3.block.3.weight', 'cad_attention_head.residual_predictor.weight']",
+      "failure": {
+        "step": 167,
+        "amp_scale": 65536.0,
+        "losses": {
+          "loss_cad_t1": 0.12059473246335983,
+          "loss_cad_t2": 0.4170776307582855,
+          "loss_cad_t3": 1.0082392692565918,
+          "loss_cad_residual": 0.14788708090782166,
+          "loss_cad_mask": 0.04376998543739319
+        },
+        "head": {
+          "image_tokens_token_norm": {
+            "mean": 83.42554473876953,
+            "p95": 106.68819427490234,
+            "max": 122.15774536132812
+          },
+          "cad_tokens_token_norm": {
+            "mean": 40.979942321777344,
+            "p95": 51.29902648925781,
+            "max": 54.555362701416016
+          },
+          "t3_logits": {
+            "finite": true,
+            "abs_mean": 4.674728870391846,
+            "abs_max": 34.25
+          },
+          "mask_logit": {
+            "finite": true,
+            "abs_mean": 13.144481658935547,
+            "abs_max": 22.015625
+          },
+          "raw_residual": {
+            "abs_max": 0.85302734375,
+            "fraction_abs_gt_5": 0.0,
+            "fraction_abs_gt_9": 0.0,
+            "tanh_exact_saturation": 0.0
+          },
+          "bounded_residual_norm_max": 0.92046719789505,
+          "t3_classifier_weight_abs_max": 0.10131832957267761
+        },
+        "grad": {
+          "grad_norm": {
+            "cad_attention_head.cross_attention": 6.524327338106689,
+            "cad_attention_head.decoder": null,
+            "cad_attention_head.geometry": 3.155528091862576,
+            "cad_attention_head.image_attention": 8.94312476619254,
+            "cad_attention_head.image_projection": 6.786858801298538,
+            "cad_attention_head.mask_predictor": 0.4489308126531771,
+            "cad_attention_head.residual_predictor": null,
+            "cad_attention_head.t3_classifier": 3.5696365579160387
+          },
+          "non_finite_parameters": [
+            "cad_attention_head.decoder.2.block.3.weight",
+            "cad_attention_head.decoder.3.block.0.weight",
+            "cad_attention_head.decoder.3.block.3.weight",
+            "cad_attention_head.residual_predictor.weight"
+          ]
+        },
+        "non_finite_parameters": [
+          "cad_attention_head.decoder.2.block.3.weight",
+          "cad_attention_head.decoder.3.block.0.weight",
+          "cad_attention_head.decoder.3.block.3.weight",
+          "cad_attention_head.residual_predictor.weight"
+        ]
+      },
+      "last_finite_step": 166,
+      "last_finite_total_loss": 0.5566321611404419
+    },
+    "amp_low_scale": {
+      "arm": "amp_low_scale",
+      "start_step": 160,
+      "status": "FINITE",
+      "steps": [
+        {
+          "step": 161,
+          "total_loss": 0.200128436088562,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.222052110090175,
+            "cad_attention_head.decoder": 2.5414098099351468,
+            "cad_attention_head.geometry": 0.6909421915325787,
+            "cad_attention_head.image_attention": 1.093925445077791,
+            "cad_attention_head.image_projection": 0.5771942733662562,
+            "cad_attention_head.mask_predictor": 0.023340910446329955,
+            "cad_attention_head.residual_predictor": 5.515905788477003,
+            "cad_attention_head.t3_classifier": 0.09239627797466508
+          }
+        },
+        {
+          "step": 162,
+          "total_loss": 0.20248943567276,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.3652692940563558,
+            "cad_attention_head.decoder": 3.397332509866775,
+            "cad_attention_head.geometry": 0.7921576725728543,
+            "cad_attention_head.image_attention": 1.279942905053124,
+            "cad_attention_head.image_projection": 0.6996347785375904,
+            "cad_attention_head.mask_predictor": 0.025610123509795364,
+            "cad_attention_head.residual_predictor": 5.287675921253413,
+            "cad_attention_head.t3_classifier": 0.11179067853287664
+          }
+        },
+        {
+          "step": 163,
+          "total_loss": 0.21001586318016052,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.520961492782479,
+            "cad_attention_head.decoder": 5.856786470152506,
+            "cad_attention_head.geometry": 0.8543096333686134,
+            "cad_attention_head.image_attention": 1.4320421750526573,
+            "cad_attention_head.image_projection": 0.8093609567937275,
+            "cad_attention_head.mask_predictor": 0.02841532696756967,
+            "cad_attention_head.residual_predictor": 5.605746294587215,
+            "cad_attention_head.t3_classifier": 0.17836513044345265
+          }
+        },
+        {
+          "step": 164,
+          "total_loss": 0.30037426948547363,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.6083059647025757,
+            "cad_attention_head.decoder": 13.767668474889472,
+            "cad_attention_head.geometry": 0.8987359128248362,
+            "cad_attention_head.image_attention": 1.7658537386327429,
+            "cad_attention_head.image_projection": 1.0268966822532117,
+            "cad_attention_head.mask_predictor": 0.09675347547981203,
+            "cad_attention_head.residual_predictor": 5.910885727698764,
+            "cad_attention_head.t3_classifier": 0.5532538873934696
+          }
+        },
+        {
+          "step": 165,
+          "total_loss": 0.3998527228832245,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.484126802747663,
+            "cad_attention_head.decoder": 15.421104575353194,
+            "cad_attention_head.geometry": 0.9136716658760211,
+            "cad_attention_head.image_attention": 2.051989372705307,
+            "cad_attention_head.image_projection": 1.473533745855455,
+            "cad_attention_head.mask_predictor": 0.17455737272166014,
+            "cad_attention_head.residual_predictor": 5.81618514995353,
+            "cad_attention_head.t3_classifier": 0.8516415165766471
+          }
+        },
+        {
+          "step": 166,
+          "total_loss": 0.549491286277771,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.1169937087046367,
+            "cad_attention_head.decoder": 30.082584667387607,
+            "cad_attention_head.geometry": 1.4315568926687021,
+            "cad_attention_head.image_attention": 3.609034828575626,
+            "cad_attention_head.image_projection": 2.7899796556684713,
+            "cad_attention_head.mask_predictor": 0.21172485557074722,
+            "cad_attention_head.residual_predictor": 6.379043279935019,
+            "cad_attention_head.t3_classifier": 1.3733469008730677
+          }
+        },
+        {
+          "step": 167,
+          "total_loss": 1.6927391290664673,
+          "grad": {
+            "cad_attention_head.cross_attention": 6.385313075087847,
+            "cad_attention_head.decoder": 67.56839701759954,
+            "cad_attention_head.geometry": 3.0907536280900065,
+            "cad_attention_head.image_attention": 8.716830107430889,
+            "cad_attention_head.image_projection": 6.616529772068619,
+            "cad_attention_head.mask_predictor": 0.44470573250613993,
+            "cad_attention_head.residual_predictor": 8.849030748605049,
+            "cad_attention_head.t3_classifier": 3.4755775694935283
+          }
+        },
+        {
+          "step": 168,
+          "total_loss": 2.70306396484375,
+          "grad": {
+            "cad_attention_head.cross_attention": 6.404308897930864,
+            "cad_attention_head.decoder": 68.40409370167325,
+            "cad_attention_head.geometry": 3.058364415010166,
+            "cad_attention_head.image_attention": 9.076250616896273,
+            "cad_attention_head.image_projection": 7.1467810874409885,
+            "cad_attention_head.mask_predictor": 0.390945395877658,
+            "cad_attention_head.residual_predictor": 6.176665701499751,
+            "cad_attention_head.t3_classifier": 4.470331786286016
+          }
+        },
+        {
+          "step": 169,
+          "total_loss": 2.0829405784606934,
+          "grad": {
+            "cad_attention_head.cross_attention": 4.244024764418184,
+            "cad_attention_head.decoder": 44.53890114277255,
+            "cad_attention_head.geometry": 2.1897917396389643,
+            "cad_attention_head.image_attention": 4.8938931745320655,
+            "cad_attention_head.image_projection": 3.86195741965854,
+            "cad_attention_head.mask_predictor": 0.5056390167884589,
+            "cad_attention_head.residual_predictor": 8.711987867343115,
+            "cad_attention_head.t3_classifier": 3.5239534196097506
+          }
+        },
+        {
+          "step": 170,
+          "total_loss": 1.7902058362960815,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.044275883085755,
+            "cad_attention_head.decoder": 28.717854976732877,
+            "cad_attention_head.geometry": 0.9162905190874837,
+            "cad_attention_head.image_attention": 2.562386989713786,
+            "cad_attention_head.image_projection": 1.831708460759947,
+            "cad_attention_head.mask_predictor": 0.2611814384271299,
+            "cad_attention_head.residual_predictor": 8.122579723126579,
+            "cad_attention_head.t3_classifier": 3.0105102130231685
+          }
+        },
+        {
+          "step": 171,
+          "total_loss": 1.643726110458374,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.0927986731251935,
+            "cad_attention_head.decoder": 24.30980803178126,
+            "cad_attention_head.geometry": 1.1953790306606713,
+            "cad_attention_head.image_attention": 3.060441689718383,
+            "cad_attention_head.image_projection": 2.2604130680448185,
+            "cad_attention_head.mask_predictor": 0.35982448203413125,
+            "cad_attention_head.residual_predictor": 5.494183619507611,
+            "cad_attention_head.t3_classifier": 2.7698292528196897
+          }
+        },
+        {
+          "step": 172,
+          "total_loss": 1.3897849321365356,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.676313091002466,
+            "cad_attention_head.decoder": 18.939112280335365,
+            "cad_attention_head.geometry": 0.8127999939521554,
+            "cad_attention_head.image_attention": 2.04596710830977,
+            "cad_attention_head.image_projection": 1.3738415725826463,
+            "cad_attention_head.mask_predictor": 0.29669248482019206,
+            "cad_attention_head.residual_predictor": 7.512798712559459,
+            "cad_attention_head.t3_classifier": 2.432029632466687
+          }
+        },
+        {
+          "step": 173,
+          "total_loss": 1.257843255996704,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.615463564220585,
+            "cad_attention_head.decoder": 17.02770090892561,
+            "cad_attention_head.geometry": 0.7911574876595242,
+            "cad_attention_head.image_attention": 2.0403432334268206,
+            "cad_attention_head.image_projection": 1.437673065921368,
+            "cad_attention_head.mask_predictor": 0.1599034070904196,
+            "cad_attention_head.residual_predictor": 6.590637167888396,
+            "cad_attention_head.t3_classifier": 2.351038769774611
+          }
+        },
+        {
+          "step": 174,
+          "total_loss": 1.1586037874221802,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.358229200729548,
+            "cad_attention_head.decoder": 15.01559007604122,
+            "cad_attention_head.geometry": 0.8139423606188289,
+            "cad_attention_head.image_attention": 1.9040051568089642,
+            "cad_attention_head.image_projection": 1.285973807711119,
+            "cad_attention_head.mask_predictor": 0.3548403549331124,
+            "cad_attention_head.residual_predictor": 4.924555597656934,
+            "cad_attention_head.t3_classifier": 2.108722497654054
+          }
+        },
+        {
+          "step": 175,
+          "total_loss": 1.0535852909088135,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.3924820252169274,
+            "cad_attention_head.decoder": 12.772773220053041,
+            "cad_attention_head.geometry": 0.7061598105118368,
+            "cad_attention_head.image_attention": 1.5967515324201569,
+            "cad_attention_head.image_projection": 1.039267247326915,
+            "cad_attention_head.mask_predictor": 0.34653169437001125,
+            "cad_attention_head.residual_predictor": 7.036801725063327,
+            "cad_attention_head.t3_classifier": 1.9362526164316793
+          }
+        },
+        {
+          "step": 176,
+          "total_loss": 0.9710249304771423,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.1670151333334884,
+            "cad_attention_head.decoder": 10.193075002605134,
+            "cad_attention_head.geometry": 0.6945787310336383,
+            "cad_attention_head.image_attention": 1.41406477565658,
+            "cad_attention_head.image_projection": 0.8998202008548924,
+            "cad_attention_head.mask_predictor": 0.1527603656921216,
+            "cad_attention_head.residual_predictor": 5.250466561234826,
+            "cad_attention_head.t3_classifier": 1.8396887076576187
+          }
+        },
+        {
+          "step": 177,
+          "total_loss": 0.9302352666854858,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.78955213453107,
+            "cad_attention_head.decoder": 9.813084445323591,
+            "cad_attention_head.geometry": 0.49765852899677887,
+            "cad_attention_head.image_attention": 1.1721661001118604,
+            "cad_attention_head.image_projection": 0.7847936751506459,
+            "cad_attention_head.mask_predictor": 0.1730536163306081,
+            "cad_attention_head.residual_predictor": 5.4756561170068805,
+            "cad_attention_head.t3_classifier": 1.7396619476724144
+          }
+        },
+        {
+          "step": 178,
+          "total_loss": 0.8737167119979858,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.0119798805947107,
+            "cad_attention_head.decoder": 8.309336513445182,
+            "cad_attention_head.geometry": 0.6316488666781989,
+            "cad_attention_head.image_attention": 1.3016269534269638,
+            "cad_attention_head.image_projection": 0.8225382638298679,
+            "cad_attention_head.mask_predictor": 0.19883238266993475,
+            "cad_attention_head.residual_predictor": 5.730110179666616,
+            "cad_attention_head.t3_classifier": 1.5114371102038748
+          }
+        },
+        {
+          "step": 179,
+          "total_loss": 0.8151754140853882,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.6540190767588745,
+            "cad_attention_head.decoder": 7.961748958681931,
+            "cad_attention_head.geometry": 0.4165094377299006,
+            "cad_attention_head.image_attention": 1.0344255810796583,
+            "cad_attention_head.image_projection": 0.6389644139478038,
+            "cad_attention_head.mask_predictor": 0.13938218832607074,
+            "cad_attention_head.residual_predictor": 5.030225793225549,
+            "cad_attention_head.t3_classifier": 1.43873071993743
+          }
+        },
+        {
+          "step": 180,
+          "total_loss": 0.7713654637336731,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.590426755023801,
+            "cad_attention_head.decoder": 7.2552931104930565,
+            "cad_attention_head.geometry": 0.46858659153464355,
+            "cad_attention_head.image_attention": 1.0685313180575864,
+            "cad_attention_head.image_projection": 0.6618016000267605,
+            "cad_attention_head.mask_predictor": 0.09971849007269773,
+            "cad_attention_head.residual_predictor": 4.5237576673205675,
+            "cad_attention_head.t3_classifier": 1.3659754171921883
+          }
+        },
+        {
+          "step": 181,
+          "total_loss": 0.7204281091690063,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.7272068422711493,
+            "cad_attention_head.decoder": 6.003591038051741,
+            "cad_attention_head.geometry": 0.43885638978779945,
+            "cad_attention_head.image_attention": 0.9914638429045066,
+            "cad_attention_head.image_projection": 0.6275071699656105,
+            "cad_attention_head.mask_predictor": 0.1157805874388244,
+            "cad_attention_head.residual_predictor": 5.74726889679618,
+            "cad_attention_head.t3_classifier": 1.1788026884278648
+          }
+        },
+        {
+          "step": 182,
+          "total_loss": 0.6862366795539856,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.4447405071193926,
+            "cad_attention_head.decoder": 5.480074562409967,
+            "cad_attention_head.geometry": 0.4697297044071081,
+            "cad_attention_head.image_attention": 0.893890233853158,
+            "cad_attention_head.image_projection": 0.5394203602338045,
+            "cad_attention_head.mask_predictor": 0.12437262434670457,
+            "cad_attention_head.residual_predictor": 3.5799152362705238,
+            "cad_attention_head.t3_classifier": 1.0273272924705044
+          }
+        },
+        {
+          "step": 183,
+          "total_loss": 0.6746053695678711,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.6379927530916982,
+            "cad_attention_head.decoder": 5.852091532510323,
+            "cad_attention_head.geometry": 0.36605827768618665,
+            "cad_attention_head.image_attention": 0.7999404701605435,
+            "cad_attention_head.image_projection": 0.4949806342963638,
+            "cad_attention_head.mask_predictor": 0.1160448738868118,
+            "cad_attention_head.residual_predictor": 5.7174258995879255,
+            "cad_attention_head.t3_classifier": 1.0539609294085088
+          }
+        },
+        {
+          "step": 184,
+          "total_loss": 0.638479471206665,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.5455291044641928,
+            "cad_attention_head.decoder": 4.693482539265102,
+            "cad_attention_head.geometry": 0.4831194823134509,
+            "cad_attention_head.image_attention": 0.8480107418472058,
+            "cad_attention_head.image_projection": 0.5242818198588336,
+            "cad_attention_head.mask_predictor": 0.08654674673102448,
+            "cad_attention_head.residual_predictor": 4.215077324574228,
+            "cad_attention_head.t3_classifier": 1.0400015020038265
+          }
+        },
+        {
+          "step": 185,
+          "total_loss": 0.6112754940986633,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.459609293075885,
+            "cad_attention_head.decoder": 4.650216028216569,
+            "cad_attention_head.geometry": 0.3654448001052366,
+            "cad_attention_head.image_attention": 0.721751311045072,
+            "cad_attention_head.image_projection": 0.43825379348752,
+            "cad_attention_head.mask_predictor": 0.08660296179890802,
+            "cad_attention_head.residual_predictor": 4.7671991509805,
+            "cad_attention_head.t3_classifier": 0.9545477534366154
+          }
+        },
+        {
+          "step": 186,
+          "total_loss": 0.5768729448318481,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.232847623125928,
+            "cad_attention_head.decoder": 4.388684273791415,
+            "cad_attention_head.geometry": 0.30277146673446587,
+            "cad_attention_head.image_attention": 0.6588730825502118,
+            "cad_attention_head.image_projection": 0.3804804273865589,
+            "cad_attention_head.mask_predictor": 0.10111185060642755,
+            "cad_attention_head.residual_predictor": 3.7135445131182685,
+            "cad_attention_head.t3_classifier": 0.791468261129789
+          }
+        },
+        {
+          "step": 187,
+          "total_loss": 0.5480155944824219,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.4220494985738255,
+            "cad_attention_head.decoder": 3.7108646185587943,
+            "cad_attention_head.geometry": 0.3662765987094334,
+            "cad_attention_head.image_attention": 0.6788686217226929,
+            "cad_attention_head.image_projection": 0.38675807081070773,
+            "cad_attention_head.mask_predictor": 0.09347194095361819,
+            "cad_attention_head.residual_predictor": 4.464596537506938,
+            "cad_attention_head.t3_classifier": 0.6904150857014288
+          }
+        },
+        {
+          "step": 188,
+          "total_loss": 0.5242344737052917,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.1280957525918929,
+            "cad_attention_head.decoder": 3.6523805376540683,
+            "cad_attention_head.geometry": 0.23758897479259594,
+            "cad_attention_head.image_attention": 0.5172237940394818,
+            "cad_attention_head.image_projection": 0.30048890970739006,
+            "cad_attention_head.mask_predictor": 0.08014714270823271,
+            "cad_attention_head.residual_predictor": 3.8336195755488154,
+            "cad_attention_head.t3_classifier": 0.7003454722081425
+          }
+        },
+        {
+          "step": 189,
+          "total_loss": 0.5093762874603271,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.2418242481259396,
+            "cad_attention_head.decoder": 3.447593228547974,
+            "cad_attention_head.geometry": 0.3342960651271979,
+            "cad_attention_head.image_attention": 0.6410511541525258,
+            "cad_attention_head.image_projection": 0.3812970420606522,
+            "cad_attention_head.mask_predictor": 0.08210178233144717,
+            "cad_attention_head.residual_predictor": 3.5958947823992657,
+            "cad_attention_head.t3_classifier": 0.6810614841139037
+          }
+        },
+        {
+          "step": 190,
+          "total_loss": 0.49026018381118774,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.3165639049661466,
+            "cad_attention_head.decoder": 3.352627986226815,
+            "cad_attention_head.geometry": 0.31190061705776084,
+            "cad_attention_head.image_attention": 0.559084856901579,
+            "cad_attention_head.image_projection": 0.32473881841970076,
+            "cad_attention_head.mask_predictor": 0.08487935635731837,
+            "cad_attention_head.residual_predictor": 4.553999160155886,
+            "cad_attention_head.t3_classifier": 0.6251978663414209
+          }
+        },
+        {
+          "step": 191,
+          "total_loss": 0.4659251868724823,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.00585115178183,
+            "cad_attention_head.decoder": 2.806645198456364,
+            "cad_attention_head.geometry": 0.23208696313991106,
+            "cad_attention_head.image_attention": 0.5015611079945337,
+            "cad_attention_head.image_projection": 0.2931991148292505,
+            "cad_attention_head.mask_predictor": 0.0826520472601509,
+            "cad_attention_head.residual_predictor": 3.2290416955359005,
+            "cad_attention_head.t3_classifier": 0.5733715989905481
+          }
+        },
+        {
+          "step": 192,
+          "total_loss": 0.4505234956741333,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.2121874179584382,
+            "cad_attention_head.decoder": 2.655545248492581,
+            "cad_attention_head.geometry": 0.28908119517101827,
+            "cad_attention_head.image_attention": 0.527196507813254,
+            "cad_attention_head.image_projection": 0.28435164956036135,
+            "cad_attention_head.mask_predictor": 0.07903017746447316,
+            "cad_attention_head.residual_predictor": 4.032391198138902,
+            "cad_attention_head.t3_classifier": 0.5482836495139265
+          }
+        },
+        {
+          "step": 193,
+          "total_loss": 0.4352111518383026,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.0398883074103547,
+            "cad_attention_head.decoder": 2.7353287003800237,
+            "cad_attention_head.geometry": 0.2192920497334531,
+            "cad_attention_head.image_attention": 0.44959118301327866,
+            "cad_attention_head.image_projection": 0.23997930119098418,
+            "cad_attention_head.mask_predictor": 0.07946128728931662,
+            "cad_attention_head.residual_predictor": 3.722737403794501,
+            "cad_attention_head.t3_classifier": 0.5157752993789483
+          }
+        },
+        {
+          "step": 194,
+          "total_loss": 0.41811269521713257,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.0926547929979598,
+            "cad_attention_head.decoder": 2.437140357028356,
+            "cad_attention_head.geometry": 0.258729908313232,
+            "cad_attention_head.image_attention": 0.5040822464046099,
+            "cad_attention_head.image_projection": 0.2894159309770584,
+            "cad_attention_head.mask_predictor": 0.07484495019410771,
+            "cad_attention_head.residual_predictor": 3.6346746411663693,
+            "cad_attention_head.t3_classifier": 0.4497596514118856
+          }
+        },
+        {
+          "step": 195,
+          "total_loss": 0.40458768606185913,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.182627845384086,
+            "cad_attention_head.decoder": 2.159494662314169,
+            "cad_attention_head.geometry": 0.250663222406108,
+            "cad_attention_head.image_attention": 0.4577031428989337,
+            "cad_attention_head.image_projection": 0.2367000028296795,
+            "cad_attention_head.mask_predictor": 0.060010074220177116,
+            "cad_attention_head.residual_predictor": 4.1560709924450645,
+            "cad_attention_head.t3_classifier": 0.3988572875447762
+          }
+        },
+        {
+          "step": 196,
+          "total_loss": 0.3924596905708313,
+          "grad": {
+            "cad_attention_head.cross_attention": 0.8381179843891796,
+            "cad_attention_head.decoder": 2.10374043801077,
+            "cad_attention_head.geometry": 0.1546446394846833,
+            "cad_attention_head.image_attention": 0.3646724970077674,
+            "cad_attention_head.image_projection": 0.19451036529647567,
+            "cad_attention_head.mask_predictor": 0.04876840161318649,
+            "cad_attention_head.residual_predictor": 2.8946851426314995,
+            "cad_attention_head.t3_classifier": 0.40104170719229965
+          }
+        },
+        {
+          "step": 197,
+          "total_loss": 0.3816618323326111,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.01705733028933,
+            "cad_attention_head.decoder": 2.1263952618840274,
+            "cad_attention_head.geometry": 0.24667783990184358,
+            "cad_attention_head.image_attention": 0.42015517024934096,
+            "cad_attention_head.image_projection": 0.22320371485696627,
+            "cad_attention_head.mask_predictor": 0.04668140764993742,
+            "cad_attention_head.residual_predictor": 3.187339767255938,
+            "cad_attention_head.t3_classifier": 0.4053308425838457
+          }
+        },
+        {
+          "step": 198,
+          "total_loss": 0.37056925892829895,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.1167416547852191,
+            "cad_attention_head.decoder": 1.867718258288306,
+            "cad_attention_head.geometry": 0.2534706686375626,
+            "cad_attention_head.image_attention": 0.40465480167013207,
+            "cad_attention_head.image_projection": 0.2034970144234914,
+            "cad_attention_head.mask_predictor": 0.0448561172854138,
+            "cad_attention_head.residual_predictor": 3.65750080647795,
+            "cad_attention_head.t3_classifier": 0.3748001584744453
+          }
+        },
+        {
+          "step": 199,
+          "total_loss": 0.3556589186191559,
+          "grad": {
+            "cad_attention_head.cross_attention": 0.6945807026198799,
+            "cad_attention_head.decoder": 1.526633325245718,
+            "cad_attention_head.geometry": 0.14097597959373442,
+            "cad_attention_head.image_attention": 0.3040218677315515,
+            "cad_attention_head.image_projection": 0.1607601327217418,
+            "cad_attention_head.mask_predictor": 0.04541107743007397,
+            "cad_attention_head.residual_predictor": 2.312971583660052,
+            "cad_attention_head.t3_classifier": 0.32099822399040495
+          }
+        },
+        {
+          "step": 200,
+          "total_loss": 0.3478946387767792,
+          "grad": {
+            "cad_attention_head.cross_attention": 0.9772706811562291,
+            "cad_attention_head.decoder": 1.5566765961686304,
+            "cad_attention_head.geometry": 0.2340378345407825,
+            "cad_attention_head.image_attention": 0.38812501660737453,
+            "cad_attention_head.image_projection": 0.20805591488227956,
+            "cad_attention_head.mask_predictor": 0.04889638213055102,
+            "cad_attention_head.residual_predictor": 3.3209308816623055,
+            "cad_attention_head.t3_classifier": 0.2901790801936248
+          }
+        }
+      ],
+      "amp_scale": 1024.0,
+      "non_finite_parameters": [],
+      "first_bad_step": null,
+      "last_finite_step": 200,
+      "last_finite_total_loss": 0.3478946387767792
+    },
+    "fp32": {
+      "arm": "fp32",
+      "start_step": 160,
+      "status": "FINITE",
+      "steps": [
+        {
+          "step": 161,
+          "total_loss": 0.20012405514717102,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.2247216824047036,
+            "cad_attention_head.decoder": 2.5389845858373334,
+            "cad_attention_head.geometry": 0.6917079356382203,
+            "cad_attention_head.image_attention": 1.0950154732585424,
+            "cad_attention_head.image_projection": 0.5777004912926677,
+            "cad_attention_head.mask_predictor": 0.023415956071097047,
+            "cad_attention_head.residual_predictor": 5.524288589262386,
+            "cad_attention_head.t3_classifier": 0.09238802256678905
+          }
+        },
+        {
+          "step": 162,
+          "total_loss": 0.20251056551933289,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.369937552615415,
+            "cad_attention_head.decoder": 3.385613470269672,
+            "cad_attention_head.geometry": 0.7937497767478818,
+            "cad_attention_head.image_attention": 1.2824146502688043,
+            "cad_attention_head.image_projection": 0.7008788245558375,
+            "cad_attention_head.mask_predictor": 0.02562560880040073,
+            "cad_attention_head.residual_predictor": 5.2989277146595075,
+            "cad_attention_head.t3_classifier": 0.11156689777032397
+          }
+        },
+        {
+          "step": 163,
+          "total_loss": 0.20968708395957947,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.5219802506759534,
+            "cad_attention_head.decoder": 5.824456237357973,
+            "cad_attention_head.geometry": 0.8551370445239799,
+            "cad_attention_head.image_attention": 1.4341284251178006,
+            "cad_attention_head.image_projection": 0.8101415137584952,
+            "cad_attention_head.mask_predictor": 0.028408819704847814,
+            "cad_attention_head.residual_predictor": 5.60374472353536,
+            "cad_attention_head.t3_classifier": 0.17618163176663176
+          }
+        },
+        {
+          "step": 164,
+          "total_loss": 0.29938971996307373,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.6028128923337293,
+            "cad_attention_head.decoder": 13.666482844300376,
+            "cad_attention_head.geometry": 0.8985270251620875,
+            "cad_attention_head.image_attention": 1.7636859864298313,
+            "cad_attention_head.image_projection": 1.0253935495970663,
+            "cad_attention_head.mask_predictor": 0.09470122161089417,
+            "cad_attention_head.residual_predictor": 5.849475644450542,
+            "cad_attention_head.t3_classifier": 0.54995500085733
+          }
+        },
+        {
+          "step": 165,
+          "total_loss": 0.3972027897834778,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.46153306879547,
+            "cad_attention_head.decoder": 15.362993053285088,
+            "cad_attention_head.geometry": 0.909357569228622,
+            "cad_attention_head.image_attention": 2.045812001968731,
+            "cad_attention_head.image_projection": 1.4682908101271452,
+            "cad_attention_head.mask_predictor": 0.17326842263765516,
+            "cad_attention_head.residual_predictor": 5.652663451540597,
+            "cad_attention_head.t3_classifier": 0.8471875789192407
+          }
+        },
+        {
+          "step": 166,
+          "total_loss": 0.5453492403030396,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.07848533756172,
+            "cad_attention_head.decoder": 29.831555529681612,
+            "cad_attention_head.geometry": 1.4149021308150682,
+            "cad_attention_head.image_attention": 3.577706317490154,
+            "cad_attention_head.image_projection": 2.7672175655099456,
+            "cad_attention_head.mask_predictor": 0.2086980986671019,
+            "cad_attention_head.residual_predictor": 6.248163118515286,
+            "cad_attention_head.t3_classifier": 1.3605391481899147
+          }
+        },
+        {
+          "step": 167,
+          "total_loss": 1.6708964109420776,
+          "grad": {
+            "cad_attention_head.cross_attention": 6.36676801555273,
+            "cad_attention_head.decoder": 67.07858624021775,
+            "cad_attention_head.geometry": 3.0774586552898597,
+            "cad_attention_head.image_attention": 8.661316092592083,
+            "cad_attention_head.image_projection": 6.5723660374944535,
+            "cad_attention_head.mask_predictor": 0.43828362683600874,
+            "cad_attention_head.residual_predictor": 8.905403519546393,
+            "cad_attention_head.t3_classifier": 3.443316032548811
+          }
+        },
+        {
+          "step": 168,
+          "total_loss": 2.70674204826355,
+          "grad": {
+            "cad_attention_head.cross_attention": 6.439124620745994,
+            "cad_attention_head.decoder": 68.76345447692064,
+            "cad_attention_head.geometry": 3.073334862608091,
+            "cad_attention_head.image_attention": 9.141377901360428,
+            "cad_attention_head.image_projection": 7.191972319678057,
+            "cad_attention_head.mask_predictor": 0.3933164937669283,
+            "cad_attention_head.residual_predictor": 6.1946171558851955,
+            "cad_attention_head.t3_classifier": 4.475188802965692
+          }
+        },
+        {
+          "step": 169,
+          "total_loss": 2.0566213130950928,
+          "grad": {
+            "cad_attention_head.cross_attention": 4.271846426435687,
+            "cad_attention_head.decoder": 43.86847645903174,
+            "cad_attention_head.geometry": 2.1781692622072413,
+            "cad_attention_head.image_attention": 4.846490045085126,
+            "cad_attention_head.image_projection": 3.8062171759231447,
+            "cad_attention_head.mask_predictor": 0.5104423272593793,
+            "cad_attention_head.residual_predictor": 8.917352103565987,
+            "cad_attention_head.t3_classifier": 3.47205766705636
+          }
+        },
+        {
+          "step": 170,
+          "total_loss": 1.7958834171295166,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.071888141085103,
+            "cad_attention_head.decoder": 29.052284041592973,
+            "cad_attention_head.geometry": 0.930725049758333,
+            "cad_attention_head.image_attention": 2.5927703790502954,
+            "cad_attention_head.image_projection": 1.863113923626939,
+            "cad_attention_head.mask_predictor": 0.26509515757595614,
+            "cad_attention_head.residual_predictor": 8.19682508748887,
+            "cad_attention_head.t3_classifier": 3.014363763715808
+          }
+        },
+        {
+          "step": 171,
+          "total_loss": 1.6600254774093628,
+          "grad": {
+            "cad_attention_head.cross_attention": 3.178207811359877,
+            "cad_attention_head.decoder": 24.689868566053303,
+            "cad_attention_head.geometry": 1.2308865938265279,
+            "cad_attention_head.image_attention": 3.120229736342475,
+            "cad_attention_head.image_projection": 2.2928454968731145,
+            "cad_attention_head.mask_predictor": 0.36907205367302764,
+            "cad_attention_head.residual_predictor": 5.604977301078199,
+            "cad_attention_head.t3_classifier": 2.7811144302217015
+          }
+        },
+        {
+          "step": 172,
+          "total_loss": 1.3894157409667969,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.771127809309189,
+            "cad_attention_head.decoder": 19.10175913734993,
+            "cad_attention_head.geometry": 0.8310072226114791,
+            "cad_attention_head.image_attention": 2.044651829996702,
+            "cad_attention_head.image_projection": 1.3715051892254029,
+            "cad_attention_head.mask_predictor": 0.30678723420751886,
+            "cad_attention_head.residual_predictor": 7.902220740966081,
+            "cad_attention_head.t3_classifier": 2.426773672056856
+          }
+        },
+        {
+          "step": 173,
+          "total_loss": 1.2613036632537842,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.5681909247072774,
+            "cad_attention_head.decoder": 17.45478294132196,
+            "cad_attention_head.geometry": 0.7984314783301933,
+            "cad_attention_head.image_attention": 2.092737741578663,
+            "cad_attention_head.image_projection": 1.4810924348645247,
+            "cad_attention_head.mask_predictor": 0.1570899266786791,
+            "cad_attention_head.residual_predictor": 6.0262915872799745,
+            "cad_attention_head.t3_classifier": 2.3317075279841695
+          }
+        },
+        {
+          "step": 174,
+          "total_loss": 1.1538746356964111,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.5354222149597225,
+            "cad_attention_head.decoder": 14.67495731230252,
+            "cad_attention_head.geometry": 0.8490093489293152,
+            "cad_attention_head.image_attention": 1.8864632634459426,
+            "cad_attention_head.image_projection": 1.2507480633018417,
+            "cad_attention_head.mask_predictor": 0.3714244502871809,
+            "cad_attention_head.residual_predictor": 6.084185533274916,
+            "cad_attention_head.t3_classifier": 2.070415956303763
+          }
+        },
+        {
+          "step": 175,
+          "total_loss": 1.0525296926498413,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.392246727219402,
+            "cad_attention_head.decoder": 12.807766605319859,
+            "cad_attention_head.geometry": 0.6970491715790744,
+            "cad_attention_head.image_attention": 1.5991634789884768,
+            "cad_attention_head.image_projection": 1.0362365232115878,
+            "cad_attention_head.mask_predictor": 0.34422965687431245,
+            "cad_attention_head.residual_predictor": 7.0481039777454315,
+            "cad_attention_head.t3_classifier": 1.9423661784625652
+          }
+        },
+        {
+          "step": 176,
+          "total_loss": 0.9753483533859253,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.0856062091987817,
+            "cad_attention_head.decoder": 10.340409965715292,
+            "cad_attention_head.geometry": 0.6857186392231797,
+            "cad_attention_head.image_attention": 1.3604267807601162,
+            "cad_attention_head.image_projection": 0.8476230300599291,
+            "cad_attention_head.mask_predictor": 0.15454039366799496,
+            "cad_attention_head.residual_predictor": 5.024518400245167,
+            "cad_attention_head.t3_classifier": 1.8422906201537128
+          }
+        },
+        {
+          "step": 177,
+          "total_loss": 0.9316912293434143,
+          "grad": {
+            "cad_attention_head.cross_attention": 2.0151233648010534,
+            "cad_attention_head.decoder": 9.669830432964453,
+            "cad_attention_head.geometry": 0.5070562410667151,
+            "cad_attention_head.image_attention": 1.1629381132600138,
+            "cad_attention_head.image_projection": 0.7416509533485138,
+            "cad_attention_head.mask_predictor": 0.1650019896642028,
+            "cad_attention_head.residual_predictor": 6.612782768306992,
+            "cad_attention_head.t3_classifier": 1.719998880467571
+          }
+        },
+        {
+          "step": 178,
+          "total_loss": 0.8704560399055481,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.9788133369754182,
+            "cad_attention_head.decoder": 8.238791798145277,
+            "cad_attention_head.geometry": 0.6199825180716766,
+            "cad_attention_head.image_attention": 1.2824765580453685,
+            "cad_attention_head.image_projection": 0.8147254152496113,
+            "cad_attention_head.mask_predictor": 0.17616990913909258,
+            "cad_attention_head.residual_predictor": 5.621766737361469,
+            "cad_attention_head.t3_classifier": 1.4984911778450247
+          }
+        },
+        {
+          "step": 179,
+          "total_loss": 0.814694881439209,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.6243418291055922,
+            "cad_attention_head.decoder": 7.917914801011187,
+            "cad_attention_head.geometry": 0.36483542635544053,
+            "cad_attention_head.image_attention": 0.9526391041777502,
+            "cad_attention_head.image_projection": 0.5862450658698859,
+            "cad_attention_head.mask_predictor": 0.12818477760620167,
+            "cad_attention_head.residual_predictor": 5.2563344599090405,
+            "cad_attention_head.t3_classifier": 1.4403155035489554
+          }
+        },
+        {
+          "step": 180,
+          "total_loss": 0.7748101949691772,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.845130459452725,
+            "cad_attention_head.decoder": 7.131060033278616,
+            "cad_attention_head.geometry": 0.5218352007298043,
+            "cad_attention_head.image_attention": 1.129133689586101,
+            "cad_attention_head.image_projection": 0.6976983920544588,
+            "cad_attention_head.mask_predictor": 0.10934616778563416,
+            "cad_attention_head.residual_predictor": 5.585100246418931,
+            "cad_attention_head.t3_classifier": 1.3787616442932247
+          }
+        },
+        {
+          "step": 181,
+          "total_loss": 0.7169153690338135,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.6770032618495045,
+            "cad_attention_head.decoder": 5.856725439578993,
+            "cad_attention_head.geometry": 0.4154834202809421,
+            "cad_attention_head.image_attention": 0.948472089155049,
+            "cad_attention_head.image_projection": 0.5947158355246598,
+            "cad_attention_head.mask_predictor": 0.12773821133695312,
+            "cad_attention_head.residual_predictor": 5.6311024356760795,
+            "cad_attention_head.t3_classifier": 1.154062017701191
+          }
+        },
+        {
+          "step": 182,
+          "total_loss": 0.6850914359092712,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.4642580106357401,
+            "cad_attention_head.decoder": 5.559711105695933,
+            "cad_attention_head.geometry": 0.4519204623891829,
+            "cad_attention_head.image_attention": 0.9105572716140965,
+            "cad_attention_head.image_projection": 0.549637332840955,
+            "cad_attention_head.mask_predictor": 0.14153206549690675,
+            "cad_attention_head.residual_predictor": 3.769624828624884,
+            "cad_attention_head.t3_classifier": 1.013916831690191
+          }
+        },
+        {
+          "step": 183,
+          "total_loss": 0.6738789081573486,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.7835327313688254,
+            "cad_attention_head.decoder": 5.738489943694134,
+            "cad_attention_head.geometry": 0.42006008043166804,
+            "cad_attention_head.image_attention": 0.8403198878891047,
+            "cad_attention_head.image_projection": 0.5044377002448477,
+            "cad_attention_head.mask_predictor": 0.12213495951101701,
+            "cad_attention_head.residual_predictor": 6.2139128637118874,
+            "cad_attention_head.t3_classifier": 1.0600836022090525
+          }
+        },
+        {
+          "step": 184,
+          "total_loss": 0.6388934850692749,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.528434619944736,
+            "cad_attention_head.decoder": 4.683792592854986,
+            "cad_attention_head.geometry": 0.4804543162345195,
+            "cad_attention_head.image_attention": 0.8550660163256407,
+            "cad_attention_head.image_projection": 0.5279165768380215,
+            "cad_attention_head.mask_predictor": 0.08747698648297951,
+            "cad_attention_head.residual_predictor": 4.0762724577251985,
+            "cad_attention_head.t3_classifier": 1.050140094065571
+          }
+        },
+        {
+          "step": 185,
+          "total_loss": 0.6122314929962158,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.46979216540795,
+            "cad_attention_head.decoder": 4.658929076479126,
+            "cad_attention_head.geometry": 0.34524969417742196,
+            "cad_attention_head.image_attention": 0.7073636377226415,
+            "cad_attention_head.image_projection": 0.426038634741992,
+            "cad_attention_head.mask_predictor": 0.08929034250711357,
+            "cad_attention_head.residual_predictor": 4.849288244355987,
+            "cad_attention_head.t3_classifier": 0.9486796610636843
+          }
+        },
+        {
+          "step": 186,
+          "total_loss": 0.5802904367446899,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.487889711655974,
+            "cad_attention_head.decoder": 4.439626917972159,
+            "cad_attention_head.geometry": 0.42226545711283725,
+            "cad_attention_head.image_attention": 0.7732451663560758,
+            "cad_attention_head.image_projection": 0.4456949918014904,
+            "cad_attention_head.mask_predictor": 0.10560065618976011,
+            "cad_attention_head.residual_predictor": 4.438567803014758,
+            "cad_attention_head.t3_classifier": 0.7874137134143193
+          }
+        },
+        {
+          "step": 187,
+          "total_loss": 0.5474304556846619,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.4407997495164542,
+            "cad_attention_head.decoder": 3.603499905838795,
+            "cad_attention_head.geometry": 0.36305025121644907,
+            "cad_attention_head.image_attention": 0.6774310929323014,
+            "cad_attention_head.image_projection": 0.38288664403895667,
+            "cad_attention_head.mask_predictor": 0.09605632578959933,
+            "cad_attention_head.residual_predictor": 4.533525469120498,
+            "cad_attention_head.t3_classifier": 0.6877570694957207
+          }
+        },
+        {
+          "step": 188,
+          "total_loss": 0.5240535140037537,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.1474686054462733,
+            "cad_attention_head.decoder": 3.6313232136369478,
+            "cad_attention_head.geometry": 0.24279273803976895,
+            "cad_attention_head.image_attention": 0.5497773251375472,
+            "cad_attention_head.image_projection": 0.32456132121974396,
+            "cad_attention_head.mask_predictor": 0.07856949426899972,
+            "cad_attention_head.residual_predictor": 3.7887594496866597,
+            "cad_attention_head.t3_classifier": 0.703414887626242
+          }
+        },
+        {
+          "step": 189,
+          "total_loss": 0.5127472281455994,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.4991201640858876,
+            "cad_attention_head.decoder": 3.491855664146336,
+            "cad_attention_head.geometry": 0.43795785079229577,
+            "cad_attention_head.image_attention": 0.7521374278086872,
+            "cad_attention_head.image_projection": 0.4425194136765933,
+            "cad_attention_head.mask_predictor": 0.07638442822806281,
+            "cad_attention_head.residual_predictor": 4.383160938515133,
+            "cad_attention_head.t3_classifier": 0.6862596938974862
+          }
+        },
+        {
+          "step": 190,
+          "total_loss": 0.489627480506897,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.271761406694538,
+            "cad_attention_head.decoder": 3.289890657181574,
+            "cad_attention_head.geometry": 0.31031433947818254,
+            "cad_attention_head.image_attention": 0.566043390673041,
+            "cad_attention_head.image_projection": 0.3316618154381031,
+            "cad_attention_head.mask_predictor": 0.079821108436119,
+            "cad_attention_head.residual_predictor": 4.360187280994665,
+            "cad_attention_head.t3_classifier": 0.6273262956661502
+          }
+        },
+        {
+          "step": 191,
+          "total_loss": 0.46699661016464233,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.0590374828223743,
+            "cad_attention_head.decoder": 2.8077805507417493,
+            "cad_attention_head.geometry": 0.2556658515297564,
+            "cad_attention_head.image_attention": 0.5291713882819168,
+            "cad_attention_head.image_projection": 0.3035063031199886,
+            "cad_attention_head.mask_predictor": 0.0793571051077359,
+            "cad_attention_head.residual_predictor": 3.309648072555303,
+            "cad_attention_head.t3_classifier": 0.5756478979543868
+          }
+        },
+        {
+          "step": 192,
+          "total_loss": 0.45133113861083984,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.351081078442694,
+            "cad_attention_head.decoder": 2.5891385454404356,
+            "cad_attention_head.geometry": 0.3684789728462637,
+            "cad_attention_head.image_attention": 0.6022178576584324,
+            "cad_attention_head.image_projection": 0.33058501082769054,
+            "cad_attention_head.mask_predictor": 0.07890426347927225,
+            "cad_attention_head.residual_predictor": 4.336485517082013,
+            "cad_attention_head.t3_classifier": 0.5482716428119007
+          }
+        },
+        {
+          "step": 193,
+          "total_loss": 0.4382745027542114,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.3289295444234934,
+            "cad_attention_head.decoder": 2.7319340558783813,
+            "cad_attention_head.geometry": 0.3383549734130831,
+            "cad_attention_head.image_attention": 0.5811638899727637,
+            "cad_attention_head.image_projection": 0.3199886623618354,
+            "cad_attention_head.mask_predictor": 0.07728808230587599,
+            "cad_attention_head.residual_predictor": 4.551988458396036,
+            "cad_attention_head.t3_classifier": 0.5213907384991278
+          }
+        },
+        {
+          "step": 194,
+          "total_loss": 0.417094886302948,
+          "grad": {
+            "cad_attention_head.cross_attention": 0.9429641309371837,
+            "cad_attention_head.decoder": 2.463668196445143,
+            "cad_attention_head.geometry": 0.22949722684439733,
+            "cad_attention_head.image_attention": 0.4727699281487297,
+            "cad_attention_head.image_projection": 0.27069507840818097,
+            "cad_attention_head.mask_predictor": 0.07079045507332155,
+            "cad_attention_head.residual_predictor": 3.0316610775740465,
+            "cad_attention_head.t3_classifier": 0.4572771297256347
+          }
+        },
+        {
+          "step": 195,
+          "total_loss": 0.4038863480091095,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.1767719320608183,
+            "cad_attention_head.decoder": 2.036074786619393,
+            "cad_attention_head.geometry": 0.2617506411411736,
+            "cad_attention_head.image_attention": 0.4569322145145592,
+            "cad_attention_head.image_projection": 0.24557833445842195,
+            "cad_attention_head.mask_predictor": 0.06135592756250467,
+            "cad_attention_head.residual_predictor": 4.203977670571963,
+            "cad_attention_head.t3_classifier": 0.3995493104459651
+          }
+        },
+        {
+          "step": 196,
+          "total_loss": 0.3948972821235657,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.1714109748865476,
+            "cad_attention_head.decoder": 2.18280074869557,
+            "cad_attention_head.geometry": 0.29457890137142395,
+            "cad_attention_head.image_attention": 0.5178471198229062,
+            "cad_attention_head.image_projection": 0.2835598482998957,
+            "cad_attention_head.mask_predictor": 0.05552590501153953,
+            "cad_attention_head.residual_predictor": 3.9473772332816988,
+            "cad_attention_head.t3_classifier": 0.40666799216384936
+          }
+        },
+        {
+          "step": 197,
+          "total_loss": 0.383096307516098,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.1802377170199287,
+            "cad_attention_head.decoder": 2.150032847528317,
+            "cad_attention_head.geometry": 0.3033858745819332,
+            "cad_attention_head.image_attention": 0.4820680974948258,
+            "cad_attention_head.image_projection": 0.26216286526138705,
+            "cad_attention_head.mask_predictor": 0.04893709854756769,
+            "cad_attention_head.residual_predictor": 3.7718702785709106,
+            "cad_attention_head.t3_classifier": 0.4110880222797583
+          }
+        },
+        {
+          "step": 198,
+          "total_loss": 0.3705264627933502,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.066387870174608,
+            "cad_attention_head.decoder": 1.843085692987131,
+            "cad_attention_head.geometry": 0.2355066648760891,
+            "cad_attention_head.image_attention": 0.38263131374917236,
+            "cad_attention_head.image_projection": 0.1931493863990236,
+            "cad_attention_head.mask_predictor": 0.042206404793498235,
+            "cad_attention_head.residual_predictor": 3.604403289507654,
+            "cad_attention_head.t3_classifier": 0.377924597751759
+          }
+        },
+        {
+          "step": 199,
+          "total_loss": 0.356458842754364,
+          "grad": {
+            "cad_attention_head.cross_attention": 0.7436044595032024,
+            "cad_attention_head.decoder": 1.5330881849459599,
+            "cad_attention_head.geometry": 0.1648520514214833,
+            "cad_attention_head.image_attention": 0.3139560037912149,
+            "cad_attention_head.image_projection": 0.17059253784599338,
+            "cad_attention_head.mask_predictor": 0.0434941710999644,
+            "cad_attention_head.residual_predictor": 2.368580122338929,
+            "cad_attention_head.t3_classifier": 0.3278118687013218
+          }
+        },
+        {
+          "step": 200,
+          "total_loss": 0.3484053313732147,
+          "grad": {
+            "cad_attention_head.cross_attention": 1.097434790949333,
+            "cad_attention_head.decoder": 1.5684519787647186,
+            "cad_attention_head.geometry": 0.2558959052313665,
+            "cad_attention_head.image_attention": 0.4216557981401815,
+            "cad_attention_head.image_projection": 0.2233231754644509,
+            "cad_attention_head.mask_predictor": 0.04677775306924425,
+            "cad_attention_head.residual_predictor": 3.780630592292728,
+            "cad_attention_head.t3_classifier": 0.29591351694642953
+          }
+        }
+      ],
+      "amp_scale": null,
+      "non_finite_parameters": [],
+      "first_bad_step": null,
+      "last_finite_step": 200,
+      "last_finite_total_loss": 0.3484053313732147
+    }
+  },
+  "interpretation": "matched replay from a recorded last-good state; not generalization",
+  "current_arm": "fp32"
+}

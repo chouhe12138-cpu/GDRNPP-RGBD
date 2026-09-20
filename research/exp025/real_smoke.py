@@ -12,7 +12,8 @@ import torch
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer
 from core.gdrn_modeling.models.heads.hierarchical_cad_attention_head import hierarchy_log_probabilities
 from .preflight import CONFIG, read_config, audit_optimizer
-from .runtime import seed_all, real_batch, amp_step, metadata, save_report
+from .runtime import (NonFiniteTrainingError, seed_all, real_batch, amp_step, metadata,
+                      save_last_good, save_report)
 
 
 def main():
@@ -53,21 +54,27 @@ def main():
         history, timings = [], []
         report.update(losses=history, timings=timings)
         torch.cuda.reset_peak_memory_stats()
+        last_good = args.output / 'last_good.pth'
         for step in range(args.steps):
             report['current_step'] = step + 1
             optimizer.zero_grad(set_to_none=True)
             torch.cuda.synchronize()
             start = time.perf_counter()
+            diagnostics = {}
             with torch.cuda.amp.autocast():
                 _, losses = model(batch['roi_img'], roi_classes=batch['roi_cls'], gt_xyz=batch['roi_xyz'],
-                                  gt_mask_visib=batch['roi_mask_visib'], do_loss=True)
+                                  gt_mask_visib=batch['roi_mask_visib'], do_loss=True, diagnostics=diagnostics)
                 total = sum(losses.values())
             torch.cuda.synchronize()
             forward_end = time.perf_counter()
-            amp_step(model, optimizer, scaler, total)
+            amp_step(model, optimizer, scaler, total, step=step + 1, losses=losses,
+                     diagnostics=diagnostics, head=model.cad_attention_head)
             torch.cuda.synchronize()
             timings.append(dict(forward_ms=(forward_end-start)*1000,
                                 backward_and_update_ms=(time.perf_counter()-forward_end)*1000))
+            # After the timing capture: an 8-step smoke may fail at any step, so this stays
+            # per-step, but the checkpoint write must not be reported as step time.
+            save_last_good(last_good, model, optimizer, scaler, step + 1, dict(kind='real_smoke'))
             history.append({k: float(v.detach()) for k, v in losses.items()})
         if torch.equal(initial_head, model.cad_attention_head.t3_classifier.weight):
             raise RuntimeError('Classifier did not update')
@@ -93,11 +100,15 @@ def main():
             after = model(batch['roi_img'], roi_classes=batch['roi_cls'], return_cad_debug=True)
         torch.testing.assert_close(after['t3_logits'], out['t3_logits'], rtol=0, atol=0)
         report.update(status='PASS', losses=history, timings=timings, amp_skipped_steps=0,
+            last_good=dict(step=args.steps, path=last_good.name),
             step_median_ms=statistics.median(sum(t.values()) for t in timings[2:] or timings),
             peak_allocated_gb=torch.cuda.max_memory_allocated()/1e9,
             peak_reserved_gb=torch.cuda.max_memory_reserved()/1e9,
             total_parameters=sum(p.numel() for p in model.parameters()), checkpoint=checkpoint.name,
             timing_scope='fixed batch; excludes repeated loader/render', checkpoint_roundtrip=True)
+    except NonFiniteTrainingError as exc:
+        report.update(status='FAIL', error=str(exc), failure=exc.telemetry)
+        raise
     except Exception as exc:
         report.update(status='BLOCKED' if str(exc).startswith('BLOCKED:') else 'FAIL', error=str(exc))
         raise

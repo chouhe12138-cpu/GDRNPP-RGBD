@@ -41,7 +41,8 @@ class GDRN_CAD(nn.Module):
             self.backbone.eval()
         return self
 
-    def predict(self, image, classes):
+    def backbone_feature(self, image):
+        """The single [B,1024,8,8] tensor the head consumes, with the frozen-backbone rule."""
         if self.training and any(p.requires_grad for p in self.backbone.parameters()):
             feature = self.backbone(image)
         else:
@@ -49,13 +50,16 @@ class GDRN_CAD(nn.Module):
                 feature = self.backbone(image)
         if isinstance(feature, (tuple, list)):
             feature = feature[0]
-        return self.cad_attention_head(feature, classes)
+        return feature
+
+    def predict(self, image, classes, diagnostics=None):
+        return self.cad_attention_head(self.backbone_feature(image), classes, diagnostics=diagnostics)
 
     def forward(self, x, roi_classes=None, gt_xyz=None, gt_mask_visib=None, do_loss=False,
-                return_cad_debug=False, **_unused):
+                return_cad_debug=False, diagnostics=None, **_unused):
         if roi_classes is None:
             raise ValueError('EXP025 requires ROI classes')
-        prediction = self.predict(x, roi_classes)
+        prediction = self.predict(x, roi_classes, diagnostics=diagnostics)
         if do_loss:
             if gt_xyz is None or gt_mask_visib is None:
                 raise ValueError('EXP025 requires visible XYZ targets')

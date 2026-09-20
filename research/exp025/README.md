@@ -49,6 +49,11 @@ python -m pytest -q research/exp025/tests
 python -m research.exp025.preflight
 python -m research.exp025.real_smoke --output output/diagnostics/exp025_smoke_NEW --save-batch .local/exp025/batch_NEW.pt
 python -m research.exp025.learnability --output output/diagnostics/exp025_fixed_NEW --load-batch .local/exp025/batch_NEW.pt
+python -m research.exp025.numerical_replay --output output/diagnostics/exp025_replay_NEW \
+    --from-checkpoint output/diagnostics/exp025_fixed_NEW/full_last_good.pth \
+    --load-batch .local/exp025/batch_NEW.pt
+python -m research.exp025.residual_probe --output output/diagnostics/exp025_probe_NEW --load-batch .local/exp025/batch_NEW.pt
+python -m research.exp025.accumulation_smoke --output output/diagnostics/exp025_accum_NEW --load-batch .local/exp025/batch_NEW.pt
 ```
 
 `real_smoke` 默认 CUDA、CPP、batch4、8 steps；可用 `--train-backbone yes`、
@@ -56,6 +61,32 @@ python -m research.exp025.learnability --output output/diagnostics/exp025_fixed_
 `learnability` 固定官方冻结主干、同一 batch/seed/初始参数，分别执行 residual+mask
 与完整 loss 各200步，常数 lr，每20步记录；GT-path 仅用于隔离残差诊断，不是训练路由。
 不预设通用下降阈值，不用 fixed-batch 数值冒充泛化性能。
+
+## 数值诊断工具
+
+- 所有 step 都经过 `runtime.amp_step`：失败时抛出 `NonFiniteTrainingError`，携带该步的
+  step、AMP scale、全部 loss 分量、图像/CAD token 范数、T3 logits、mask logit、raw
+  residual 分布与逐模块梯度范数，`learnability`/`real_smoke` 把它写进 `report.json` 的
+  `failure` 字段并保留已完成 history。每个 arm 每 `--last-good-period`（默认20）步写
+  `model/optimizer/scaler/step/RNG` 到 `<arm>_last_good.pth`。
+- `numerical_replay` 从某个 last-good state 出发，用同一 batch 跑 A 当前 AMP /
+  B 指定低 scale AMP（`--scale`）/ C FP32（`amp_step(..., scaler=None)`）三臂，报告每臂
+  首个非有限步、首个坏参数与该步梯度范数；只做重放，不改 loss/结构/协议。
+- `residual_probe` 有三个诊断臂（`--arms` 可选）：`baseline_residual_only`（正式残差
+  路径）、`zero_init_residual`（最后一层零初始化的同路径对照）、`gt_t3_conditioned`
+  （image token 与 GT T3 CAD token 拼接后过 `Linear(2D,D)+GELU+Linear(D,3)`）。三臂
+  同 batch/seed/steps/lr 且 route weight 0，用于判断 residual 是否可学、以及是否缺
+  T3 conditioning；GT T3 不进入正式模型、损失或推理。
+- `accumulation_smoke` 覆盖正式形状（physical batch4、effective48、accumulate12）的状态机：
+  optimizer step 只在 accumulation 边界发生、scheduler 与 update 一一对应、AMP 无跳步、
+  save+resume 后与不间断训练逐张量一致。它复用 `solver_utils` 的
+  `accumulation_window_size`/`should_optimizer_step` 与 `MyCheckpointer`。
+
+Optimizer 恢复边界属共享框架修复（`core/utils/my_checkpoint.py` +
+`engine.do_train`）：LightningLite wrapper 继承 `torch.optim.Optimizer.load_state_dict`，
+只恢复 wrapper 自己的 `state`/`param_groups`，真正 step 的底层 optimizer 不被更新，
+resume 后 scheduler 的 LR 写入也会与训练 optimizer 脱钩。回归测试见
+`research/tests/test_lite_optimizer_resume.py`。
 
 服务器仅由用户按 RUNBOOK bundle/release/Docker 流程运行；新增 `exp025_lmo`
 profile 根据初始化来源检查权重、consistent hierarchy、PBR/LM-O/VOC，并执行 CPU
