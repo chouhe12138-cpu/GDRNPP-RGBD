@@ -29,7 +29,16 @@ ENV LANG=C.UTF-8 \
     PYTHONPATH=/workspace/gdrnpp:/opt/bop_toolkit:/opt/bop_renderer/build \
     LD_LIBRARY_PATH=/workspace/gdrnpp/core/csrc/uncertainty_pnp/lib:/opt/gdrn-venv/lib/python3.10/site-packages/torch/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
-RUN apt-get update \
+# The lab network intercepts plain-HTTP access to archive.ubuntu.com (captive-portal
+# redirect) and cannot reach developer.download.nvidia.com, so the base image's sources
+# are repointed at an HTTPS mirror and its CUDA apt list is dropped. The CUDA toolchain
+# comes from the base image; no package installed below needs that repository.
+RUN sed -i -E \
+        -e 's|https?://archive\.ubuntu\.com/ubuntu/?|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+        -e 's|https?://security\.ubuntu\.com/ubuntu/?|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+        /etc/apt/sources.list \
+    && rm -f /etc/apt/sources.list.d/cuda*.list /etc/apt/sources.list.d/nvidia*.list \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         bash ca-certificates git \
         python3 python3-dev python3-pip python3-venv \
