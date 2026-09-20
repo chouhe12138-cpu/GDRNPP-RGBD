@@ -617,7 +617,8 @@ Gate D（hierarchy identity）✔；Gate E 的服务器 EGL 一项未执行，�
 | `official_frozen` | lab0 | 65536 | FAIL | `mask_predictor.weight` 非有限，step 1 |
 | `official_frozen` | lab0 | 32768 | **PASS** | `amp_skipped_steps=0`、`checkpoint_roundtrip=true` |
 | `imagenet_full` | lab1 | 65536 | FAIL | `mask_predictor.weight` 非有限，step 1 |
-| `imagenet_full` | lab1 | 32768 | **PASS** | `amp_skipped_steps=0`、`checkpoint_roundtrip=true` |
+| `imagenet_full` | lab1 | 32768 | **PASS** | `amp_skipped_steps=0`、`checkpoint_roundtrip=true`（主干 lr 仍是旧值 3e-5） |
+| `imagenet_full` | lab1 | 32768 | **PASS** | 主干 lr 改为 3e-4 后、在最终配置 `b9bddcc` 上重跑：`optimizer_groups` 为 `cad_head`/`backbone` 均 3e-4 |
 
 **共同通过的最高 scale = 32768**（预注册口径：两臂共同通过的最高值）。两臂在 65536 上失败在
 **同一步、同一张量**，其余模块梯度有限（lab0 最大 0.482、lab1 0.499），五个 loss 分量有限，
@@ -694,7 +695,12 @@ checkpoint 审计，`gradscaler.scale=2048`）。
 `exp025_server_gate_official_frozen_a02.json` 与 `..._a02_metadata.json`（lab0 @32768 PASS，
 run `RUN-20260920-111840-gate-s42-a01`）、`exp025_server_gate_imagenet_full_a01.json`
 （lab1 @65536 FAIL）、`exp025_server_gate_imagenet_full_a02.json`（lab1 @32768 PASS，
-主干 lr 3e-5 的旧配置）。
+主干 lr 3e-5 的旧配置）、`exp025_server_gate_imagenet_full_a03.json`（lab1 @32768 PASS，
+`source_commit=b9bddcc…`，主干 lr 3e-4 的最终配置）。
+
+Derived：`b9bddcc` 上两臂的 gate 均已通过——lab0 的配置与 `e3e0e65` 时相比只有共享的
+`SOLVER.AMP.INIT_SCALE`（与该次 `--amp-scale` 同值）与 `FORMAL_READY`，模型、loss、batch、
+LR 均未变；lab1 在主干 lr 改动后已按最终配置重跑并 PASS。
 
 ## 下一步
 
