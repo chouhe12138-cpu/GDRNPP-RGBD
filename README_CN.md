@@ -4,8 +4,10 @@
 到直接姿态头的信息利用。当前进展见 STATUS；已退出工作树的历史专用执行框架
 可通过 Git 历史恢复，实验记录继续保留。
 
-2026-09-20：新增 [EXP025 统一 T3=512 CAD attention](research/exp025/README.md)，
-当前处于本地数值诊断，正式训练未开放；不替换历史 EXP022。
+2026-09-20：[EXP025 统一 T3=512 CAD attention](research/exp025/README.md) 按交接包 v2
+重构 image 分支为四级 Image-SA（写回 feature 并进入下一级 transition），并把 formal
+恢复为真实 batch48；本机测试、preflight 与 CUDA smoke 通过，服务器 batch48/EGL gate
+未执行，正式训练未开放。不替换历史 EXP022。
 
 ## 阅读顺序
 

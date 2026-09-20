@@ -1,7 +1,9 @@
-"""Formal-path accumulation smoke: physical batch 4 x accumulation 12, AMP, resume.
+"""Local accumulation smoke: physical batch 4 x accumulation 12, AMP, resume.
 
-`smoke.py` runs REFERENCE_BS=4, so it never exercises the shipped accumulation shape.
-This state-machine smoke repeats one saved batch (or the online loader with --online) and
+The formal config trains at a real batch 48, so this local shape is carried by the smoke
+itself (`--batch-size 4 --reference-bs 48`) instead of being inherited from `train.py`.
+`smoke.py` runs REFERENCE_BS=4, so it never exercises accumulation at all.  This
+state-machine smoke repeats one saved batch (or the online loader with --online) and
 checks the counters and the LR a resumed run must continue -- optimizer step, scheduler
 epoch, accumulation boundaries, AMP scale -- against an uninterrupted run.  Tensor
 equality across sessions is not available on this GPU path, so it is judged against a
@@ -142,7 +144,9 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--load-batch', type=Path)
     parser.add_argument('--online', action='store_true', help='use the real loader instead of one saved batch')
-    parser.add_argument('--batch-size', type=int, default=4)
+    parser.add_argument('--batch-size', type=int, default=4, help='physical batch of this local smoke')
+    parser.add_argument('--reference-bs', type=int, default=48,
+                        help='reference batch this local smoke emulates; not read from the formal config')
     parser.add_argument('--iters-per-epoch', type=int, default=25)
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--split-epoch', type=int, default=2, help='epochs completed before the checkpoint')
@@ -158,12 +162,15 @@ def main():
     cfg = read_config(args.config, False, 'official_lmo')
     cfg.MODEL.DEVICE = args.device
     cfg.MODEL.WEIGHTS = ''  # build_model_optimizer already loads the configured initialization
+    # Explicit local shape: the formal config trains at a real batch 48 (accumulation 1).
+    cfg.SOLVER.IMS_PER_BATCH, cfg.SOLVER.REFERENCE_BS = args.batch_size, args.reference_bs
     accumulate = solver_utils.get_accumulation_steps(cfg.SOLVER.REFERENCE_BS, cfg.SOLVER.IMS_PER_BATCH)
     total_updates = solver_utils.optimizer_updates_per_training(
         args.iters_per_epoch, args.epochs, accumulate)
     max_iter = args.iters_per_epoch * args.epochs
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING',
-                  batch_size=args.batch_size, iters_per_epoch=args.iters_per_epoch,
+                  batch_size=args.batch_size, reference_bs=args.reference_bs,
+                  iters_per_epoch=args.iters_per_epoch,
                   epochs=args.epochs, split_epoch=args.split_epoch, accumulate_iter=accumulate,
                   total_optimizer_updates=total_updates, amp=args.amp,
                   batch_source='online' if args.online else str(args.load_batch),

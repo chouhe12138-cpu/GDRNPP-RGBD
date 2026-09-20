@@ -6,10 +6,14 @@
 
 ## 模型与监督契约
 
-- ConvNeXt 输出 `[B,1024,8,8]`，adapter→512；三次 bilinear 上采样与
-  `1×1 Conv/GN/GELU + 3×3 Conv/GN/GELU` 得到 256@16、128@32、64@64。
-- 投影到 256 维；64×64 图像 token 先做 window8、shift4 self-attention，
-  再依次读取 T0/T1/T2/T3。PreNorm、残差 FFN ratio2、8 heads、dropout0。
+- ConvNeXt 输出 `[B,1024,8,8]`，`1×1 Conv` adapter→512；随后是**四级 Image-SA
+  stage**：8×8 global、16×16 global、32×32 window8+shift4、64×64 window8+shift4。
+  每级先投影到 256 维做 self-attention，再把结果 residual 写回 feature，**写回后的
+  feature 才进入下一级 Spatial Transition**（`1×1 Conv/GN/GELU + 3×3 Conv/GN/GELU`
+  bilinear 上采样，得 256@16、128@32、64@64）；末级 SA 的 tokens `[B,4096,256]` 直接
+  作为后续 query，其 feature 无下游消费者因此不回写。PreNorm、残差 FFN ratio2、
+  8 heads、dropout0。CAD 分支在 Image 解码阶段完全独立，只在最终 tokens 汇合。
+- 最终 tokens 依次读取 T0/T1/T2/T3（CA 顺序固定，bank 为 1/8/64/512 tokens）。
 - 固定 `consistent_v3.npz` 只取 T1=8、T2=64、T3=512；T4 不进入模型。
   共享 10 维几何 descriptor MLP，T1 全局 attention，T2/T3 为 parent broadcast
   后的 sibling attention；不反向更新 parent。learned T0 顺序读取三层；
@@ -48,9 +52,12 @@ mmcv 的 `--opts` 不会重新执行 Python 派生字段，不要只用它覆盖
 `GDRN_CONVNEXT_BASE_WEIGHTS` 指定本机权重，不自动下载。
 
 LM-O PBR40/GT-box，seed42，AdamW lr3e-4、wd.01、betas(.9,.999)、eps1e-8；
-解冻主干 lr 乘 .1。物理 batch4、累积12、effective48；AMP 显式开启；40epoch，
+解冻主干 lr 乘 .1。**formal 是真实 batch48（`IMS_PER_BATCH=48`、`REFERENCE_BS=48`，
+accumulate=1，每 iteration 一次真实 optimizer update）**；AMP 显式开启；40epoch，
 warmup4%，cosine 到初始 lr 的 .01；E5–E40 定点评价，best checkpoint 关闭。
-`FORMAL_READY=False`。`smoke.py` 使用独立有界 8-image split，不能用于正式实验。
+`FORMAL_READY=False`。本机显存受限的 4×12 形状只存在于 `smoke.py`（4/48）与诊断脚本
+的显式参数里，不改 formal；engine 的梯度累计保留给这些本地路径。`smoke.py` 使用独立
+有界 8-image split，不能用于正式实验。
 
 从仓库根目录执行（每次使用新的 output 名称）：
 
@@ -60,6 +67,7 @@ conda activate pytorch22
 python -m pytest -q research/exp025/tests
 python -m research.exp025.preflight
 python -m research.exp025.real_smoke --output output/diagnostics/exp025_smoke_NEW --save-batch .local/exp025/batch_NEW.pt
+python -m research.exp025.amp_boundary_probe --output output/diagnostics/exp025_boundary_NEW --load-batch .local/exp025/batch_NEW.pt
 python -m research.exp025.learnability --output output/diagnostics/exp025_fixed_NEW --load-batch .local/exp025/batch_NEW.pt
 python -m research.exp025.numerical_replay --output output/diagnostics/exp025_replay_NEW \
     --from-checkpoint output/diagnostics/exp025_fixed_NEW/full_last_good.pth \
@@ -69,10 +77,23 @@ python -m research.exp025.accumulation_smoke --output output/diagnostics/exp025_
 ```
 
 `real_smoke` 默认 CUDA、CPP、batch4、8 steps；可用 `--train-backbone yes`、
-`--backbone-init imagenet`、`--renderer egl`、`--load-batch`。
+`--backbone-init imagenet`、`--renderer egl`、`--load-batch`、`--amp-scale`（初始
+GradScaler scale，生产默认 65536）。它同时校验四级 Image-SA 的参数确实被更新。
+`amp_boundary_probe` 从同一 seed/batch 各跑一步 FP32 与指定 scale 的 AMP，报告每个
+子模块未缩放梯度元素最大值、`scale × abs_max` 与 fp16 上限 65504 的关系，用来判断
+非有限梯度是缩放后的 fp16 边界还是 loss/结构发散；在旧 commit 的 worktree 中运行同一
+命令即可做跨结构对照。
 `learnability` 固定官方冻结主干、同一 batch/seed/初始参数，分别执行 residual+mask
 与完整 loss 各200步，常数 lr，每20步记录；GT-path 仅用于隔离残差诊断，不是训练路由。
 不预设通用下降阈值，不用 fixed-batch 数值冒充泛化性能。
+
+## 历史证据边界
+
+2026-09-20 重构了 image 分支（此前是 transition 链 + 末端一次 64×64 SA，SA 结果不进入
+后续 transition），并把 formal 从本机 4×12 形状改回真实 batch48。**重构前记录的
+Residual V1/V2、AMP scale sweep、route/T3 accuracy、residual probe、生产路径 AMP
+recovery 以及当时的 CPU/CUDA smoke 参数值都属于旧结构**，在 RECORD 中原样保留并已标注，
+不能当作新结构的验证或机制证据；新结构的机制复验从零开始。
 
 ## 数值诊断工具
 
@@ -92,7 +113,8 @@ python -m research.exp025.accumulation_smoke --output output/diagnostics/exp025_
   不再是独立臂，其历史结果保留在旧报告里。conditioned 臂的 last-good 额外保存
   `probe_state_dict`，并在跑完后重建 model+probe+optimizer 重载做 roundtrip 校验
   （`roundtrip.status=MATCH` 表示记录指标可逐项复现）。
-- `accumulation_smoke` 覆盖正式形状（physical batch4、effective48、accumulate12）的状态机：
+- `accumulation_smoke` 覆盖本地 4×12 形状（`--batch-size 4 --reference-bs 48`，**不再从
+  formal 继承**）的状态机：
   optimizer step 只在 accumulation 边界发生、scheduler 只在真实 update 上推进、AMP 无跳步、
   save+resume 后与不间断训练在**无噪声计数与 LR 轨迹上逐项相等**。CUDA+AMP 同一配置两次运行
   本就有约 1e-3 量级 run-to-run 噪声（carried SDPA backward 在 CUDA 上是 atomic），

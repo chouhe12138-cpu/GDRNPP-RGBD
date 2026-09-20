@@ -6,7 +6,13 @@ from torch import nn
 from torch.nn import functional as F
 
 from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
-from .cad_attention_blocks import AttentionBlock, CADGeometryEncoder, CADStageTransition, WindowAttentionBlock
+from .cad_attention_blocks import (AttentionBlock, CADGeometryEncoder, CADStageTransition,
+                                   ImageSAStage)
+
+# One image-branch stage per resolution: self-attention at 8x8 and 16x16 is global,
+# 32x32 and 64x64 use window + shifted-window.  The CAD branch stays independent until the
+# final 64x64 tokens run the T0/T1/T2/T3 cross-attention ladder.
+IMAGE_STAGES = ((512, 8, 'global'), (256, 16, 'global'), (128, 32, 'window'), (64, 64, 'window'))
 
 
 def hierarchy_log_probabilities(logits):
@@ -106,14 +112,17 @@ class HierarchicalCADAttentionHead(nn.Module):
         for depth in (1, 2, 3):
             for field in ('anchors', 'normals', 'radii'):
                 self.register_buffer(f'level{depth}_{field}', getattr(hierarchy.level(depth), field), persistent=False)
+        self.token_dim = int(token_dim)
         self.route_weight, self.residual_weight, self.mask_weight = route_weight, residual_weight, mask_weight
         self.residual_beta = residual_beta
         self.geometry = CADGeometryEncoder(token_dim, num_heads)
-        self.decoder = nn.Sequential(nn.Conv2d(1024, 512, 1), CADStageTransition(512, 256),
-                                     CADStageTransition(256, 128), CADStageTransition(128, 64))
-        self.image_projection = nn.Conv2d(64, token_dim, 1)
-        self.image_attention = nn.Sequential(WindowAttentionBlock(token_dim, num_heads),
-                                            WindowAttentionBlock(token_dim, num_heads, shift=4))
+        self.input_adapter = nn.Conv2d(1024, 512, 1)
+        self.stages = nn.ModuleList(
+            ImageSAStage(channels, resolution, attention, token_dim, num_heads,
+                         write_back=index < len(IMAGE_STAGES) - 1)
+            for index, (channels, resolution, attention) in enumerate(IMAGE_STAGES))
+        self.transitions = nn.ModuleList(
+            CADStageTransition(before, after) for before, after in ((512, 256), (256, 128), (128, 64)))
         self.cross_attention = nn.ModuleList(AttentionBlock(token_dim, num_heads) for _ in range(4))
         self.t3_classifier = nn.Linear(token_dim, 512)
         self.residual_predictor = SoftT3ResidualPredictor(token_dim, residual_context_dim,
@@ -135,9 +144,18 @@ class HierarchicalCADAttentionHead(nn.Module):
         return tuple(bank[inverse] for bank in self.geometry(descriptors))
 
     def encode(self, feature, classes):
-        """Image tokens after self-attention and the T0/T1/T2/T3 cross-attention ladder."""
-        tokens = self.image_projection(self.decoder(feature)).flatten(2).transpose(1, 2)
-        tokens = self.image_attention(tokens)
+        """Image tokens after the four-stage self-attention ladder and T0/T1/T2/T3 CA.
+
+        Each stage writes its attended tokens back into the feature, and that updated
+        feature is what the next spatial transition consumes, so no stage can decay into a
+        side branch.  Only the final 64x64 tokens enter the cross-attention ladder.
+        """
+        feature = self.input_adapter(feature)
+        tokens = None
+        for index, stage in enumerate(self.stages):
+            feature, tokens = stage(feature)
+            if index < len(self.transitions):
+                feature = self.transitions[index](feature)
         banks = self.token_banks(classes)
         for block, bank in zip(self.cross_attention, banks):
             tokens = block(tokens, bank)

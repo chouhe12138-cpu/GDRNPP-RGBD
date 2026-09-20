@@ -180,6 +180,19 @@ def test_eval_requires_a_complete_exp025_checkpoint(tmp_path):
     assert require_full_checkpoint(str(complete)) == str(complete)
 
 
+def test_formal_batch_is_real_48():
+    """Formal training performs one real update per iteration, no gradient accumulation."""
+    from mmcv import Config
+    from core.utils import solver_utils
+    cfg = read_config()
+    assert (int(cfg.SOLVER.IMS_PER_BATCH), int(cfg.SOLVER.REFERENCE_BS)) == (48, 48)
+    assert solver_utils.get_accumulation_steps(cfg.SOLVER.REFERENCE_BS, cfg.SOLVER.IMS_PER_BATCH) == 1
+    # The local shape stays available in its own config and diagnostics.
+    smoke = Config.fromfile(str(Path(cfg.filename).with_name('smoke.py')))
+    assert solver_utils.get_accumulation_steps(smoke.SOLVER.REFERENCE_BS,
+                                               smoke.SOLVER.IMS_PER_BATCH) == 12
+
+
 def test_wrapper_grad_range(head):
     from core.gdrn_modeling.models.GDRN_CAD import GDRN_CAD
     backbone = torch.nn.Sequential(torch.nn.AdaptiveAvgPool2d((8, 8)), torch.nn.Conv2d(3, 1024, 1))

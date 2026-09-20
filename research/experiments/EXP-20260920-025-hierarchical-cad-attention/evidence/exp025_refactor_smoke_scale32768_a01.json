@@ -1,0 +1,137 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "eb2fdb292451fa9da491b32ab855182934d697fa",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "hierarchy_sha256": "02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_refactor_smoke_scale32768_a01",
+  "status": "PASS",
+  "batch_source": ".local/exp025/fixed_batch4_a01.pt",
+  "renderer": "cpp",
+  "batch_size": 4,
+  "steps": 8,
+  "device": "cuda:0",
+  "amp_init_scale": 32768.0,
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 10787652
+    }
+  ],
+  "losses": [
+    {
+      "loss_cad_t1": 2.0688483715057373,
+      "loss_cad_t2": 4.173064708709717,
+      "loss_cad_t3": 6.400556564331055,
+      "loss_cad_residual": 0.1496841311454773,
+      "loss_cad_mask": 0.8380190134048462
+    },
+    {
+      "loss_cad_t1": 2.002856731414795,
+      "loss_cad_t2": 3.97452974319458,
+      "loss_cad_t3": 6.230374813079834,
+      "loss_cad_residual": 0.14886051416397095,
+      "loss_cad_mask": 1.3344907760620117
+    },
+    {
+      "loss_cad_t1": 1.8943945169448853,
+      "loss_cad_t2": 3.746278762817383,
+      "loss_cad_t3": 5.978643894195557,
+      "loss_cad_residual": 0.1483171582221985,
+      "loss_cad_mask": 0.7581446766853333
+    },
+    {
+      "loss_cad_t1": 1.7849863767623901,
+      "loss_cad_t2": 3.5920052528381348,
+      "loss_cad_t3": 5.836652755737305,
+      "loss_cad_residual": 0.14792399108409882,
+      "loss_cad_mask": 0.22916364669799805
+    },
+    {
+      "loss_cad_t1": 1.6675028800964355,
+      "loss_cad_t2": 3.4062747955322266,
+      "loss_cad_t3": 5.662643909454346,
+      "loss_cad_residual": 0.14755643904209137,
+      "loss_cad_mask": 0.3197805881500244
+    },
+    {
+      "loss_cad_t1": 1.5200340747833252,
+      "loss_cad_t2": 3.2087361812591553,
+      "loss_cad_t3": 5.532887935638428,
+      "loss_cad_residual": 0.14733843505382538,
+      "loss_cad_mask": 0.2194085419178009
+    },
+    {
+      "loss_cad_t1": 1.376352310180664,
+      "loss_cad_t2": 3.0175631046295166,
+      "loss_cad_t3": 5.430680751800537,
+      "loss_cad_residual": 0.1472444236278534,
+      "loss_cad_mask": 0.1664775013923645
+    },
+    {
+      "loss_cad_t1": 1.2589638233184814,
+      "loss_cad_t2": 2.834044933319092,
+      "loss_cad_t3": 5.307525634765625,
+      "loss_cad_residual": 0.14700806140899658,
+      "loss_cad_mask": 0.1729142665863037
+    }
+  ],
+  "timings": [
+    {
+      "forward_ms": 548.8943219988869,
+      "backward_and_update_ms": 464.1723950007872
+    },
+    {
+      "forward_ms": 61.5399050002452,
+      "backward_and_update_ms": 154.94949299863947
+    },
+    {
+      "forward_ms": 58.872883000731235,
+      "backward_and_update_ms": 151.49896599905333
+    },
+    {
+      "forward_ms": 52.3483449997002,
+      "backward_and_update_ms": 148.7803170002735
+    },
+    {
+      "forward_ms": 48.88713999935135,
+      "backward_and_update_ms": 148.83179000025848
+    },
+    {
+      "forward_ms": 49.27047300043341,
+      "backward_and_update_ms": 131.94810499953746
+    },
+    {
+      "forward_ms": 49.25783399994543,
+      "backward_and_update_ms": 135.24906100064982
+    },
+    {
+      "forward_ms": 48.4965719988395,
+      "backward_and_update_ms": 136.62254200062307
+    }
+  ],
+  "current_step": 8,
+  "amp_skipped_steps": 0,
+  "last_good": {
+    "step": 8,
+    "path": "last_good.pth"
+  },
+  "step_median_ms": 191.4190219995362,
+  "peak_allocated_gb": 1.656275456,
+  "peak_reserved_gb": 1.9398656,
+  "total_parameters": 98352068,
+  "checkpoint": "smoke_checkpoint.pth",
+  "image_stages": {
+    "total": 90,
+    "updated": 90
+  },
+  "timing_scope": "fixed batch; excludes repeated loader/render",
+  "checkpoint_roundtrip": true
+}

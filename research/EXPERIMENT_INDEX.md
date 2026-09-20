@@ -14,9 +14,15 @@ scheduler gate（skip 不再推进 LR 计划）、正式 Residual V2（预测 so
 零初始化，loss/层级/协议不变）、`BACKBONE_INIT`/`MODEL.WEIGHTS` 语义拆分与 eval
 fail-closed、consistent_v3 SHA256 固定，并修正 residual probe telemetry。未启动 formal。
 
+2026-09-20（结构重构轮）：EXP025 按交接包 v2 修正 image 分支（四级 Image-SA 写回并
+进入下一级 Spatial Transition，此前 SA 是旁路读出）并把 formal 从本机 4×12 形状恢复为
+真实 batch48；CAD 分支、统一 T3、Residual V2、checkpoint/AMP 修复均保留。本机测试、
+preflight、CUDA smoke 与 AMP 边界探针通过，服务器 batch48/EGL gate 未执行。**此前的
+EXP025 fixed-batch 结果属于旧 Image 结构**，在 RECORD 中原样保留并标注为历史诊断。
+
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
-| EXP025 统一 T3 CAD attention | IMPLEMENTED / DIAGNOSED / CLOSURE_VERIFIED / FORMAL_NOT_STARTED | resume 边界已修复；非有限梯度定位为 AMP 缩放后 fp16 反向上溢（scale 阈值在 16384 与 32768 之间），非 loss/结构发散；生产路径 skip 语义已验证且 scheduler gate 已收紧；正式 residual 改为预测 soft-T3 conditioning + 零初始化（固定 batch：residual-only 200 步 0.5404→0.1238、无饱和，full 臂 route 不劣于旧实现） | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | STRUCTURE_REFACTORED / LOCAL_SMOKE_PASS / FORMAL_NOT_STARTED | 2026-09-20 交接包 v2：image 分支改为四级 Image-SA（8/16 global、32/64 window+shift）写回 feature 并进入下一级 transition，formal 恢复真实 batch48（accumulate=1）；head 参数 10,787,652。本机 `49 passed`/`377 passed`、preflight PASS、CUDA batch4 smoke 在 scale ≤32768 全通过且 90/90 个 stage 参数更新；`amp_boundary_probe` 显示 65536 的上溢是 Mask 头的缩放后 fp16 边界（1.156×65536 > 65504），非 loss/结构发散。 **重构前的 resume 修复、AMP 上溢定位、Residual V2 与 fixed-batch 数值均属旧 Image 结构**，仅作历史诊断 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

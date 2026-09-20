@@ -2,7 +2,47 @@
 
 最后核对：2026-09-20。
 
-## EXP025 统一 T3 分类（2026-09-20，第三轮：生产 AMP 与 Residual V2 收口）
+## EXP025 Image 分支结构重构与 formal batch 修正（2026-09-20，第四轮）
+
+按交接包 `CAD_EXP025_local_agent_pack_v2` 修正两处偏离，**不改**统一 T3=512、
+T2/T1 marginal NLL、nested target、对称分支选择、Residual V2、mask BCE、hierarchy/SHA
+契约、checkpoint 语义、Lite optimizer resume 修复与 scheduler gate。
+
+**Image 分支**：原来是 `1×1 Conv` + 三个 Spatial Transition 的纯上采样链，
+self-attention 只在整条链之后对 64×64 做一次，SA 结果不进入任何 transition（旁路读出）；
+现在是 `input_adapter` 后接四级 `ImageSAStage`（8×8 global、16×16 global、
+32×32 window+shift、64×64 window+shift），每级把 attention residual 写回 feature，
+**写回后的 feature 才进入下一级 transition**；末级 tokens `[B,4096,256]` 再依次对
+T0/T1/T2/T3 做 cross-attention，之后供 T3 classifier / Residual V2 / mask。
+head 参数 8,217,796 → **10,787,652**，模型总参数 95,683,588 → **98,352,068**（preflight 实测）。
+
+**formal batch**：`train.py` 原来是 `IMS_PER_BATCH=4, REFERENCE_BS=48`（本机 4×12 形状），
+现改为 **48/48**（accumulate=1，每 iteration 一次真实 optimizer update）；本机形状移入
+`smoke.py`（4/48）与诊断脚本的显式参数（`accumulation_smoke` 新增
+`--batch-size/--reference-bs`，不再从 formal 继承），engine 的梯度累计未删除。
+
+**本轮 Observed（全部本地，非正式结果）**：`pytest -q research/exp025/tests` **49 passed**、
+`pytest -q research` **377 passed**、CPU preflight **PASS**（head 10,787,652、
+`hierarchy_sha_match=true`）。新增单测覆盖四级 shape/token 数、每级调用一次、写回传播
+（扰动任一级 SA 会改变下一级输入）、CA 顺序 T0/T1/T2/T3、每级参数有梯度、formal 48/48。
+`real_smoke`（CUDA batch4、8 步、CPP）在初始 scale 32768/16384/8192 全部 **PASS**
+（无跳步、checkpoint 往返一致、90/90 个 image stage 参数更新），65536 于 step1 失败于
+`mask_predictor.weight`；新增 `amp_boundary_probe` 的同 seed 一步 FP32 对照显示该参数
+未缩放梯度元素最大值由旧结构 0.707 升到 1.156（×65536 = 75,746 > 65,504），
+是**缩放后的 fp16 边界**而非 loss/结构发散。`learnability` 60 步 LOCAL_SMOKE 两臂 loss
+有限、full 臂 T3 NLL 6.40→0.94、T3 accuracy 0.001→0.732、predicted-path XYZ 74.2→6.2 mm、
+无 tanh 饱和；`accumulation_smoke` 4/48 状态机 **PASS**；真实入口 `main_gdrn.py` +
+`smoke.py`（本机 CPP、AMP）退出码 0，13 iteration/epoch 落 2 次 update、GradScaler 保持
+65536。注意 accumulation 的 divisor 会把每个 micro-batch 的缩放 fp16 梯度缩小 12 倍，
+因此 formal 48/48（accumulate=1）比本机 4×12 诊断更贴近 fp16 边界，batch48 的 AMP 行为
+只能由服务器实测。
+
+**重构前的固定 batch 结果（Residual V1/V2、AMP scale sweep、route/T3 accuracy、
+residual probe、生产路径 AMP recovery）属于旧 Image 分支**，保留为历史诊断证据，
+不删除也不当作新结构的验证；下方"第三轮"及更早各段均为重构前记录。
+`FORMAL_READY=False`；服务器真实 batch48 与 EGL gate 未执行，正式训练未启动。
+
+## EXP025 统一 T3 分类（2026-09-20，第三轮：生产 AMP 与 Residual V2 收口；重构前结构）
 
 **生产路径 AMP recovery 已验证**：`amp_recovery_smoke` 用 `LightningLite(precision=16)` 的
 真实对象（`_LiteModule` 进入 fp16 autocast 并把输入 cast 成 fp16、plugin 的 `GradScaler`、
@@ -67,7 +107,8 @@ last-good checkpoint；`numerical_replay` 做 AMP/低scale/FP32 matched 重放�
 `FORMAL_READY=False` 仍不变，正式训练、服务器 EGL 与 E5–E40 均未执行。
 实现与未完成项见 [EXP025 README](exp025/README.md) 和
 [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md)。
-下方“尚未建立 EXP025 / 等待安排”等为 09-19 及以前历史状态，本段为最新安排。
+本段是**重构前**结构的收口记录，最新一轮见本文顶部；下方“尚未建立 EXP025 /
+等待安排”等为 09-19 及以前历史状态。
 
 ## CAD hierarchy 轻量整理（2026-09-19）
 
@@ -391,6 +432,10 @@ matched PnP 缺口作为已结束实验的未生成证据保留；不启动 EPro
 
 ## 下一步
 
+0. EXP025 新结构已完成本机验证，下一步是服务器 gate：用新 release 在 `exp025_lmo`
+   profile 下跑 preflight、EGL 真实 batch48 前反向与 checkpoint save/resume，并实测
+   batch48 下的 AMP/GradScaler 行为与峰值显存；通过前 `FORMAL_READY` 保持 `False`，
+   不启动 40 epoch 正式训练。是否固定 formal 初始 AMP scale 属训练策略，待用户确认。
 1. EXP021 训练已结束：B/C run_id、source 与 E5–E40 八个固定评估点（含逐物体
    ADD(-S)0.1d）均已记录并随记录提交；仍缺 run exit code 与服务器权重文件核验。
 2. 用户已判定当前代码与网络结构设计需要修正，后续不在现有设计上直接继续；EXP022

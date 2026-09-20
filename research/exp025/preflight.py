@@ -69,7 +69,19 @@ def run(cfg):
     groups = audit_optimizer(model, optimizer, cfg)
     image = torch.randn(1, 3, 256, 256)
     classes = torch.zeros(1, dtype=torch.long)
-    prediction = model.predict(image, classes)
+    diagnostics = {}
+    prediction = model.predict(image, classes, diagnostics=diagnostics)
+    # The four-stage image ladder and the shared prediction heads, checked on the server
+    # as well: a stale release must fail here instead of producing numbers.
+    expected = {'t3_logits': (1, 512, 64, 64), 'residual': (1, 3, 64, 64), 'mask_logit': (1, 1, 64, 64)}
+    for name, shape in expected.items():
+        if tuple(prediction[name].shape) != shape:
+            raise RuntimeError(f'Unexpected {name} shape {tuple(prediction[name].shape)}, expected {shape}')
+    if tuple(diagnostics['image_tokens'].shape) != (1, 4096, model.cad_attention_head.token_dim):
+        raise RuntimeError(f'Unexpected final image tokens: {tuple(diagnostics["image_tokens"].shape)}')
+    counts = [bank.shape[1] for bank in model.cad_attention_head.token_banks(classes)]
+    if counts != [1, 8, 64, 512]:
+        raise RuntimeError(f'Unexpected CAD bank token counts: {counts}')
     xyz = torch.full((1, 3, 64, 64), .5)
     mask = torch.ones(1, 1, 64, 64)
     losses, stats = model.cad_attention_head.loss(prediction, classes, xyz, mask)

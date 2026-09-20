@@ -88,6 +88,46 @@ class WindowAttentionBlock(nn.Module):
         return x + self.ffn(self.ffn_norm(x))
 
 
+class ImageSAStage(nn.Module):
+    """One image-branch stage whose self-attention is written back into the feature.
+
+    The returned feature is what the next spatial transition consumes, so the attention
+    cannot degrade into a read-only side branch.  The last stage returns `None` as its
+    feature: nothing downstream consumes it, and a back projection no loss reaches would
+    only add parameters without gradients.
+    """
+
+    def __init__(self, channels, resolution, attention, token_dim=256, num_heads=8,
+                 window=8, shift=4, write_back=True):
+        super().__init__()
+        if attention not in ('global', 'window') or token_dim % num_heads:
+            raise ValueError('Invalid image self-attention geometry')
+        self.resolution = int(resolution)
+        self.global_attention = attention == 'global'
+        self.to_tokens = nn.Conv2d(channels, token_dim, 1)
+        if self.global_attention:
+            self.attention = nn.ModuleList((AttentionBlock(token_dim, num_heads),))
+        else:
+            self.attention = nn.ModuleList((
+                WindowAttentionBlock(token_dim, num_heads, self.resolution, window),
+                WindowAttentionBlock(token_dim, num_heads, self.resolution, window, shift)))
+        self.to_feature = nn.Linear(token_dim, channels) if write_back else None
+
+    def forward(self, feature):
+        batch, channels, height, width = feature.shape
+        tokens = self.to_tokens(feature).flatten(2).transpose(1, 2)
+        if tokens.shape[1] != self.resolution ** 2 or (height, width) != (self.resolution,) * 2:
+            raise ValueError(f'Expected {self.resolution}x{self.resolution} image features')
+        for block in self.attention:
+            # Self-attention reads its own tokens as context: with `context=None` the global
+            # block would skip its context norm and leave those parameters without gradient.
+            tokens = block(tokens, tokens) if self.global_attention else block(tokens)
+        if self.to_feature is None:  # final stage: the tokens are the cross-attention query
+            return None, tokens
+        update = self.to_feature(tokens).transpose(1, 2).reshape(batch, channels, height, width)
+        return feature + update, tokens
+
+
 class CADGeometryEncoder(nn.Module):
     def __init__(self, dim=256, heads=8):
         super().__init__()

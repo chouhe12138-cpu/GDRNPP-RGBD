@@ -26,6 +26,8 @@ def main():
     parser.add_argument('--renderer', choices=('cpp', 'egl'), default='cpp')
     parser.add_argument('--batch-size', type=int, default=4)
     parser.add_argument('--steps', type=int, default=8)
+    parser.add_argument('--amp-scale', type=float, default=65536.,
+                        help='initial GradScaler scale; the production default is 65536')
     parser.add_argument('--load-batch', type=Path)
     parser.add_argument('--save-batch', type=Path)
     args = parser.parse_args()
@@ -35,7 +37,8 @@ def main():
     cfg = read_config(args.config, args.train_backbone == 'yes', args.backbone_init)
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING',
                   batch_source=str(args.load_batch or 'online'), renderer=args.renderer,
-                  batch_size=args.batch_size, steps=args.steps, device=args.device)
+                  batch_size=args.batch_size, steps=args.steps, device=args.device,
+                  amp_init_scale=args.amp_scale)
     save_report(args.output, report)
     try:
         if not torch.cuda.is_available() or not args.device.startswith('cuda'):
@@ -43,6 +46,8 @@ def main():
         seed_all(42)
         torch.set_num_threads(4)
         cfg.MODEL.DEVICE = args.device
+        # This diagnostic runs its own local batch; the formal config stays at batch 48.
+        cfg.SOLVER.IMS_PER_BATCH = cfg.SOLVER.REFERENCE_BS = args.batch_size
         model, optimizer = build_model_optimizer(cfg)
         model.train()
         report['optimizer_groups'] = audit_optimizer(model, optimizer, cfg)
@@ -50,7 +55,9 @@ def main():
         frozen = {k: v.detach().cpu().clone() for k, v in model.backbone.state_dict().items()} if not cfg.TRAIN_BACKBONE else None
         initial_backbone = next(model.backbone.parameters()).detach().clone()
         initial_head = model.cad_attention_head.t3_classifier.weight.detach().clone()
-        scaler = torch.cuda.amp.GradScaler()
+        initial_stages = {name: value.detach().clone()
+                          for name, value in model.cad_attention_head.stages.named_parameters()}
+        scaler = torch.cuda.amp.GradScaler(init_scale=args.amp_scale)
         history, timings = [], []
         report.update(losses=history, timings=timings)
         torch.cuda.reset_peak_memory_stats()
@@ -83,6 +90,12 @@ def main():
                 raise RuntimeError('Frozen backbone changed')
         elif torch.equal(initial_backbone, next(model.backbone.parameters())):
             raise RuntimeError('Trainable backbone did not update')
+        # Every image-branch stage must actually be trained, not just constructed.
+        stages_now = dict(model.cad_attention_head.stages.named_parameters())
+        updated = [name for name, value in initial_stages.items() if not torch.equal(value, stages_now[name])]
+        if len(updated) != len(initial_stages):
+            raise RuntimeError('Image stages did not update: '
+                               f'{sorted(set(initial_stages) - set(updated))}')
         model.eval()
         with torch.no_grad(), torch.cuda.amp.autocast():
             out = model(batch['roi_img'], roi_classes=batch['roi_cls'], return_cad_debug=True)
@@ -105,6 +118,7 @@ def main():
             peak_allocated_gb=torch.cuda.max_memory_allocated()/1e9,
             peak_reserved_gb=torch.cuda.max_memory_reserved()/1e9,
             total_parameters=sum(p.numel() for p in model.parameters()), checkpoint=checkpoint.name,
+            image_stages=dict(total=len(initial_stages), updated=len(updated)),
             timing_scope='fixed batch; excludes repeated loader/render', checkpoint_roundtrip=True)
     except NonFiniteTrainingError as exc:
         report.update(status='FAIL', error=str(exc), failure=exc.telemetry)

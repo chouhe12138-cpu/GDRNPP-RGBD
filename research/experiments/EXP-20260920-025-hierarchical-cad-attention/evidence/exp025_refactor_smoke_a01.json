@@ -1,0 +1,105 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "official_lmo",
+  "train_backbone": false,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "eb2fdb292451fa9da491b32ab855182934d697fa",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "hierarchy_sha256": "02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_refactor_smoke_a01",
+  "status": "FAIL",
+  "batch_source": ".local/exp025/fixed_batch4_a01.pt",
+  "renderer": "cpp",
+  "batch_size": 4,
+  "steps": 8,
+  "device": "cuda:0",
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 10787652
+    }
+  ],
+  "losses": [],
+  "timings": [],
+  "current_step": 1,
+  "error": "Non-finite gradient (AMP): ['cad_attention_head.mask_predictor.weight']",
+  "failure": {
+    "step": 1,
+    "amp_scale": 65536.0,
+    "losses": {
+      "loss_cad_t1": 2.0688483715057373,
+      "loss_cad_t2": 4.173064708709717,
+      "loss_cad_t3": 6.400556564331055,
+      "loss_cad_residual": 0.1496841311454773,
+      "loss_cad_mask": 0.8380190134048462
+    },
+    "head": {
+      "image_tokens_token_norm": {
+        "mean": 16.144451141357422,
+        "p95": 19.260541915893555,
+        "max": 24.377220153808594
+      },
+      "cad_tokens_token_norm": {
+        "mean": 19.941076278686523,
+        "p95": 20.816909790039062,
+        "max": 21.632282257080078
+      },
+      "t3_logits": {
+        "finite": true,
+        "abs_mean": 0.4631836414337158,
+        "abs_max": 3.265625
+      },
+      "mask_logit": {
+        "finite": true,
+        "abs_mean": 0.46641647815704346,
+        "abs_max": 1.3193359375
+      },
+      "raw_residual": {
+        "abs_max": 0.0,
+        "fraction_abs_gt_5": 0.0,
+        "fraction_abs_gt_9": 0.0,
+        "tanh_exact_saturation": 0.0
+      },
+      "soft_t3_context_token_norm": {
+        "mean": 3.774735927581787,
+        "p95": 3.8973140716552734,
+        "max": 3.9234325885772705
+      },
+      "bounded_residual_norm_max": 0.0,
+      "t3_classifier_weight_abs_max": 0.06249970197677612
+    },
+    "grad": {
+      "grad_norm": {
+        "cad_attention_head.cross_attention": 7.087991148277139,
+        "cad_attention_head.geometry": 6.437904831717934,
+        "cad_attention_head.input_adapter": 3.7044733592175523,
+        "cad_attention_head.mask_predictor": null,
+        "cad_attention_head.residual_predictor": 0.28042981639943587,
+        "cad_attention_head.stages": 5.741470462971407,
+        "cad_attention_head.t3_classifier": 1.796446091836452,
+        "cad_attention_head.transitions": 8.717289230451708
+      },
+      "grad_abs_max": {
+        "cad_attention_head.cross_attention": 0.0958251953125,
+        "cad_attention_head.geometry": 0.452392578125,
+        "cad_attention_head.input_adapter": 0.11956787109375,
+        "cad_attention_head.mask_predictor": null,
+        "cad_attention_head.residual_predictor": 0.061798095703125,
+        "cad_attention_head.stages": 0.140869140625,
+        "cad_attention_head.t3_classifier": 0.106689453125,
+        "cad_attention_head.transitions": 0.1639404296875
+      },
+      "non_finite_parameters": [
+        "cad_attention_head.mask_predictor.weight"
+      ]
+    },
+    "non_finite_parameters": [
+      "cad_attention_head.mask_predictor.weight"
+    ]
+  }
+}

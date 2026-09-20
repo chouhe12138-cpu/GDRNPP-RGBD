@@ -83,7 +83,8 @@ def main():
     parser.add_argument('--last-good-period', type=int, default=20,
                         help='steps between last-good checkpoints used for matched replay')
     parser.add_argument('--amp-scale', type=float, default=65536.,
-                        help='initial GradScaler scale; the recorded sweep fails above 32768')
+                        help='initial GradScaler scale (production default); see '
+                             'amp_boundary_probe for where the current structure overflows')
     parser.add_argument('--arms', default='residual_only,full')
     args = parser.parse_args()
     weights = dict(residual_only=0., full=1.)

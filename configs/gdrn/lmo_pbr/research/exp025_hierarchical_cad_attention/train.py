@@ -23,7 +23,9 @@ MODEL['POSE_NET'].update(dict(
                       residual_detach_route=True)),
     LOSS_CFG=dict(MASK_LOSS_TYPE='BCE')))
 DATALOADER = dict(NUM_WORKERS=16)
-SOLVER = dict(IMS_PER_BATCH=4, REFERENCE_BS=48, TOTAL_EPOCHS=40, MAX_TO_KEEP=10,
+# Formal training is a real batch 48: one optimizer update per iteration.  Local
+# memory-limited shapes belong to smoke.py / the exp025 diagnostics, not to this file.
+SOLVER = dict(IMS_PER_BATCH=48, REFERENCE_BS=48, TOTAL_EPOCHS=40, MAX_TO_KEEP=10,
     OPTIMIZER_CFG=dict(_delete_=True, type='AdamW', lr=3e-4, weight_decay=.01,
                       betas=(.9, .999), eps=1e-8),
     AMP=dict(ENABLED=True), WARMUP_RATIO=.04, WARMUP_FACTOR=.001, WARMUP_METHOD='linear',
