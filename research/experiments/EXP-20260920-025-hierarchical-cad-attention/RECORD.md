@@ -51,6 +51,36 @@ AMP guard 语义保持生产 engine 的 GradScaler 行为。
 - 服务器真实 batch48/EGL gate 尚未执行；本段没有设置 `FORMAL_READY` 或 AMP scale，也没有
   产生正式指标。
 
+## Observed：LM13 后续协议准备（2026-09-20）
+
+用户决定先完成 LM-O，LM13 只准备、不上服务器。新增预备配置
+`train_lm13_imagenet_full.py`，使用 ImageNet ConvNeXt 全量训练；没有可复用的 LM13 GDRNPP
+checkpoint。训练协议从 EXP023 已验证配置原样迁移：`lm_13_train_online +
+lm_imgn_13_train_1k_per_obj_online`，测试 `lm_13_test_online`，Ranger lr `1e-4`、wd `0`，
+backbone LR×0.1，physical/reference batch `4/24`，160 epoch，1000-step linear warmup，
+`flat_and_anneal` 在 72% 后 cosine 到0，每20 epoch checkpoint/eval，GT bbox。
+
+用保留的 consistent-v3 算法、seed `20260919`、每物体100万表面采样生成 LM13 本地 artifact：
+`.local/dataset_cache/exp025/lm13/consistent_v3.npz`，13 类 BOP ID
+`[1,2,4,5,6,8,9,10,11,12,13,14,15]`，SHA256
+`322cd3778f0325838675a7dc6bae1a4e1cf107bfa95e05c006dcee0836a66417`。T1/T2/T3
+为 8/64/512，最大 symmetry count 2，父子覆盖 sanity PASS、`below_one=[0,0]`。
+同一通用 builder 重新生成 LM-O artifact，SHA256 仍为
+`02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373`，与既有文件逐字节一致。
+
+CPU preflight PASS：ImageNet backbone 340 张量精确匹配，head/backbone 参数
+`10,787,652 / 87,564,416`，optimizer groups lr `1e-4 / 1e-5`，loss/gradient 有限。
+本机 RTX 4060 Laptop、CUDA 12.1、CPP 在线几何、batch4、AMP scale16384 的三步真实数据
+smoke `exp025_lm13_prepared_smoke_a02` PASS：0 skipped step，loss 各分量有限且三步下降，
+四个 Image-SA stage 均有有限非零梯度并更新，checkpoint roundtrip PASS，峰值 allocated /
+reserved `3.693 / 3.792 GB`。完整 GPU 权限回归为 **104 passed**。a01 的训练步骤同样完成，但旧 smoke 误要求90个 stage 参数张量
+在低LR短跑中全部逐位改变；其中一个 norm weight 未跨过 FP32 update quantum，故工程断言
+FAIL。判据修正为逐 stage 梯度与更新覆盖后以新 run 重跑，不把 a01 纳入科学结论。
+
+Decision：`LM13_PREPARED / LOCAL_CPU_AND_CUDA_SMOKE_PASS / SERVER_NOT_ENABLED /
+FORMAL_NOT_READY`。`exp025_lm13` 故意不在 launcher allowlist，未做服务器 EGL、未设置
+AMP.INIT_SCALE、未生成正式 checkpoint 或精度指标；只有 LM-O 完成后才进入服务器阶段。
+
 ## Observed：Image 分支结构重构与 formal batch 修正（2026-09-20，交接包 v2）
 
 按 `CAD_EXP025_local_agent_pack_v2` 修正两处偏离。**本段之后的所有 EXP025 固定 batch

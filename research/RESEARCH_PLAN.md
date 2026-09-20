@@ -10,3 +10,7 @@ AMP；有限 loss/gradient；optimizer update；冻结/更新范围；四级 Ima
 正式运行固定 seed42、40 epoch、E5/E10/E15/E20/E25/E30/E35/E40 评价，不按中间结果选模，
 不自动改 batch、追加 seed 或恢复旧实验。结果至少记录 BOP AR、ADD(-S)、reS、teS、逐物体
 趋势、run ID、source commit、checkpoint 和退出状态。
+
+LM13 已作为下一阶段配置准备，但执行顺序固定在 LM-O 之后。其协议沿用历史 GDR-Net 的
+real+DeepIM、160 epoch flat-and-anneal 配置；当前只保留本地 preflight/smoke 证据，不开放
+服务器 profile 或 formal。

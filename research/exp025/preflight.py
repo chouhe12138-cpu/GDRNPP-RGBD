@@ -14,7 +14,7 @@ from core.gdrn_modeling.models.heads.hierarchical_cad_attention_head import hier
 from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
 from research.cad_hierarchy.diagnostics import hierarchy_sanity
 from research.run_contract import validate_research_run_config
-from .configuration import CONSISTENT_V3_SHA256, require_consistent_v3, set_mode
+from .configuration import HIERARCHY_SHA256, require_hierarchy, set_mode
 
 CONFIG = Path('configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py')
 
@@ -71,17 +71,16 @@ def verify_imagenet_backbone(model, path):
 
 def run(cfg):
     validate_research_run_config(cfg, mode='prepare')
-    if cfg.TRAIN_PROTOCOL.NAME != 'exp025_lmo':
+    if cfg.TRAIN_PROTOCOL.NAME not in ('exp025_lmo', 'exp025_lm13'):
         raise ValueError('EXP025 protocol required')
     context = dataset_context(cfg)
-    if context.key != 'lmo' or context.object_ids != (1, 5, 6, 8, 9, 10, 11, 12):
-        raise ValueError('EXP025 V1 is LM-O only')
-    h = load_cad_hierarchy(context.hierarchy_path, expected_object_ids=context.object_ids, dataset_key='lmo')
+    h = load_cad_hierarchy(context.hierarchy_path, expected_object_ids=context.object_ids,
+                           dataset_key=context.key)
     sanity = hierarchy_sanity({d: v for d, v in h.numpy_levels().items() if d <= 3}, context.object_ids)
     if sanity['result'] != 'PASS':
         raise RuntimeError(sanity)
     # Identity, not just shape: the geometry buffers do not travel with a checkpoint.
-    hierarchy_sha256 = require_consistent_v3(context.hierarchy_path)
+    hierarchy_sha256 = require_hierarchy(context.hierarchy_path, context.key)
     cfg.MODEL.DEVICE = 'cpu'
     torch.manual_seed(42)
     model, optimizer = build_model_optimizer(cfg)
@@ -130,7 +129,8 @@ def run(cfg):
                 backbone_parameters=sum(p.numel() for p in model.backbone.parameters()),
                 head_parameters=sum(p.numel() for p in model.cad_attention_head.parameters()),
                 hierarchy=str(context.hierarchy_path), hierarchy_sha256=hierarchy_sha256,
-                hierarchy_sha_match=hierarchy_sha256 == CONSISTENT_V3_SHA256, hierarchy_sanity=sanity,
+                hierarchy_sha_match=hierarchy_sha256 == HIERARCHY_SHA256[context.key],
+                dataset=context.key, object_ids=list(context.object_ids), hierarchy_sanity=sanity,
                 losses={k: float(v.detach()) for k, v in losses.items()},
                 arm=str(cfg.EXP025_ARM), formal_ready=bool(cfg.RESEARCH_PROTOCOL.FORMAL_READY))
 

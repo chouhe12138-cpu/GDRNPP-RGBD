@@ -20,8 +20,8 @@ def dataset_context(cfg):
         cfg, hierarchy_path=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)
     # Every EXP025 entry point resolves the dataset, so the artifact identity is checked
     # here: nothing downstream can train or score against a different hierarchy.
-    from research.exp025.configuration import require_consistent_v3
-    require_consistent_v3(context.hierarchy_path)
+    from research.exp025.configuration import require_hierarchy
+    require_hierarchy(context.hierarchy_path, context.key)
     return context
 
 

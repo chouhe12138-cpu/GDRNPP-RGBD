@@ -18,7 +18,11 @@ OFFICIAL_WEIGHTS = 'pretrained_models/lmo_pbr/model_final_wo_optim.pth'
 # The head's geometry buffers are non-persistent, so a checkpoint is only reproducible
 # together with the exact hierarchy artifact it was trained on.  Name, mode and level
 # counts are not enough: a regenerated artifact could carry the same ones.
-CONSISTENT_V3_SHA256 = '02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373'
+HIERARCHY_SHA256 = {
+    'lmo': '02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373',
+    'lm13': '322cd3778f0325838675a7dc6bae1a4e1cf107bfa95e05c006dcee0836a66417',
+}
+CONSISTENT_V3_SHA256 = HIERARCHY_SHA256['lmo']
 
 
 @lru_cache(maxsize=8)
@@ -39,6 +43,19 @@ def require_consistent_v3(path):
     if actual != CONSISTENT_V3_SHA256:
         raise ValueError(f'EXP025 requires consistent_v3 {CONSISTENT_V3_SHA256}, '
                          f'got {actual} at {path}')
+    return actual
+
+
+def require_hierarchy(path, dataset_key):
+    """Verify the dataset-specific immutable hierarchy used by EXP025."""
+    if dataset_key not in HIERARCHY_SHA256:
+        raise ValueError(f'EXP025 has no registered hierarchy digest for {dataset_key}')
+    if not Path(path).is_file():
+        raise FileNotFoundError(f'EXP025 hierarchy artifact missing: {path}')
+    actual = sha256_file(str(Path(path).resolve()))
+    expected = HIERARCHY_SHA256[dataset_key]
+    if actual != expected:
+        raise ValueError(f'EXP025 {dataset_key} hierarchy requires {expected}, got {actual} at {path}')
     return actual
 
 

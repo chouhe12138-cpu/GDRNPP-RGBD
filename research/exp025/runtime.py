@@ -33,13 +33,13 @@ def restore_rng(state):
 
 
 def metadata(cfg):
-    from .configuration import require_consistent_v3
+    from .configuration import require_hierarchy
     hierarchy = cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH
     return dict(experiment_id=cfg.EXPERIMENT_ID, seed=42, backbone_init=cfg.BACKBONE_INIT,
                 train_backbone=bool(cfg.TRAIN_BACKBONE), config=cfg.filename,
                 source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
                 source_tree_dirty=bool(subprocess.check_output(['git', 'status', '--porcelain'], text=True).strip()),
-                hierarchy=hierarchy, hierarchy_sha256=require_consistent_v3(hierarchy),
+                hierarchy=hierarchy, hierarchy_sha256=require_hierarchy(hierarchy, cfg.DATASET_CONTEXT.KEY),
                 training_kind='diagnostic', formal=False)
 
 

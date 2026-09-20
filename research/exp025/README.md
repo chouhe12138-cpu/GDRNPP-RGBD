@@ -34,9 +34,9 @@
   `Linear(D+64,D)+GELU+Linear(D,3)`；最后一层权重与 bias 零初始化，初始残差恰为 0，
   即从 T3 anchor 出发。不用 GT id、不做 top-k、train/infer 同一 forward；detach 使
   residual loss 不反向改写已稳定的 T3 分类器（该分支只经 image token 影响它）。
-- 几何 buffer 非持久化，checkpoint 之外必须保留相同 hierarchy artifact：EXP025 固定
-  `consistent_v3.npz` SHA256 `02ce0909…1a373`，`dataset_context`/preflight/每个 report
-  都校验并记录该摘要（同一进程只 hash 一次）。
+- 几何 buffer 非持久化，checkpoint 之外必须保留相同 hierarchy artifact：LM-O
+  `consistent_v3.npz` SHA256 `02ce0909…1a373`，LM13 SHA256 `322cd377…6417`；
+  `dataset_context`/preflight/每个 report 都按数据集校验并记录摘要（同一进程只 hash 一次）。
 - `BACKBONE_INIT` 只负责主干初始化；`MODEL.WEIGHTS` 只表示**完整 GDRN_CAD checkpoint**，
   因此 fresh train 为 `""`，resume 仍走 output 目录 + `--resume`。`--eval-only`（或
   `SAVE_RESULTS_ONLY`）在缺少完整 checkpoint（t3_classifier / residual predictor /
@@ -49,6 +49,14 @@
 主干。共享协议在 `common.py`。两臂同时改变初始化和训练范围，只比较组合策略。
 诊断工具默认读取所给配置；ImageNet 通过
 `GDRN_CONVNEXT_BASE_WEIGHTS` 指定本机权重，不自动下载。
+
+`train_lm13_imagenet_full.py` 是 LM-O 之后的预备 arm。它使用 13 类 LM real + DeepIM
+renders、ImageNet ConvNeXt 全量训练、Ranger 1e-4（backbone LR×0.1）、effective batch24
+（4×6 accumulation）、160 epoch、1000-step warmup、前72% flat 后 cosine 到0，并每20
+epoch checkpoint/eval。对应 hierarchy 位于
+`.local/dataset_cache/exp025/lm13/consistent_v3.npz`。本地 CPU preflight 和 batch4
+CUDA+CPP/AMP 三步 smoke 已通过；launcher 当前明确拒绝 `exp025_lm13`，待 LM-O 完成后再补
+服务器资源门和 EGL gate。
 
 LM-O PBR40/GT-box，seed42，AdamW lr3e-4、wd.01、betas(.9,.999)、eps1e-8；
 解冻主干 lr 乘 .1。**formal 是真实 batch48（`IMS_PER_BATCH=48`、`REFERENCE_BS=48`，

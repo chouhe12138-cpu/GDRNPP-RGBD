@@ -25,6 +25,25 @@ def test_two_exp025_arms_are_explicit_and_matched():
     assert '/exp025/consistent_v3.npz' in '/' + frozen.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH
 
 
+def test_lm13_prepared_config_matches_historical_protocol():
+    cfg = Config.fromfile(str(CFG / 'train_lm13_imagenet_full.py'))
+    assert (cfg.EXP025_ARM, cfg.BACKBONE_INIT, cfg.TRAIN_BACKBONE) == (
+        'lm13_imagenet_full_prepared', 'imagenet', True)
+    assert tuple(cfg.DATASETS.TRAIN) == (
+        'lm_13_train_online', 'lm_imgn_13_train_1k_per_obj_online')
+    assert tuple(cfg.DATASETS.TEST) == ('lm_13_test_online',)
+    assert (cfg.SOLVER.IMS_PER_BATCH, cfg.SOLVER.REFERENCE_BS,
+            cfg.SOLVER.TOTAL_EPOCHS) == (4, 24, 160)
+    assert (cfg.SOLVER.OPTIMIZER_CFG.type, cfg.SOLVER.OPTIMIZER_CFG.lr,
+            cfg.SOLVER.OPTIMIZER_CFG.weight_decay) == ('Ranger', 1e-4, 0)
+    assert cfg.SOLVER.WARMUP_RATIO is None and cfg.SOLVER.WARMUP_ITERS == 1000
+    assert cfg.SOLVER.LR_SCHEDULER_NAME == 'flat_and_anneal'
+    assert cfg.SOLVER.ANNEAL_POINT == .72 and cfg.SOLVER.TARGET_LR_FACTOR == 0.
+    assert cfg.TEST.EVAL_PERIOD == cfg.SOLVER.CHECKPOINT_PERIOD == 20
+    assert not cfg.RESEARCH_PROTOCOL.FORMAL_READY and 'INIT_SCALE' not in cfg.SOLVER.AMP
+    assert '/exp025/lm13/consistent_v3.npz' in '/' + cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH
+
+
 def test_exp025_model_import_does_not_load_old_experiment_modules():
     for name in list(sys.modules):
         if name.startswith('core.gdrn_modeling.models.GDRN_') or name.startswith('research.exp022'):

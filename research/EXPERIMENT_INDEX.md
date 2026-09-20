@@ -10,6 +10,8 @@ EXP025 取代。被清退入口的最终完整快照是 commit
 
 EXP025 当前拆为 lab0 `official_frozen` 与 lab1 `imagenet_full` 两条正式 arm；服务器真实
 batch48/EGL gate 未执行，两个配置均保持 `FORMAL_READY=False`。
+LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，保持 server-disabled，
+待 LM-O 完成后再独立开放。
 
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|

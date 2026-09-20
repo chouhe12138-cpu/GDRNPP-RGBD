@@ -27,7 +27,7 @@ def test_launcher_is_valid_shell_and_exp025_only():
 def test_profile_mapping_accepts_only_exp025():
     ok = shell("container_config_value() { echo exp025_lmo; }\nresolve_resource_profile train.py")
     assert ok.stdout.strip() == 'exp025_lmo'
-    for value in ('', 'legacy_lmo', 'lm13_gdrn', 'typo'):
+    for value in ('', 'legacy_lmo', 'lm13_gdrn', 'exp025_lm13', 'typo'):
         bad = shell(f"container_config_value() {{ echo {value!r}; }}\nresolve_resource_profile train.py", False)
         assert bad.returncode != 0 and 'unknown TRAIN_PROTOCOL.NAME' in bad.stderr
 

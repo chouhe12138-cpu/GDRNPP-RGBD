@@ -11,3 +11,7 @@ EXP005 的历史结果若需精确复现，应 checkout 对应 RECORD 中记录�
 EXP025 用 `train_official_frozen.py` 与 `train_imagenet_full.py` 明确区分两条正式臂，
 `smoke.py` 只用于本地接线。已退出当前研究链的历史配置不长期保留在 HEAD；启动器
 通过配置覆盖设置唯一 OUTPUT_DIR，不复制训练循环。
+
+`train_lm13_imagenet_full.py` 是 LM-O 完成后的预备配置：ImageNet ConvNeXt 全量训练，
+沿用历史 LM real+DeepIM、160 epoch flat-and-anneal 协议。它当前不在服务器 launcher
+allowlist 中，不能启动 formal。

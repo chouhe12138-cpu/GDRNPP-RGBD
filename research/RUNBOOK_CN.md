@@ -1,5 +1,8 @@
 # EXP025 运行手册
 
+本手册当前只开放 LM-O。LM13 虽已有本地配置与验证产物，但 `exp025_lm13` 尚未加入 launcher；
+不要为 LM13 创建服务器 run，待 LM-O 正式实验完成后再扩展本手册。
+
 ## 本地验证与 bundle
 
 ```bash
@@ -79,9 +82,26 @@ test "$(sha256sum "${target}" | awk '{print $1}')" = "${expected}"
 
 ## 受控替换项目容器
 
-本轮没有修改依赖、Dockerfile、C++/CUDA 或 ABI，复用现有稳定镜像。先从旧项目容器
-读取精确 `image_ref`；新 release 的 `create` 会核对镜像 revision 与所有 native/environment
-输入，任何不兼容都会拒绝创建并要求重建。
+本轮更新了 Dockerfile 的构建期测试集合与镜像环境验证入口，因此必须从新 release 重建
+项目镜像。依赖、C++/CUDA 和 ABI 没有变化；重建用于让镜像 revision 与当前验证契约一致。
+
+```bash
+(
+set -Eeuo pipefail
+
+machine=lab0
+short_sha=REPLACE_SHORT_SHA
+release="/data/labs/${machine}/docker_data/chx/releases/GDRNPP-RGBD-${short_sha}"
+
+test "$(id -un)" = "${machine}"
+test -z "$(git -C "${release}" status --short)"
+cd "${release}"
+docker/l40/build_image.sh
+)
+```
+
+记录 `build_image.sh` 最后输出的 `image=...`，在下面填写为 `image_ref`。lab1 使用相同
+commit 构建；两台镜像都应记录同一个 source revision。
 
 先运行 `check` 和 `docker inspect`，确认精确容器标签、旧 repo mount，且容器内除
 `sleep infinity` 外无进程。只有满足这些条件才停止并删除该项目容器，再从新 release
@@ -94,6 +114,7 @@ set -Eeuo pipefail
 machine=lab0
 short_sha=REPLACE_SHORT_SHA
 expected_old_repo=REPLACE_EXACT_OLD_RELEASE
+image_ref=REPLACE_IMAGE_FROM_BUILD_OUTPUT
 root="/data/labs/${machine}/docker_data/chx"
 release="${root}/releases/GDRNPP-RGBD-${short_sha}"
 container="gdrnpp_chx_${machine}"
@@ -102,8 +123,7 @@ test "$(id -un)" = "${machine}"
 test -z "$(git -C "${release}" status --short)"
 test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.project"}}')" = GDRNPP-RGBD
 test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.machine"}}')" = "${machine}"
-image_ref="$(/usr/bin/docker inspect "${container}" --format '{{.Config.Image}}')"
-test -n "${image_ref}"
+/usr/bin/docker image inspect "${image_ref}" >/dev/null
 
 mounted_repo="$(/usr/bin/docker inspect "${container}" --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
 test "${mounted_repo}" = "${expected_old_repo}"

@@ -32,3 +32,18 @@ def test_smoke_contract_remains_small_and_non_evaluating():
     result = validate_research_run_config(cfg, mode='smoke')
     assert result['batch_size'] == 4 and result['total_epochs'] == 1
     assert result['evaluation_period'] == 0
+
+
+def test_lm13_is_prepared_but_locked_and_has_a_strict_formal_contract():
+    cfg = Config.fromfile(str(CFG / 'train_lm13_imagenet_full.py'))
+    validate_research_run_config(cfg, mode='prepare')
+    with pytest.raises(ValueError, match='not ready'):
+        validate_research_run_config(cfg, mode='formal')
+    cfg.RESEARCH_PROTOCOL.FORMAL_READY = True
+    cfg.SOLVER.AMP.INIT_SCALE = 16384
+    result = validate_research_run_config(cfg, mode='formal')
+    assert result['batch_size'] == 4 and result['total_epochs'] == 160
+    assert result['evaluation_period'] == 20
+    cfg.SOLVER.ANNEAL_POINT = .5
+    with pytest.raises(ValueError, match='flat-and-anneal mismatch'):
+        validate_research_run_config(cfg, mode='formal')

@@ -28,7 +28,7 @@ class DatasetContext:
     cad_vertex_scale: float
 
 
-def resolve_dataset_context(cfg, *, hierarchy_path=None) -> DatasetContext:
+def resolve_dataset_context(cfg, *, hierarchy_path=None, require_hierarchy=True) -> DatasetContext:
     if not cfg.DATASETS.TRAIN:
         raise ValueError("EXP025 requires one training split")
     settings = cfg.get("DATASET_CONTEXT", {})
@@ -41,10 +41,16 @@ def resolve_dataset_context(cfg, *, hierarchy_path=None) -> DatasetContext:
     data_ref = ref.__dict__[data_ref_key]
     names = tuple(train_meta.objs)
     ids = tuple(int(data_ref.obj2id[name]) for name in names)
-    if ids != (1, 5, 6, 8, 9, 10, 11, 12):
-        raise ValueError(f"EXP025 requires LM-O object order, got {ids}")
-    if len(cfg.DATASETS.TRAIN) != 1 or len(cfg.DATASETS.TEST) > 1:
-        raise ValueError("EXP025 requires one train split and at most one test split")
+    if not ids or len(set(ids)) != len(ids):
+        raise ValueError("EXP025 object IDs must be nonempty and unique")
+    for extra_name in list(cfg.DATASETS.TRAIN)[1:]:
+        extra_meta = MetadataCatalog.get(str(extra_name))
+        extra_ref = ref.__dict__[extra_meta.ref_key]
+        extra_ids = tuple(int(extra_ref.obj2id[name]) for name in extra_meta.objs)
+        if extra_ids != ids:
+            raise ValueError(f"EXP025 training split object order mismatch: {extra_name}")
+    if len(cfg.DATASETS.TEST) > 1:
+        raise ValueError("EXP025 supports at most one test split")
     test_name = str(cfg.DATASETS.TEST[0]) if cfg.DATASETS.TEST else None
     if test_name:
         test_meta = MetadataCatalog.get(test_name)
@@ -60,12 +66,13 @@ def resolve_dataset_context(cfg, *, hierarchy_path=None) -> DatasetContext:
     if "$" in expanded:
         raise ValueError(f"Unresolved EXP025 hierarchy path: {raw}")
     hierarchy = Path(expanded)
-    if not hierarchy.is_file():
-        raise FileNotFoundError(f"EXP025 hierarchy missing: {hierarchy}")
-    with np.load(hierarchy, allow_pickle=False) as artifact:
-        stored_ids = tuple(int(value) for value in artifact["object_ids"])
-        if stored_ids != ids or str(artifact.get("dataset_key", "lmo")) != str(settings.KEY):
-            raise ValueError("EXP025 hierarchy dataset/object identity mismatch")
+    if require_hierarchy:
+        if not hierarchy.is_file():
+            raise FileNotFoundError(f"EXP025 hierarchy missing: {hierarchy}")
+        with np.load(hierarchy, allow_pickle=False) as artifact:
+            stored_ids = tuple(int(value) for value in artifact["object_ids"])
+            if stored_ids != ids or str(artifact.get("dataset_key", "lmo")) != str(settings.KEY):
+                raise ValueError("EXP025 hierarchy dataset/object identity mismatch")
     targets = Path(data_ref.bop_root) / str(settings.BOP_DATASET) / str(settings.BOP_TARGETS_FILENAME)
     return DatasetContext(str(settings.KEY), train_name, test_name, data_ref_key,
                           str(settings.CAD_REF_KEY), names, ids, hierarchy,

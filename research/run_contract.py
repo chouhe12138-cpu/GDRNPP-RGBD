@@ -86,7 +86,8 @@ def validate_research_run_config(
                 raise ValueError("Evaluation period exceeds total epochs")
             if str(cfg.TEST.TEST_BBOX_TYPE).lower() != "gt" or evaluation_renderer is None:
                 raise ValueError("Formal protocol requires GT box and evaluation renderer")
-            if str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "exp025_lmo":
+            protocol_name = str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", ""))
+            if protocol_name == "exp025_lmo":
                 expected = {
                     "SEED": 42,
                     "TOTAL_EPOCHS": 40,
@@ -117,6 +118,50 @@ def validate_research_run_config(
                 arm = str(cfg.get("EXP025_ARM", ""))
                 if arm not in {"official_frozen", "imagenet_full"}:
                     raise ValueError(f"Unknown EXP025 arm: {arm}")
+            elif protocol_name == "exp025_lm13":
+                expected = {
+                    "SEED": 42,
+                    "TOTAL_EPOCHS": 160,
+                    "IMS_PER_BATCH": 4,
+                    "REFERENCE_BS": 24,
+                    "CHECKPOINT_PERIOD": 20,
+                    "EVAL_PERIOD": 20,
+                }
+                actual = {
+                    "SEED": int(cfg.SEED),
+                    "TOTAL_EPOCHS": int(cfg.SOLVER.TOTAL_EPOCHS),
+                    "IMS_PER_BATCH": int(cfg.SOLVER.IMS_PER_BATCH),
+                    "REFERENCE_BS": int(cfg.SOLVER.REFERENCE_BS),
+                    "CHECKPOINT_PERIOD": int(cfg.SOLVER.CHECKPOINT_PERIOD),
+                    "EVAL_PERIOD": int(cfg.TEST.EVAL_PERIOD),
+                }
+                if actual != expected:
+                    raise ValueError(f"EXP025 LM13 protocol mismatch: expected={expected}, actual={actual}")
+                if tuple(cfg.DATASETS.TRAIN) != (
+                    "lm_13_train_online", "lm_imgn_13_train_1k_per_obj_online"
+                ) or tuple(cfg.DATASETS.TEST) != ("lm_13_test_online",):
+                    raise ValueError("EXP025 LM13 requires the historical real+DeepIM protocol")
+                if str(cfg.MODEL.POSE_NET.XYZ_RENDERER).lower() != "egl" or evaluation_renderer != "cpp":
+                    raise ValueError("EXP025 LM13 requires EGL training and CPP evaluation")
+                optimizer = cfg.SOLVER.OPTIMIZER_CFG
+                if (str(optimizer.type) != "Ranger" or float(optimizer.lr) != 1e-4
+                        or float(optimizer.weight_decay) != 0):
+                    raise ValueError("EXP025 LM13 requires Ranger lr=1e-4 weight_decay=0")
+                schedule = {
+                    "WARMUP_RATIO": cfg.SOLVER.get("WARMUP_RATIO", None),
+                    "WARMUP_ITERS": int(cfg.SOLVER.WARMUP_ITERS),
+                    "ANNEAL_METHOD": str(cfg.SOLVER.ANNEAL_METHOD),
+                    "ANNEAL_POINT": float(cfg.SOLVER.ANNEAL_POINT),
+                    "TARGET_LR_FACTOR": float(cfg.SOLVER.TARGET_LR_FACTOR),
+                }
+                if schedule != {"WARMUP_RATIO": None, "WARMUP_ITERS": 1000,
+                                "ANNEAL_METHOD": "cosine", "ANNEAL_POINT": .72,
+                                "TARGET_LR_FACTOR": 0.}:
+                    raise ValueError(f"EXP025 LM13 flat-and-anneal mismatch: {schedule}")
+                if str(cfg.EXP025_ARM) != "lm13_imagenet_full_prepared":
+                    raise ValueError(f"Unknown EXP025 LM13 arm: {cfg.EXP025_ARM}")
+                if float(cfg.SOLVER.AMP.get("INIT_SCALE", 0)) < 1:
+                    raise ValueError("EXP025 LM13 formal requires a server-gated AMP.INIT_SCALE")
             return _summary(cfg, mode, training_supervision, evaluation_renderer)
         expected = {
             "TOTAL_EPOCHS": 40,

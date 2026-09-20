@@ -131,11 +131,15 @@ def test_sampling_fps_nearest_are_deterministic():
     np.testing.assert_array_equal(nearest[ids], np.arange(len(ids)))
 
 
-def test_real_exp025_artifact():
-    path = Path('.local/dataset_cache/exp025/consistent_v3.npz')
+@pytest.mark.parametrize('relative,dataset_key', [
+    ('consistent_v3.npz', 'lmo'),
+    ('lm13/consistent_v3.npz', 'lm13'),
+])
+def test_real_exp025_artifact(relative, dataset_key):
+    path = Path('.local/dataset_cache/exp025') / relative
     if not path.is_file():
         pytest.skip('local artifact unavailable')
-    h = load_cad_hierarchy(path, dataset_key='lmo')
+    h = load_cad_hierarchy(path, dataset_key=dataset_key)
     report = hierarchy_sanity(h.numpy_levels(), h.object_ids.tolist())
     assert report['result'] == 'PASS'
     assert [value['below_one'] for value in report['parent_coverage'].values()] == [0, 0, 0]

@@ -44,7 +44,7 @@ def main() -> int:
     for name in modules:
         importlib.import_module(name)
 
-    from core.gdrn_modeling.models import GDRN_double_mask  # noqa: F401
+    from core.gdrn_modeling.models import GDRN_CAD  # noqa: F401
     import core.gdrn_modeling.main_gdrn  # noqa: F401
     import torch
     import torchvision

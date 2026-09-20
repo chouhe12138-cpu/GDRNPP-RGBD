@@ -25,5 +25,11 @@ GradScaler 跳步时 scheduler gate 与可配置 `SOLVER.AMP.INIT_SCALE` 已接�
 运行 EGL 真实 batch48 gate，按 `65536 → 32768 → 16384` 测量；选择两臂共同通过的最高
 scale。任一臂 batch48 OOM 或 16384 仍失败时停止，不自动改梯度累积，也不启动任一 formal。
 
+LM13 后续臂状态：`PREPARED / LOCAL_CPU_AND_CUDA_SMOKE_PASS / SERVER_NOT_ENABLED /
+FORMAL_NOT_READY`。配置为 ImageNet ConvNeXt 全量训练，沿用历史 GDR-Net LM 协议：real LM +
+DeepIM renders、Ranger 1e-4、backbone LR×0.1、effective batch24、160 epoch、1000-step
+warmup、72% 后 cosine 到0、每20 epoch checkpoint/eval。LM-O 完成前不把 `exp025_lm13`
+加入 launcher。
+
 历史 EXP000–024 已退出 HEAD 的执行面。所有原始状态、结论和证据缺口继续由
 [实验索引](EXPERIMENT_INDEX.md) 链接的 RECORD 保存。

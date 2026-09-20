@@ -5,6 +5,10 @@
 ConvNeXt 初始化并训练完整主干。两臂同时改变初始化来源和主干训练范围，结果只解释为组合
 策略差异。
 
+LM-O 仍是当前优先正式实验。LM13 已按历史 GDR-Net 协议准备好 ImageNet ConvNeXt 全量
+训练配置、13 类 hierarchy 和本地 CUDA smoke，但尚未加入服务器 launcher，也不会先于
+LM-O 启动。
+
 阅读顺序：
 
 1. [当前状态](research/STATUS_CN.md)
