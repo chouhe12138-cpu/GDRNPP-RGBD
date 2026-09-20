@@ -348,6 +348,7 @@ resolve_resource_profile() {
         lm13_gdrn|lm13_real_only) printf 'lm13\n' ;;
         lm13_pbr) printf 'lm13_pbr\n' ;;
         lmo_full_imagenet) printf 'lmo_full_imagenet\n' ;;
+        exp025_lmo) printf 'exp025_lmo\n' ;;
         # LM-O and every pre-EXP023 config carry no train protocol at all
         "") printf 'legacy_lmo\n' ;;
         *) fail "unknown TRAIN_PROTOCOL.NAME: ${name} (config ${config})" ;;
@@ -478,12 +479,33 @@ require_lmo_full_imagenet_resources() {
         fail "LM-O full-training preflight failed: ${config}"
 }
 
+require_exp025_resources() {
+    local config="$1" hierarchy initialization
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lm/train_pbr -d
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lmo/test -d
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/models_info.json -r
+    require_voc_data
+    initialization="$(container_config_value "${config}" BACKBONE_INIT)" || fail "cannot read EXP025 initialization"
+    initialization="${initialization##*$'\n'}"
+    case "${initialization}" in
+        official_lmo) require_container_path /workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth -r ;;
+        imagenet) require_convnext_weights ;;
+        *) fail "unknown EXP025 BACKBONE_INIT: ${initialization}" ;;
+    esac
+    hierarchy="$(container_config_value "${config}" MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)" || fail "cannot read EXP025 hierarchy"
+    hierarchy="${hierarchy##*$'\n'}"
+    [[ -n "${hierarchy}" ]] || fail "empty EXP025 hierarchy path"
+    require_container_path "${hierarchy}" -f
+    "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp "${container}" python -m research.exp025.preflight --config "/workspace/gdrnpp/${config}" || fail "EXP025 preflight failed"
+}
+
 require_profile_resources() {
     local profile="$1" config="$2"
     case "${profile}" in
         lm13) require_lm13_resources "${config}" ;;
         lm13_pbr) require_lm13_pbr_resources "${config}" ;;
         lmo_full_imagenet) require_lmo_full_imagenet_resources "${config}" ;;
+        exp025_lmo) require_exp025_resources "${config}" ;;
         legacy_lmo) require_legacy_lmo_resources ;;
         *) fail "unknown resource profile: ${profile}" ;;
     esac

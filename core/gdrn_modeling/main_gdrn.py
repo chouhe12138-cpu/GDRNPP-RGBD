@@ -51,6 +51,7 @@ from core.gdrn_modeling.models import (
     GDRN_double_mask,
     GDRN_Dstream_double_mask,
     GDRN_PCC,
+    GDRN_CAD,
 )  # noqa
 
 

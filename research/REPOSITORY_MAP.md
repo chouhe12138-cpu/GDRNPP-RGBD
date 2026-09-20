@@ -1,5 +1,10 @@
 # 仓库地图
 
+EXP025 新入口：`core/gdrn_modeling/models/GDRN_CAD.py`，head 与 attention blocks
+位于同目录的 `heads/`；配置为 `configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/`；
+验证工具/测试/设计说明在 `research/exp025/`。复用公共 CAD loader、在线 renderer 与 evaluator，
+不依赖 EXP022 PCC 的训练/路由数学。共享 DatasetContext 仅增加可选 hierarchy path 参数。
+
 本页说明代码归属、入口及适用边界，不维护实验结果。当前进展见
 [STATUS](STATUS_CN.md)，实验事实见 [索引所链接的 RECORD](EXPERIMENT_INDEX.md)，
 操作流程见 [RUNBOOK](RUNBOOK_CN.md)，长期规则见 [AGENTS](../AGENTS.md)。

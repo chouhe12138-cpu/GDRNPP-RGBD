@@ -1,0 +1,32 @@
+{
+  "experiment_id": "EXP-20260920-025-hierarchical-cad-attention",
+  "seed": 42,
+  "backbone_init": "imagenet",
+  "train_backbone": true,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py",
+  "source_commit": "dbc1535925e092bfbec47a8b32e05f78c4687cc2",
+  "source_tree_dirty": true,
+  "hierarchy": ".local/dataset_cache/exp022/consistent_v3.npz",
+  "training_kind": "diagnostic",
+  "formal": false,
+  "run_id": "exp025_amp_imagenet_a01",
+  "status": "FAIL",
+  "batch_source": ".local/exp025/fixed_batch4_a01.pt",
+  "renderer": "cpp",
+  "batch_size": 4,
+  "steps": 8,
+  "device": "cuda:0",
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 8119172
+    },
+    {
+      "name": "backbone",
+      "lr": 2.9999999999999997e-05,
+      "parameters": 87564416
+    }
+  ],
+  "error": "Non-finite gradient"
+}

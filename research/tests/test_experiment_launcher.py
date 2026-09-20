@@ -20,6 +20,7 @@ LM13_OBJECTS = (
 )
 LM13_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/lm13/independent_v2.npz"
 LMO_FULL_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/reused_v1.npz"
+EXP025_HIERARCHY = "/home/gdrn/.cache/gdrnpp_datasets/exp022/consistent_v3.npz"
 LM13_IMGN_SPLIT = "lm_imgn_13_train_1k_per_obj_online"
 CONVNEXT_CHECKPOINT = (
     "/workspace/gdrnpp/pretrained_models/convnext/convnext_base_1k_224_ema.pth"
@@ -51,6 +52,7 @@ LM13_CONTAINER_PATHS = (
     "/workspace/gdrnpp/pretrained_models/lmo_pbr/model_final_wo_optim.pth",
     LM13_HIERARCHY,
     LMO_FULL_HIERARCHY,
+    EXP025_HIERARCHY,
 ) + tuple(
     f"/workspace/gdrnpp/datasets/lm_imgn/image_set/train_{obj}.txt" for obj in LM13_OBJECTS
 )
@@ -100,6 +102,8 @@ fake_docker() {{
           TRAIN_PROTOCOL.NAME) printf '%s\n' "${{fake_train_protocol:-}}" ;;
           DATASETS.TRAIN) printf '%s\n' "${{fake_train_splits:-}}" ;;
           MODEL.POSE_NET.PCC_HEAD.HIERARCHY_PATH) printf '%s\n' "${{fake_hierarchy:-}}" ;;
+          MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH) printf '%s\n' "${{fake_hierarchy:-}}" ;;
+          BACKBONE_INIT) printf '%s\n' "${{fake_backbone_init:-official_lmo}}" ;;
           *) return 1 ;;
         esac
         return 0

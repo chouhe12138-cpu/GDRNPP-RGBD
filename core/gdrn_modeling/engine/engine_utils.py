@@ -130,6 +130,10 @@ def training_geometry_renderer_type(cfg):
 def geometry_supervision_enabled(cfg):
     """Validate and return whether training needs rendered GT geometry targets."""
     net_cfg = cfg.MODEL.POSE_NET
+    if net_cfg.get('CAD_ATTENTION_HEAD', {}).get('ENABLED', False):
+        if net_cfg.NAME != 'GDRN_CAD' or training_geometry_renderer_type(cfg) is None:
+            raise ValueError('EXP025 requires GDRN_CAD and an online geometry renderer')
+        return True
     pcc_cfg = net_cfg.get("PCC_HEAD", {})
     if pcc_cfg.get("ENABLED", False):
         if net_cfg.NAME != "GDRN_PCC":
@@ -237,6 +241,8 @@ def batch_data(cfg, data, renderer=None, device="cuda", phase="train"):
 
 
 def batch_data_train_online(cfg, data, renderer, device="cuda"):
+    if cfg.MODEL.POSE_NET.get('CAD_ATTENTION_HEAD', {}).get('ENABLED', False):
+        return batch_data_train_online_cad(cfg, data, renderer, device=device)
     cad_cfg = cfg.MODEL.POSE_NET.get("CAD_HEAD", {})
     pcc_cfg = cfg.MODEL.POSE_NET.get("PCC_HEAD", {})
     if bool(pcc_cfg.get("ENABLED", False)):

@@ -2,6 +2,13 @@
 
 ## 目标
 
+2026-09-20 更新：已按新交接实施独立 EXP025，使用统一 T3=512 head 与
+T2/T1 marginal NLL，不采用交接初稿的三个独立 8-way head。
+优先完成数值稳定性与 fixed-batch 学习诊断；正式训练继续关闭。
+当前 residual-only 平台及 AMP 非有限梯度须先 review，未经确认不擅改初始化、
+结构或损失权重。设计见 [EXP025](exp025/README.md)，结果见对应 RECORD。
+以下 09-19 计划为已完成的前置整理范围，不再表示禁止建立新实验。
+
 2026-09-19 最新安排：先完成 CAD hierarchy 公共加载、几何和诊断的轻量整理，
 保持旧模型与训练协议。consistent_v3 的 surface oracle 支持将 T3+residual 作为
 下一阶段候选；尚不证明网络路由与残差可学习性。本轮不预留 EXP025、不实现新模型。

@@ -41,7 +41,7 @@ def hierarchy_path_from_config(cfg) -> Path:
     return Path(expanded)
 
 
-def resolve_dataset_context(cfg, *, require_hierarchy: bool = True) -> DatasetContext:
+def resolve_dataset_context(cfg, *, require_hierarchy: bool = True, hierarchy_path=None) -> DatasetContext:
     """Register splits, check their class order, then validate the CAD rows."""
     if not cfg.DATASETS.TRAIN:
         raise ValueError("EXP022 requires at least one training split")
@@ -83,7 +83,13 @@ def resolve_dataset_context(cfg, *, require_hierarchy: bool = True) -> DatasetCo
     for name, obj_id in zip(names, ids):
         if int(cad_ref.obj2id[name]) != obj_id:
             raise ValueError(f"EXP022 CAD/data object ID mismatch for {name}")
-    hierarchy = hierarchy_path_from_config(cfg)
+    if hierarchy_path is None:
+        hierarchy = hierarchy_path_from_config(cfg)
+    else:
+        expanded = os.path.expanduser(os.path.expandvars(str(hierarchy_path)))
+        if '$' in expanded:
+            raise ValueError(f'Unresolved hierarchy path: {hierarchy_path}')
+        hierarchy = Path(expanded)
     if require_hierarchy:
         if not hierarchy.is_file():
             raise FileNotFoundError(f"EXP022 hierarchy missing: {hierarchy}")

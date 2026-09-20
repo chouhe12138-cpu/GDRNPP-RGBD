@@ -1,0 +1,18 @@
+{
+  "mod_name": "lm_pbr",
+  "name": "lmo_exp025_smoke",
+  "objs": ["ape", "can", "cat", "driller", "duck", "eggbox", "glue", "holepuncher"],
+  "dataset_root": "datasets/BOP_DATASETS/lmo/train_pbr",
+  "models_root": "datasets/BOP_DATASETS/lmo/models",
+  "require_xyz": false,
+  "scene_ids": [0],
+  "scale_to_meter": 0.001,
+  "with_masks": true,
+  "with_depth": true,
+  "height": 480,
+  "width": 640,
+  "use_cache": true,
+  "num_to_load": 8,
+  "filter_invalid": true,
+  "ref_key": "lmo_full"
+}

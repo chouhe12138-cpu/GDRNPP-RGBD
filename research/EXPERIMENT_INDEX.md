@@ -7,6 +7,7 @@
 
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
+| EXP025 统一 T3 CAD attention | IMPLEMENTED / NUMERICAL_REVIEW / FORMAL_NOT_STARTED | 官方冻结/解冻 smoke 通过；fixed-batch 和 ImageNet AMP 存在数值问题 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

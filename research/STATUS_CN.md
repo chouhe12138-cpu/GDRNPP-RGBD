@@ -1,6 +1,20 @@
 # 当前研究状态
 
-最后核对：2026-09-19。
+最后核对：2026-09-20。
+
+## EXP025 统一 T3 分类（2026-09-20）
+
+根据新交接与用户修订建立独立 GDRN_CAD：仅输出 T3=512 logits，经 FP32
+log_softmax/logsumexp 得到 T2/T1；三个 NLL 等权相加，nested target、bounded
+residual、mask 和无 GT feature routing。初始化来源与 backbone 冻结开关独立。
+冻结/未冻结官方主干的 CUDA/CPP/AMP 8-step smoke 与 checkpoint 回读通过。
+固定 batch 两臂诊断发现 residual-only 平台，full 在 step160 后非有限梯度停止；
+ImageNet 解冻 smoke 也触发非有限梯度。不能将工程接线通过视为可学习性通过。
+真实入口有界smoke与续跑均退出0，但续跑optimizer step未累计，完整恢复待查。
+`FORMAL_READY=False`，暂不改变既定网络设计，等待数值问题 review。
+实现、验证范围与未完成项见 [EXP025 README](exp025/README.md) 和
+[RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md)。
+下方“尚未建立 EXP025 / 等待安排”等为 09-19 及以前历史状态，本段为最新安排。
 
 ## CAD hierarchy 轻量整理（2026-09-19）
 
