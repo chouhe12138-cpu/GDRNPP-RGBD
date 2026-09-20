@@ -1,50 +1,9 @@
 # 长期研究决策
 
-- 使用 GDRNPP/ConvNeXt-Base，LM-O GT-box 作为当前机制研究的主比较协议；检测器
-  误差和跨数据集验证单独报告。
-- Camera-XYZ RGB-D 融合候选暂缓。当前主线研究 correspondence 到 pose head 的
-  信息利用，不自动恢复早期方案。
-- 正式模型只由固定评估点判断；smoke、oracle 和结构诊断只解释机制或工程可行性。
-- 每次只改变清晰的结构因素，保留 seed 42；不做无目标超参数扫描或自动多 seed。
-- Git 只保存代码、当前有效配置和紧凑 RECORD；数据、权重、完整日志和缓存外置。
-- 已结束且不再作为直接开发入口的实验配置不要求常驻 HEAD。精确历史复现以
-  `RECORD.md` 中记录的 source commit 为准，恢复当时代码与配置，而不是让旧
-  config 在当前 core 上运行。
-- EXP005 PnP-only 保留一个按当前配置体系重建的长期 matched control；它用于未来
-  方法统一比较，不替代 EXP005 历史 source commit 的精确复现。
-- 服务器只是运行端，本地工作区是唯一代码修改来源；服务器隔离规则优先于运行
-  便利性。
-- 采用轻量实验工作流：一份 RECORD、一个中央索引、一个安全启动器。服务器正式
-  流程固定为 bundle/只读 release → `experiment.sh create` → `run`/`eval`；create
-  自动执行 image/source compatibility gate 和 native hydration。output/home/cache
-  外置可写，GPU 允许共享并以剩余显存 gate 控制；不维护哈希证据链或
-  manifest/state/index 多层框架。
-- “紧凑 RECORD”不等于只保留状态：正式曲线、指标口径、预注册门槛、决定性
-  逐物体/条件结果和失败边界属于科学证据，必须随 RECORD 保留；只删除重复状态、
-  文件哈希和基础设施审计噪声。
-- 不恢复 `experiment_system`、`managed_runtime`、旧 server scripts 或旧
-  EXPERIMENT/ACCEPTANCE JSON；当前 E/F 代码直接保留，不从历史分支重新合并。
-- launcher、cache、native hydration 等上线失败只属于基础设施验证，不写成模型或
-  科学实验失败；smoke 通过同样只证明执行链可用，不替代正式指标。
-- 2026-09-08 用户 review：EXP019 判定为**机制通过**（EPro-PnP 能稳定消费逐步改善的
-  XYZ；历史复现漂移属正常运行差异）。原 evaluator decision 保留为历史输出，不覆盖；
-  后续 gate 不再使用 0.001 这类绝对数值阈值，改为按指标尺度设定的相对浮动
-  （如 ±3%–±5%），重点判断机制、趋势与性能变化是否稳定成立；接近饱和的指标仍用
-  绝对阈值。口径与依据见 [review](notes/20260908-solver-in-the-loop-review.md)。
-- 2026-09-08 用户确定新研究主线：用可微 EPro-PnP 作为显式几何后端，把最终姿态监督
-  反传约束 Geometry/Correspondence Head（XYZ、ROI2D、Mask、Region、Reliability），
-  使对应关系学习以“能被显式求解器正确、稳定地使用”为目标。EPro-PnP 不作为主要
-  创新点；必须与 EPRO-GDR（arXiv 2409.11819）区分，新意落在机制归因、对应关系级
-  指标与跨域。该路线在 2026-09-09 后标为 Historical / Deferred，由下一条决策取代。
-- 2026-09-09 当前主线改为 EXP020 correspondence supervision + ordinary matched
-  PnP/RANSAC：用 GT-pose per-pixel reprojection loss 改进 correspondence producer，
-  不启动 EPro；A/B 唯一变量为 `REPROJ_LW`，formal 前固定为 0/1。
-- 2026-09-09 EXP018 以 `COMPLETE / MARGINAL_GAIN / CLOSED` 收口：E40 相对 EXP013A
-  四项均略升，但 BOP `+0.002346` 未达到设计阶段建议的 `+0.003`，且只有单 seed；
-  保留历史实现与结果，不追加实验或结构扩展，资源转入 EXP020。
-- 2026-09-19 用户确认 EXP021 的正式训练已经结束（B/C 两臂均到
-  `iter 255919/255920`，E5–E40 八个固定评估点齐全），本实验的记录与结果可以提交
-  本地 Git 并推送到 GitHub。用户同时判定当前代码与网络结构设计存在问题，后续不在
-  现有设计上直接继续；EXP022 及之后的实验暂不修改，等待用户安排。EXP021 收口时
-  仍缺的 run exit code、fixed-support matched PnP/K sweep 与资源 gate 保留为未生成
-  的证据缺口，不补做、不改写原 gate 或 evaluator 输出。
+- 当前唯一活动实验为 EXP025；EXP000–024 的事实与缺口以各自 RECORD 为准。
+- lab0 运行 `official_frozen`，lab1 运行 `imagenet_full`；两臂差异不能解释为单一冻结效应。
+- smoke、oracle 和 fixed-batch 诊断只证明工程链路或机制响应，不替代正式指标。
+- 历史实验执行入口不常驻 HEAD；精确复现使用 RECORD 的 source commit 和独立 worktree。
+- Git 只保存代码、有效配置、RECORD 和紧凑证据；数据、权重、完整日志和缓存外置。
+- 服务器只运行本地提交生成的只读 release；正式训练期间不修改 checkout 或镜像。
+- 正式模型只按预定评价点判断，不事后改变 gate，不自动多 seed 或按中间结果选模。

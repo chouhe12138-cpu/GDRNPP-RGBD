@@ -29,26 +29,13 @@ from .pose_from_pred import pose_from_pred
 from .pose_from_pred_centroid_z import pose_from_pred_centroid_z
 from .pose_from_pred_centroid_z_abs import pose_from_pred_centroid_z_abs
 from .net_factory import BACKBONES, POSE_CORRECTORS
+from .backbone_factory import get_backbone_init_args
 from .heads.gcr_pose_corrector import corrected_centroid_z
 from .heads.quality_coverage_attention import QualityCoverageAttention
 from .heads.global_hierarchical_cad_head import GlobalGuidedHierarchicalCADHead
 from core.utils.my_checkpoint import load_timm_pretrained
 
 logger = logging.getLogger(__name__)
-
-
-def get_backbone_init_args(cfg):
-    """Build backbone arguments without network access when loading a full checkpoint."""
-
-    backbone_cfg = cfg.MODEL.POSE_NET.BACKBONE
-    init_args = copy.deepcopy(backbone_cfg.INIT_CFG)
-    backbone_type = init_args.pop("type")
-    if "timm/" in backbone_type or "tv/" in backbone_type:
-        init_args["model_name"] = backbone_type.split("/")[-1]
-    if cfg.MODEL.WEIGHTS and init_args.get("pretrained", False):
-        logger.info("Disable backbone pretrained download because MODEL.WEIGHTS is set")
-        init_args["pretrained"] = False
-    return backbone_type, init_args
 
 
 class GDRN_DoubleMask(nn.Module):

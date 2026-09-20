@@ -1,7 +1,7 @@
 """Local accumulation smoke: physical batch 4 x accumulation 12, AMP, resume.
 
 The formal config trains at a real batch 48, so this local shape is carried by the smoke
-itself (`--batch-size 4 --reference-bs 48`) instead of being inherited from `train.py`;
+itself (`--batch-size 4 --reference-bs 48`) instead of being inherited from a formal arm config;
 `smoke.py` carries the same 4/48 shape for its own end-to-end run.  This state-machine
 smoke repeats one saved batch (or the online loader with --online) and checks the counters
 and the LR a resumed run must continue -- optimizer step, scheduler epoch, accumulation

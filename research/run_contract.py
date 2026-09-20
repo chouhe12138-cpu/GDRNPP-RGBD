@@ -86,6 +86,37 @@ def validate_research_run_config(
                 raise ValueError("Evaluation period exceeds total epochs")
             if str(cfg.TEST.TEST_BBOX_TYPE).lower() != "gt" or evaluation_renderer is None:
                 raise ValueError("Formal protocol requires GT box and evaluation renderer")
+            if str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", "")) == "exp025_lmo":
+                expected = {
+                    "SEED": 42,
+                    "TOTAL_EPOCHS": 40,
+                    "IMS_PER_BATCH": 48,
+                    "REFERENCE_BS": 48,
+                    "CHECKPOINT_PERIOD": 5,
+                    "EVAL_PERIOD": 5,
+                }
+                actual = {
+                    "SEED": int(cfg.SEED),
+                    "TOTAL_EPOCHS": int(cfg.SOLVER.TOTAL_EPOCHS),
+                    "IMS_PER_BATCH": int(cfg.SOLVER.IMS_PER_BATCH),
+                    "REFERENCE_BS": int(cfg.SOLVER.REFERENCE_BS),
+                    "CHECKPOINT_PERIOD": int(cfg.SOLVER.CHECKPOINT_PERIOD),
+                    "EVAL_PERIOD": int(cfg.TEST.EVAL_PERIOD),
+                }
+                if actual != expected:
+                    raise ValueError(f"EXP025 formal protocol mismatch: expected={expected}, actual={actual}")
+                if tuple(cfg.DATASETS.TRAIN) != ("lmo_pbr_train",) or tuple(cfg.DATASETS.TEST) != ("lmo_bop_test",):
+                    raise ValueError("EXP025 formal requires LM-PBR train and LM-O test")
+                if str(cfg.MODEL.POSE_NET.XYZ_RENDERER).lower() != "egl" or evaluation_renderer != "cpp":
+                    raise ValueError("EXP025 formal requires EGL training and CPP evaluation")
+                if not bool(cfg.SOLVER.CHECKPOINT_BY_EPOCH):
+                    raise ValueError("EXP025 formal checkpoints must be epoch based")
+                scale = float(cfg.SOLVER.AMP.get("INIT_SCALE", 0))
+                if scale < 1:
+                    raise ValueError("EXP025 formal requires the server-gated AMP.INIT_SCALE")
+                arm = str(cfg.get("EXP025_ARM", ""))
+                if arm not in {"official_frozen", "imagenet_full"}:
+                    raise ValueError(f"Unknown EXP025 arm: {arm}")
             return _summary(cfg, mode, training_supervision, evaluation_renderer)
         expected = {
             "TOTAL_EPOCHS": 40,

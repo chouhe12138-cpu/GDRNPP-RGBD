@@ -9,10 +9,9 @@ import torch
 from torch import nn
 
 from core.utils.solver_utils import build_optimizer_with_params
-from .GDRN_double_mask import get_backbone_init_args
-from .net_factory import BACKBONES
+from .backbone_factory import BACKBONES, get_backbone_init_args
 from .heads.hierarchical_cad_attention_head import HierarchicalCADAttentionHead
-from research.exp022.dataset_context import resolve_dataset_context
+from research.exp025.dataset_context import resolve_dataset_context
 
 
 def dataset_context(cfg):
@@ -115,7 +114,7 @@ def build_model_optimizer(cfg, is_test=False):
         # complete checkpoint is, and fail before anything is scored.
         require_full_checkpoint(cfg.MODEL.WEIGHTS)
     if bool(net.BACKBONE.FREEZE) == bool(cfg.TRAIN_BACKBONE):
-        raise ValueError('Backbone controls disagree; edit train.py or use the tool mode override')
+        raise ValueError('Backbone controls disagree; edit the selected arm config or use the tool override')
     context = dataset_context(cfg)
     backbone_type, args = get_backbone_init_args(cfg)
     source = str(cfg.BACKBONE_INIT)

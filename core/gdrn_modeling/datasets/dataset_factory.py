@@ -1,37 +1,13 @@
 """Register datasets in this file will be imported in project root to register
 the datasets."""
 import logging
+import importlib
 import os
 import os.path as osp
 import mmcv
 import detectron2.utils.comm as comm
 import ref
 from detectron2.data import DatasetCatalog, MetadataCatalog
-from core.gdrn_modeling.datasets import (
-    lm_pbr,
-    lm_dataset_d2,
-    lm_syn_imgn,
-    lmo_bop_test,
-    ycbv_pbr,
-    ycbv_d2,
-    ycbv_bop_test,
-    hb_pbr,
-    hb_bop_val,
-    hb_bop_test,
-    tudl_pbr,
-    tudl_d2,
-    tudl_bop_test,
-    tless_pbr,
-    tless_d2,
-    tless_bop_test,
-    icbin_pbr,
-    icbin_bop_test,
-    itodd_pbr,
-    itodd_bop_test,
-    itodd_d2,
-)
-
-
 cur_dir = osp.dirname(osp.abspath(__file__))
 # from lib.utils.utils import iprint
 __all__ = [
@@ -42,9 +18,9 @@ __all__ = [
 ]
 _DSET_MOD_NAMES = [
     "lm_pbr",
+    "lmo_bop_test",
     "lm_dataset_d2",
     "lm_syn_imgn",
-    "lmo_bop_test",
     "ycbv_pbr",
     "ycbv_d2",
     "ycbv_bop_test",
@@ -64,6 +40,12 @@ _DSET_MOD_NAMES = [
     "itodd_d2",
 ]
 
+
+def _dataset_module(name):
+    if name not in _DSET_MOD_NAMES:
+        raise ValueError(f"Unknown dataset module: {name}")
+    return importlib.import_module(f"core.gdrn_modeling.datasets.{name}")
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,12 +55,12 @@ def register_dataset(mod_name, dset_name, data_cfg=None):
     dset_name: dataset name
     data_cfg: dataset config
     """
-    register_func = eval(mod_name)
+    register_func = _dataset_module(mod_name)
     register_func.register_with_name_cfg(dset_name, data_cfg)
 
 
 def get_available_datasets(mod_name):
-    return eval(mod_name).get_available_datasets()
+    return _dataset_module(mod_name).get_available_datasets()
 
 
 def register_datasets_in_cfg(cfg):

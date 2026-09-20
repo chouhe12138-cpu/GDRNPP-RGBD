@@ -8,7 +8,7 @@ from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
 from research.cad_hierarchy.geometry import traverse_hierarchy, oracle_decode
 from research.cad_hierarchy.diagnostics import hierarchy_sanity, surface_representation
 
-h = load_cad_hierarchy(".local/dataset_cache/exp022/consistent_v3.npz",
+h = load_cad_hierarchy(".local/dataset_cache/exp025/consistent_v3.npz",
                        expected_object_ids=(1, 5, 6, 8, 9, 10, 11, 12), dataset_key="lmo")
 levels = h.numpy_levels()  # CPU float64；原始 Torch 数据通过 h.level(3) 访问
 report = hierarchy_sanity(levels, h.object_ids.tolist())
@@ -42,10 +42,10 @@ surface_representation 与 residual_stats。sanity 检查所有相邻层的父�
 历史 global_coverage 字段指全局最近锚点的球，不是所有球的并集。
 父球覆盖、有限采样覆盖都不能单独证明整个连续表面的覆盖。
 
-历史 oracle CLI、fixed PnP 和 DatasetContext 接线仍在 EXP022；它们不是公共接口。
-T3+residual 是后续方法候选：surface oracle 支持其几何上限，但未证明网络可学习性。
-本轮不分配 EXP025，不实现 attention、模型或训练 preflight。
+历史 builder、oracle CLI 和 fixed PnP 已随 EXP022 执行面退出 HEAD；需要追溯时使用
+实验 RECORD 中记录的 commit。当前 DatasetContext、attention 模型与训练 preflight
+由 EXP025 自有模块维护。
 
 测试：激活 Conda `pytorch22` 后运行 `python -m pytest -q research/cad_hierarchy/tests`。
-合成测试无需数据集；三个真实 artifact 回归缺文件时 skip。历史 Torch 路由对照与
-采样 reference 测试使用已安装的项目依赖；生产公共模块没有这些历史依赖。
+合成测试无需数据集；EXP025 真实 artifact 回归在本地文件缺失时 skip。生产公共模块
+不依赖历史实验包。

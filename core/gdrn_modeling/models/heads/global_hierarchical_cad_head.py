@@ -25,7 +25,7 @@ def load_hierarchy(path: str | Path) -> dict[str, torch.Tensor]:
     if not path.is_file():
         raise FileNotFoundError(
             f"EXP021 CAD hierarchy is missing: {path}. "
-            "Run python -m research.exp021.build_cad_hierarchy first."
+            "Recover the historical builder from the experiment's recorded source commit."
         )
     with np.load(path, allow_pickle=False) as data:
         required = {

@@ -1,4 +1,4 @@
-_base_ = ['./train.py']
+_base_ = ['./train_official_frozen.py']
 DATALOADER = dict(NUM_WORKERS=0, PERSISTENT_WORKERS=False)
 DATASETS = dict(TRAIN=('lmo_exp025_smoke',), TEST=())
 DATA_CFG = dict(lmo_exp025_smoke='research/exp025/smoke_dataset.json')

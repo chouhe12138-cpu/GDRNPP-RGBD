@@ -1,5 +1,11 @@
 # EXP023 LM13 Progressive PCC 全 backbone 训练
 
+## 2026-09-20 收口
+
+Decision：`CLOSED / SUPERSEDED_BY_EXP025 / FORMAL_NOT_RUN`。服务器 EGL 与正式训练未执行，
+已有本地协议、数据和接线证据保留。配置、LM13 server profile、runner 和专用测试已退出
+HEAD；删除前最终完整快照为 `8c6ca86aa0668777548d4f30b8cc6f6ad9864067`。
+
 - `experiment_id`: `EXP-20260918-023-lm13-progressive-pcc-fulltrain`
 - 状态：`PRETRAIN_CHECKS_PASS / SERVER_INTEGRATION_ADDED / LAUNCHER_CLOSURE_ADDED /
   EGL_SMOKE_PENDING / FORMAL_NOT_STARTED`

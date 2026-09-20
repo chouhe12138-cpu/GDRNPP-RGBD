@@ -20,8 +20,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=CONFIG)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--train-backbone', choices=('yes', 'no'), default='no')
-    parser.add_argument('--backbone-init', choices=('official_lmo', 'imagenet'), default='official_lmo')
+    parser.add_argument('--train-backbone', choices=('yes', 'no'))
+    parser.add_argument('--backbone-init', choices=('official_lmo', 'imagenet'))
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--renderer', choices=('cpp', 'egl'), default='cpp')
     parser.add_argument('--batch-size', type=int, default=4)
@@ -35,7 +35,9 @@ def main():
     if args.steps < 2 or args.batch_size < 1:
         parser.error('Require steps >= 2 and positive batch size')
     args.output.mkdir(parents=True, exist_ok=False)
-    cfg = read_config(args.config, args.train_backbone == 'yes', args.backbone_init)
+    cfg = read_config(args.config,
+                      None if args.train_backbone is None else args.train_backbone == 'yes',
+                      args.backbone_init)
     args.amp_scale = amp_init_scale(cfg, args.amp_scale)
     report = dict(**metadata(cfg), run_id=args.output.name, status='RUNNING',
                   batch_source=str(args.load_batch or 'online'), renderer=args.renderer,

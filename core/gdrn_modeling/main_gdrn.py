@@ -1,5 +1,6 @@
 from loguru import logger as loguru_logger
 import logging
+import importlib
 import os
 
 os.environ["PYOPENGL_PLATFORM"] = "egl"
@@ -43,16 +44,24 @@ import ref
 from core.gdrn_modeling.datasets.dataset_factory import register_datasets_in_cfg
 from core.gdrn_modeling.engine.engine_utils import geometry_supervision_enabled, get_renderer
 from core.gdrn_modeling.engine.engine import GDRN_Lite
-from core.gdrn_modeling.models import (
-    GDRN,
-    GDRN_no_region,
-    GDRN_cls,
-    GDRN_cls2reg,
-    GDRN_double_mask,
-    GDRN_Dstream_double_mask,
-    GDRN_PCC,
-    GDRN_CAD,
-)  # noqa
+MODEL_MODULES = {
+    "GDRN": "core.gdrn_modeling.models.GDRN",
+    "GDRN_no_region": "core.gdrn_modeling.models.GDRN_no_region",
+    "GDRN_cls": "core.gdrn_modeling.models.GDRN_cls",
+    "GDRN_cls2reg": "core.gdrn_modeling.models.GDRN_cls2reg",
+    "GDRN_double_mask": "core.gdrn_modeling.models.GDRN_double_mask",
+    "GDRN_Dstream_double_mask": "core.gdrn_modeling.models.GDRN_Dstream_double_mask",
+    "GDRN_PCC": "core.gdrn_modeling.models.GDRN_PCC",
+    "GDRN_CAD": "core.gdrn_modeling.models.GDRN_CAD",
+}
+
+
+def build_model_optimizer(cfg, is_test=False):
+    name = str(cfg.MODEL.POSE_NET.NAME)
+    if name not in MODEL_MODULES:
+        raise ValueError(f"Unsupported GDRN model: {name}")
+    module = importlib.import_module(MODEL_MODULES[name])
+    return module.build_model_optimizer(cfg, is_test=is_test)
 
 
 logger = logging.getLogger("detectron2")
@@ -160,7 +169,7 @@ class Lite(GDRN_Lite):
             renderer = get_renderer(cfg, data_ref, obj_names=train_obj_names, gpu_id=render_gpu_id)
 
         logger.info(f"Used GDRN module name: {cfg.MODEL.POSE_NET.NAME}")
-        model, optimizer = eval(cfg.MODEL.POSE_NET.NAME).build_model_optimizer(cfg, is_test=args.eval_only)
+        model, optimizer = build_model_optimizer(cfg, is_test=args.eval_only)
         if compact_log_enabled(cfg):
             total_params = sum(p.numel() for p in model.parameters())
             trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

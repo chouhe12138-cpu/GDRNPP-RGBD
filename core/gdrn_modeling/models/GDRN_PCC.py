@@ -10,10 +10,10 @@ import torch.nn as nn
 
 from core.utils.solver_utils import build_optimizer_with_params
 
-from .GDRN_double_mask import get_backbone_init_args
+from .backbone_factory import get_backbone_init_args
 from .heads.progressive_pcc_head import ProgressivePCCHead
 from .net_factory import BACKBONES
-from research.exp022.dataset_context import resolve_dataset_context
+from core.gdrn_modeling.datasets.research_context import resolve_dataset_context
 
 
 class GDRN_PCC(nn.Module):

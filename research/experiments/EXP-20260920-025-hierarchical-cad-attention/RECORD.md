@@ -9,9 +9,11 @@
 c1/c2/c3 head 不采用。历史 EXP022 模型、loss 与 artifact 未改；共享 context
 只加向后兼容的可选 hierarchy_path 参数。
 
-配置：`configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py`。
+正式配置：同目录 `train_official_frozen.py`（lab0，原 GDRNPP LM-O 主干冻结）与
+`train_imagenet_full.py`（lab1，ImageNet ConvNeXt 全量训练），共享 `common.py`。
 seed42；LM-O PBR/GT-box；正式候选40epoch、真实 batch48（accumulate=1）、AMP；
-官方初始化冻结为默认，另支持解冻及 ImageNet。T1/T2/T3 NLL 各1，残差与mask各1。
+T1/T2/T3 NLL 各1，残差与mask各1。两臂同时改变初始化来源和主干训练范围，只解释为
+组合策略差异。
 正式预定 E5/E10/E15/E20/E25/E30/E35/E40 指标均**未生成**，best 关闭。
 本轮所有运行均为 diagnostic，不能用于正式精度、跨 seed 或服务器吞吐结论。
 
@@ -19,7 +21,7 @@ seed42；LM-O PBR/GT-box；正式候选40epoch、真实 batch48（accumulate=1�
 `f2f735f`）；第二轮改动已提交。环境 Conda `pytorch22`、torch2.2、RTX4060 Laptop。
 本机产物统一在 `output/diagnostics/<run_id>/`；固定 batch
 `.local/exp025/fixed_batch4_a01.pt` 来自 frozen_a01 的在线 CPP 渲染。
-hierarchy `.local/dataset_cache/exp022/consistent_v3.npz`；不复制数据或权重入 Git。
+hierarchy `.local/dataset_cache/exp025/consistent_v3.npz`；不复制数据或权重入 Git。
 
 Decision：**STRUCTURE_REFACTORED / LOCAL_SMOKE_PASS / FORMAL_NOT_STARTED**。
 2026-09-20 按交接包 v2 重构 image 分支（四级 Image-SA 写回并进入下一级 transition）并把
@@ -33,6 +35,21 @@ non-finite gradient 定位为 AMP 缩放后的 fp16 梯度上溢，并完成 res
 conditioning + 末层零初始化（Residual V2，见对应小节，`residual_detach_route=True`）；
 AMP 初始 scale 已具备生产配置能力（`SOLVER.AMP.INIT_SCALE`，见收口轮小节），其余
 AMP guard 语义保持生产 engine 的 GradScaler 行为。
+
+## Observed：正式训练前执行面收口（2026-09-20）
+
+- EXP000–024 的活动配置、runner、诊断与服务器 profile 已退出 HEAD；对应 RECORD、紧凑
+  evidence 与稳定 core 实现保留，删除前快照为 `8c6ca86aa0668777548d4f30b8cc6f6ad9864067`。
+- EXP025 的模型入口改为按配置延迟导入；backbone factory 与 DatasetContext 已移入稳定模块
+  和 EXP025 自有命名空间，当前构建链不导入 EXP022 或其他 GDRN 模型模块。
+- 两条正式 arm 拆成独立配置；launcher 只接受 `exp025_lmo`，强制 arm/server 映射，并新增
+  唯一输出目录的 EGL batch48 gate。formal contract 继续拒绝 `FORMAL_READY=False`、缺失共同
+  `AMP.INIT_SCALE` 或任何 seed/batch/epoch/eval/checkpoint 协议漂移。
+- 本地活动测试 **97 passed / 4 skipped**；两个 CPU preflight 均 PASS，分别精确核对 340 个
+  official/ImageNet backbone tensor、hierarchy SHA、optimizer 参数范围、有限 loss/gradient
+  与输出形状。4 个 skip 为本机无 CUDA 的真实 GradScaler 检查，不以 CPU 结果替代。
+- 服务器真实 batch48/EGL gate 尚未执行；本段没有设置 `FORMAL_READY` 或 AMP scale，也没有
+  产生正式指标。
 
 ## Observed：Image 分支结构重构与 formal batch 修正（2026-09-20，交接包 v2）
 
@@ -62,7 +79,7 @@ mask BCE、hierarchy 与 SHA 契约均未改。末级 stage 不回写（`to_feat
 | 模型总参数 | 95,683,588 | **98,352,068**（preflight 实测） |
 | formal batch | IMS_PER_BATCH=4、REFERENCE_BS=48（本机 4×12 形状） | **48/48**，accumulate=1 |
 
-**formal batch**：原来的 formal 配置直接带着本机显存受限的 4×12 形状；现在 `train.py`
+**formal batch**：原来的 formal 配置直接带着本机显存受限的 4×12 形状；现在两条正式配置
 是真实 batch48（每 iteration 一次真实 optimizer update），本机形状改由 `smoke.py`
 （4/48）与诊断脚本显式携带，`accumulation_smoke` 新增 `--batch-size/--reference-bs`
 且不再从 formal 继承。engine 的梯度累计未删除。
@@ -118,7 +135,7 @@ fp16 上限的关系使 65536 必然上溢、32768 不会（阈值在两者之�
 创建的 GradScaler。未设置时函数返回 `None`，Lite 仍自建 scaler（65536），历史实验行为
 不变；要求 `SOLVER.AMP.ENABLED=True` 且值 ≥ 1，否则 fail-closed。只改初始值：动态
 growth/backoff、scaler 的 checkpoint 保存/恢复、GradScaler 跳步时 scheduler 不推进的
-逻辑都未触碰。EXP025 的 `train.py` **不设置**该字段，`FORMAL_READY=False` 不变。
+逻辑都未触碰。EXP025 的两个正式配置**不设置**该字段，`FORMAL_READY=False` 不变。
 
 **Observed（本机）**：
 

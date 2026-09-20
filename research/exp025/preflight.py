@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 import torch
@@ -15,7 +16,7 @@ from research.cad_hierarchy.diagnostics import hierarchy_sanity
 from research.run_contract import validate_research_run_config
 from .configuration import CONSISTENT_V3_SHA256, require_consistent_v3, set_mode
 
-CONFIG = Path('configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py')
+CONFIG = Path('configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py')
 
 
 def read_config(path=CONFIG, train_backbone=None, backbone_init=None):
@@ -42,6 +43,32 @@ def audit_optimizer(model, optimizer, cfg):
     return groups
 
 
+def verify_imagenet_backbone(model, path):
+    """Verify every ConvNeXt tensor against the official Facebook checkpoint."""
+    raw = torch.load(path, map_location='cpu', weights_only=False)
+    raw = raw.get('model', raw.get('state_dict', raw))
+    current = model.backbone.state_dict()
+    converted = {}
+    for name, tensor in raw.items():
+        if name.startswith(('head.', 'norm.')):
+            continue
+        name = name.replace('downsample_layers.0.0.', 'stem_0.')
+        name = name.replace('downsample_layers.0.1.', 'stem_1.')
+        name = re.sub(r'downsample_layers\.(\d+)\.(\d+)',
+                      lambda match: f'stages_{match.group(1)}.downsample.{match.group(2)}', name)
+        name = re.sub(r'stages\.(\d+)\.(\d+)',
+                      lambda match: f'stages_{match.group(1)}.blocks.{match.group(2)}', name)
+        name = name.replace('dwconv', 'conv_dw').replace('pwconv', 'mlp.fc')
+        if name not in current:
+            raise RuntimeError(f'Unmapped ImageNet tensor: {name}')
+        converted[name] = tensor.reshape(current[name].shape)
+    if current.keys() != converted.keys():
+        raise RuntimeError(f'ImageNet backbone tensor mismatch: {current.keys() - converted.keys()}')
+    if any(not torch.equal(current[name].cpu(), converted[name]) for name in current):
+        raise RuntimeError('ImageNet backbone weights were not loaded exactly')
+    return len(converted)
+
+
 def run(cfg):
     validate_research_run_config(cfg, mode='prepare')
     if cfg.TRAIN_PROTOCOL.NAME != 'exp025_lmo':
@@ -59,7 +86,6 @@ def run(cfg):
     torch.manual_seed(42)
     model, optimizer = build_model_optimizer(cfg)
     if cfg.BACKBONE_INIT == 'imagenet':
-        from research.exp022.preflight import verify_imagenet_backbone
         loaded = verify_imagenet_backbone(model, Path(cfg.MODEL.POSE_NET.BACKBONE.INIT_CFG.checkpoint_path))
     else:
         loaded = len(model.backbone.state_dict())
@@ -105,7 +131,8 @@ def run(cfg):
                 head_parameters=sum(p.numel() for p in model.cad_attention_head.parameters()),
                 hierarchy=str(context.hierarchy_path), hierarchy_sha256=hierarchy_sha256,
                 hierarchy_sha_match=hierarchy_sha256 == CONSISTENT_V3_SHA256, hierarchy_sanity=sanity,
-                losses={k: float(v.detach()) for k, v in losses.items()}, formal_ready=False)
+                losses={k: float(v.detach()) for k, v in losses.items()},
+                arm=str(cfg.EXP025_ARM), formal_ready=bool(cfg.RESEARCH_PROTOCOL.FORMAL_READY))
 
 
 def main():

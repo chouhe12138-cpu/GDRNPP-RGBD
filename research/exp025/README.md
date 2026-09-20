@@ -44,11 +44,10 @@
 
 ## 配置与入口
 
-唯一训练配置：`configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train.py`。
-直接编辑顶部 `TRAIN_BACKBONE` / `BACKBONE_INIT` / `BACKBONE_LR_MULT`；
-初始化来源与冻结状态独立，支持 official_lmo / imagenet × frozen / trainable。
-mmcv 的 `--opts` 不会重新执行 Python 派生字段，不要只用它覆盖顶部控制变量。
-诊断工具的同名 CLI 会同步所有派生字段。ImageNet 通过
+正式配置拆成两个明确 arm：`train_official_frozen.py` 用于 lab0，加载原 GDRNPP LM-O
+主干并冻结；`train_imagenet_full.py` 用于 lab1，从 ImageNet ConvNeXt 初始化并训练完整
+主干。共享协议在 `common.py`。两臂同时改变初始化和训练范围，只比较组合策略。
+诊断工具默认读取所给配置；ImageNet 通过
 `GDRN_CONVNEXT_BASE_WEIGHTS` 指定本机权重，不自动下载。
 
 LM-O PBR40/GT-box，seed42，AdamW lr3e-4、wd.01、betas(.9,.999)、eps1e-8；
@@ -70,10 +69,6 @@ python -m research.exp025.real_smoke --output output/diagnostics/exp025_smoke_NE
 python -m research.exp025.amp_boundary_probe --output output/diagnostics/exp025_boundary_NEW --load-batch .local/exp025/batch_NEW.pt
 python -m research.exp025.learnability --output output/diagnostics/exp025_fixed_NEW \
     --load-batch .local/exp025/batch_NEW.pt --amp-scale 16384
-python -m research.exp025.numerical_replay --output output/diagnostics/exp025_replay_NEW \
-    --from-checkpoint output/diagnostics/exp025_fixed_NEW/full_last_good.pth \
-    --load-batch .local/exp025/batch_NEW.pt
-python -m research.exp025.residual_probe --output output/diagnostics/exp025_probe_NEW --load-batch .local/exp025/batch_NEW.pt
 python -m research.exp025.accumulation_smoke --output output/diagnostics/exp025_accum_NEW --load-batch .local/exp025/batch_NEW.pt
 ```
 
@@ -100,8 +95,9 @@ GradScaler scale，生产默认 65536）。它同时校验四级 Image-SA 的参
 返回 `None`，所有历史实验继续使用 Lite 自己的默认 scaler（65536）。只改初始值——动态
 growth/backoff、scaler 的 checkpoint 保存/恢复、以及 GradScaler 跳步时 scheduler 不推进的
 逻辑都不变。要求 `SOLVER.AMP.ENABLED=True` 且值 ≥ 1，否则 fail-closed。
-EXP025 的 `train.py` **故意不设置**：最终用 65536/32768/16384 由服务器真实 batch48 +
-EGL gate 决定。本地 `real_smoke`/`learnability`/`amp_boundary_probe` 的 `--amp-scale`
+两个正式配置均**故意不设置**：最终用 65536/32768/16384 由两台服务器真实 batch48 +
+EGL gate 决定，并固定两臂共同通过的最高值。本地 `real_smoke`/`learnability`/
+`amp_boundary_probe` 的 `--amp-scale`
 默认跟随该配置（未设置时仍是 65536）。
 
 ## 历史证据边界
@@ -119,17 +115,6 @@ recovery 以及当时的 CPU/CUDA smoke 参数值都属于旧结构**，在 RECO
   residual 分布与逐模块梯度范数，`learnability`/`real_smoke` 把它写进 `report.json` 的
   `failure` 字段并保留已完成 history。每个 arm 每 `--last-good-period`（默认20）步写
   `model/optimizer/scaler/step/RNG` 到 `<arm>_last_good.pth`。
-- `numerical_replay` 从某个 last-good state 出发，用同一 batch 跑 A 当前 AMP /
-  B 指定低 scale AMP（`--scale`）/ C FP32（`amp_step(..., scaler=None)`）三臂，报告每臂
-  首个非有限步、首个坏参数与该步梯度范数；只做重放，不改 loss/结构/协议。
-- `residual_probe` 有两个诊断臂（`--arms` 可选）：`baseline_residual_only`（正式残差
-  路径）与 `gt_t3_conditioned`（image token 与 GT T3 CAD token 拼接后过
-  `Linear(2D,D)+GELU+Linear(D,3)`）。两臂同 batch/seed/steps/lr 且 route weight 0，
-  用于判断 residual 是否可学、以及是否缺 T3 identity 输入；GT T3 不进入正式模型、
-  损失或推理。第一轮的 `zero_init_residual` 对照已成为正式初始化（Residual V2），
-  不再是独立臂，其历史结果保留在旧报告里。conditioned 臂的 last-good 额外保存
-  `probe_state_dict`，并在跑完后重建 model+probe+optimizer 重载做 roundtrip 校验
-  （`roundtrip.status=MATCH` 表示记录指标可逐项复现）。
 - `accumulation_smoke` 覆盖本地 4×12 形状（`--batch-size 4 --reference-bs 48`，**不再从
   formal 继承**）的状态机：
   optimizer step 只在 accumulation 边界发生、scheduler 只在真实 update 上推进、AMP 无跳步、
@@ -139,10 +124,8 @@ recovery 以及当时的 CPU/CUDA smoke 参数值都属于旧结构**，在 RECO
   硬判据是 optimizer step / scheduler epoch / LR 序列 / accumulation 边界 / scaler。
   它复用 `solver_utils` 的 `accumulation_window_size`/`should_optimizer_step` 与
   `MyCheckpointer`。
-- `amp_recovery_smoke` 走真实生产对象（`LightningLite(precision=16)`、precision plugin 的
-  `GradScaler`、Lite optimizer wrapper、进入 fp16 autocast 的 `_LiteModule`），从同一
-  full arm last-good 继续，逐 update 记录 scale/内部 optimizer step/scheduler epoch/参数
-  delta/是否继续；`--unguarded-scheduler` 复现修复前"skip 也推进 scheduler"的循环作对照。
+- 重构前使用的 numerical replay、residual probe 与专用 AMP recovery runner 已在结论固定后
+  退出 HEAD；其代码可从 RECORD 所列 source commit 恢复，原始紧凑报告继续随 RECORD 保存。
 
 Optimizer 恢复边界属共享框架修复（`core/utils/my_checkpoint.py` +
 `engine.do_train`）：LightningLite wrapper 继承 `torch.optim.Optimizer.load_state_dict`，
@@ -150,9 +133,9 @@ Optimizer 恢复边界属共享框架修复（`core/utils/my_checkpoint.py` +
 resume 后 scheduler 的 LR 写入也会与训练 optimizer 脱钩。回归测试见
 `research/tests/test_lite_optimizer_resume.py`。
 
-服务器仅由用户按 RUNBOOK bundle/release/Docker 流程运行；新增 `exp025_lmo`
-profile 根据初始化来源检查权重、consistent hierarchy、PBR/LM-O/VOC，并执行 CPU
-preflight。launcher 本地 mock 通过不代表服务器 EGL、挂载或正式训练通过。
+服务器仅由用户按 RUNBOOK bundle/release/Docker 流程运行；`exp025_lmo` profile 根据
+arm 和初始化来源检查权重、EXP025 hierarchy、PBR/LM-O/VOC，并执行 CPU preflight。
+launcher 强制 `official_frozen→lab0`、`imagenet_full→lab1`，历史 profile 已退出 HEAD。
 
 ## 验证分层
 

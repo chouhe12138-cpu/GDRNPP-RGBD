@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
 
 from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
 from research.cad_hierarchy import geometry as g
@@ -118,50 +117,28 @@ def test_paths_and_residuals():
         g.traverse_hierarchy(points, anchors, 8)
 
 
-def test_reference_sampling_fps_nearest():
-    from research.exp021 import build_cad_hierarchy as old
+def test_sampling_fps_nearest_are_deterministic():
     mesh = dict(pts=np.array([[0., 0, 0], [1., 0, 0], [0., 1, 0], [0., 0, 1]]),
                 faces=np.array([[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]]))
-    a = old._sample_surface(mesh, 1000, np.random.default_rng(42))
+    a = g.sample_surface(mesh, 1000, np.random.default_rng(42))
     b = g.sample_surface(mesh, 1000, np.random.default_rng(42))
     for x, y in zip(a, b):
         np.testing.assert_array_equal(x, y)
     first = a[0].mean(0)
     ids = g.farthest_point_sampling(a[0], 8, first)
-    np.testing.assert_array_equal(ids, old._fps(a[0], 8, first))
-    np.testing.assert_array_equal(g.nearest_anchor(a[0], a[0][ids]), old._nearest(a[0], a[0][ids]))
+    assert len(np.unique(ids)) == len(ids)
+    nearest = g.nearest_anchor(a[0], a[0][ids])
+    np.testing.assert_array_equal(nearest[ids], np.arange(len(ids)))
 
 
-@pytest.mark.parametrize('name,failures', [('reused_v1', [0, 512, 0]),
-                                         ('independent_v2', [64, 512, 4084]),
-                                         ('consistent_v3', [0, 0, 0])])
-def test_real_artifact(name, failures):
-    path = Path('.local/dataset_cache/exp022') / f'{name}.npz'
+def test_real_exp025_artifact():
+    path = Path('.local/dataset_cache/exp025/consistent_v3.npz')
     if not path.is_file():
         pytest.skip('local artifact unavailable')
-    h = load_cad_hierarchy(path)
+    h = load_cad_hierarchy(path, dataset_key='lmo')
     report = hierarchy_sanity(h.numpy_levels(), h.object_ids.tolist())
-    assert [v['below_one'] for v in report['parent_coverage'].values()] == failures
-    from core.gdrn_modeling.models.heads.progressive_pcc_head import load_pcc_hierarchy, ProgressivePCCHead
-    if name == 'consistent_v3':
-        with pytest.raises(ValueError, match='version or mode'):
-            load_pcc_hierarchy(path)
-    else:
-        arrays = load_pcc_hierarchy(path, dataset_key='lmo')
-        with np.load(path) as original:
-            for key, value in arrays.items():
-                np.testing.assert_array_equal(value.numpy(), original[key])
-                assert value.numpy().dtype == original[key].dtype
-    # Compare float32 reference routing away from exact cell boundaries.
-    points = torch.from_numpy(np.random.default_rng(42).normal(size=(100, 3)).astype(np.float32))
-    parent = torch.zeros(100, dtype=torch.long)
-    paths = []
-    for level in h.levels:
-        parent = parent * 8 + ProgressivePCCHead._nearest_child(
-            points, torch.zeros(100, dtype=torch.long), parent, level.anchors)
-        paths.append(parent.numpy())
-    np.testing.assert_array_equal(g.traverse_hierarchy(points.numpy(),
-        [level.anchors[0].numpy() for level in h.levels]), np.stack(paths, axis=1))
+    assert report['result'] == 'PASS'
+    assert [value['below_one'] for value in report['parent_coverage'].values()] == [0, 0, 0]
 
 
 def test_import_isolation():

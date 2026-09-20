@@ -1,5 +1,12 @@
 # EXP024 LM-O Progressive PCC ImageNet 全主干训练
 
+## 2026-09-20 收口
+
+Decision：`CLOSED / SUPERSEDED_BY_EXP025 / FORMAL_NOT_RUN`。lab1 batch4 EGL smoke 证据保留，
+40 epoch formal 从未启动；该组合策略转入 EXP025 的 ImageNet full arm 并改用真实 batch48
+gate。配置和服务器 profile 已退出 HEAD；删除前最终完整快照为
+`8c6ca86aa0668777548d4f30b8cc6f6ad9864067`。
+
 - `experiment_id`: `EXP-20260919-024-lmo-progressive-pcc-fulltrain`
 - 状态：`LOCAL_CPU_PREFLIGHT_PASS / SERVER_EGL_SMOKE_PASS /
   FORMAL_UNLOCKED / FORMAL_NOT_STARTED`
