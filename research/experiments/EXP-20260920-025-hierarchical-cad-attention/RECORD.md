@@ -45,9 +45,9 @@ AMP guard 语义保持生产 engine 的 GradScaler 行为。
 - 两条正式 arm 拆成独立配置；launcher 只接受 `exp025_lmo`，强制 arm/server 映射，并新增
   唯一输出目录的 EGL batch48 gate。formal contract 继续拒绝 `FORMAL_READY=False`、缺失共同
   `AMP.INIT_SCALE` 或任何 seed/batch/epoch/eval/checkpoint 协议漂移。
-- 本地活动测试 **97 passed / 4 skipped**；两个 CPU preflight 均 PASS，分别精确核对 340 个
+- 本地活动测试在 GPU 权限下 **101 passed**；两个 CPU preflight 均 PASS，分别精确核对 340 个
   official/ImageNet backbone tensor、hierarchy SHA、optimizer 参数范围、有限 loss/gradient
-  与输出形状。4 个 skip 为本机无 CUDA 的真实 GradScaler 检查，不以 CPU 结果替代。
+  与输出形状；真实 CUDA/GradScaler 测试也已在本机 RTX 4060 Laptop 上通过。
 - 服务器真实 batch48/EGL gate 尚未执行；本段没有设置 `FORMAL_READY` 或 AMP scale，也没有
   产生正式指标。
 
