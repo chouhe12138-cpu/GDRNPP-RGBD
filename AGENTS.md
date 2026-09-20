@@ -27,7 +27,8 @@
 
 - 一个科学问题使用唯一 `experiment_id`，一次执行使用唯一 `run_id`。
 - 每个实验目录只维护一份叙述性 `RECORD.md`；实验导航维护在
-  `research/EXPERIMENT_INDEX.md`，当前工作摘要维护在 `research/STATUS_CN.md`。
+  `research/EXPERIMENT_INDEX.md`，当前进展和唯一下一步只维护在
+  `research/STATUS_CN.md`。README、RUNBOOK、INDEX 和 RECORD 不复制当前状态段落。
 - 正式记录保留：研究问题与唯一变量、experiment/run ID、协议与指标口径、配置
   路径、seed、源码 commit、checkpoint 文件名与 epoch、全部预定正式评估点的
   聚合指标、预注册 gate、结论或失败原因。
@@ -81,6 +82,10 @@
   `set -Eeuo pipefail`、集中定义的短变量和一行一个命令；允许空行与注释帮助核对。
   避免超长单行、反斜杠续行、依赖当前目录或复制后仍需拼接的片段。简单的
   `status/logs` 等单步命令也保持短行、绝对路径和显式参数。
+- 给用户的服务器代码块必须自动从 `id -un` 识别 lab0/lab1，并自动解析 GPU、bundle
+  commit、release、受管容器、镜像和当前/最新 run；不得要求用户修改机器编号、填写
+  `REPLACE_*`、记住旧容器名或复制上一段输出。机械对象有零个或多个候选时列出候选并
+  fail-closed，不静默选择“最新”。只有科学选择或破坏性授权才交给用户决定。
 - 长流程拆成多个可独立执行并核对输出的短代码块；每个代码块重新定义所需变量，
   不依赖上一个代码块遗留的 shell 状态，避免复制或终端截断后执行不完整。
 - 本地 `.git` 历史是恢复兜底，禁止删除或重写：不删 `.git` 目录、不清空

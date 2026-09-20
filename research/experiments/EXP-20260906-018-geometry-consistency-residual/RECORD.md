@@ -4,8 +4,8 @@
 
 在 EXP013A initial camera-frame pose 后，用 predicted metric XYZ–ROI2D 在当前 pose
 下的显式 2D reprojection residual 驱动一次 Region-free、support-masked、轻量
-6DoF correction，能否比 EXP013A 获得稳定的整体姿态收益？实现细节见
-[实现说明](../../exp018/README.md)。
+6DoF correction，能否比 EXP013A 获得稳定的整体姿态收益？历史实现入口已退出 HEAD，
+精确复现使用下方 source commit 的独立 worktree。
 
 - experiment_id：`EXP-20260906-018-geometry-consistency-residual`。
 - formal run_id：`RUN-20260906-115421-formal-s42-a01`。

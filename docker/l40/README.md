@@ -8,5 +8,5 @@ repo、BOP/VOC 和 weights 只读挂载；output、cache 和项目 home 外置�
 image/source、native、CUDA、资源、hierarchy SHA 与 CPU preflight gate。
 
 普通 Python/config 变化复用稳定镜像。只有 Dockerfile、requirements、vendor、C++/CUDA
-或 ABI 变化才重建镜像。完整 release、batch48 gate 和 formal 命令见
+或 ABI 变化才重建镜像。当前 release、容器检查和 formal 命令见
 `research/RUNBOOK_CN.md`。

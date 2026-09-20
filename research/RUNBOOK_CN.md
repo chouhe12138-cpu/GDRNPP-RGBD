@@ -1,9 +1,13 @@
-# EXP025 运行手册
+# EXP025 当前运行手册
 
-本手册当前只开放 LM-O。LM13 虽已有本地配置与验证产物，但 `exp025_lm13` 尚未加入 launcher；
-不要为 LM13 创建服务器 run，待 LM-O 正式实验完成后再扩展本手册。
+本手册只描述从当前状态继续工作所需的操作。EXP025 的 formal 前 batch48/EGL gate 已完成，
+canonical 结果见对应 [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md)。
+本手册覆盖同一 source release 的两条 LM-O formal arm；LM13 服务器 profile 尚未开放。
 
-## 本地验证与 bundle
+所有服务器代码块都可在 lab0、lab1 原样执行，不含需要手改的机器编号、SHA、release、镜像、
+旧容器名或 run ID。机械对象无法唯一确定时命令会列出候选并停止。
+
+## 1. 本地验证与 bundle
 
 ```bash
 (
@@ -13,40 +17,82 @@ cd /home/wsluser/GDRNPP-RGBD
 source /home/wsluser/miniconda3/etc/profile.d/conda.sh
 conda activate pytorch22
 export GDRN_CONVNEXT_BASE_WEIGHTS=/home/wsluser/.cache/torch/hub/checkpoints/convnext_base_1k_224_ema.pth
+frozen_config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py
+full_config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_imagenet_full.py
 
 PYTHONPATH="$PWD" pytest -q research/exp025/tests research/tests research/cad_hierarchy/tests
-python -m research.exp025.preflight \
-  --config configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py
-python -m research.exp025.preflight \
-  --config configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_imagenet_full.py
+python -m research.exp025.preflight --config "${frozen_config}"
+python -m research.exp025.preflight --config "${full_config}"
 git diff --check
 docker/l40/create_bundle.sh
 )
 ```
 
-bundle 位于 `.local/release/GDRNPP-RGBD-<short-sha>.bundle`。传到两台服务器各自的
-`/data/labs/<machine>/docker_data/chx/transfer/`。服务器不连接远端 Git。
+`create_bundle.sh` 会打印 bundle 的完整本地路径。把该文件分别放入两台服务器当前账户的
+`/data/labs/<登录账户>/docker_data/chx/transfer/`；服务器不连接远端 Git。用户只需传文件，
+不用抄写文件名中的 SHA。
 
-## 建立只读 release
+## 2. 自动验证 bundle 并建立 release
 
-以下代码块在 lab0/lab1 分别执行，只修改 `machine`、`short_sha` 和 `full_sha`：
+以下代码块自动寻找 transfer 中唯一一个尚未建立 release 的 GDRNPP bundle，从 bundle 自身
+解析 commit。若没有新 bundle，则核对并复用服务器记录的当前 release；若有多个候选则停止。
 
 ```bash
 (
 set -Eeuo pipefail
 
-machine=lab0
-short_sha=REPLACE_SHORT_SHA
-full_sha=REPLACE_FULL_SHA
-root="/data/labs/${machine}/docker_data/chx"
-bundle="${root}/transfer/GDRNPP-RGBD-${short_sha}.bundle"
-release="${root}/releases/GDRNPP-RGBD-${short_sha}"
+machine="$(id -un)"
+case "${machine}" in
+    lab0|lab1) ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
 
-test "$(id -un)" = "${machine}"
-test -f "${bundle}"
+root="/data/labs/${machine}/docker_data/chx"
+marker="${root}/transfer/GDRNPP-RGBD-current-release.txt"
+mapfile -t bundles < <(
+    find "${root}/transfer" -maxdepth 1 -type f -name 'GDRNPP-RGBD-*.bundle' -print | sort
+)
+
+candidates=()
+for bundle in "${bundles[@]}"; do
+    full_sha="$(git bundle list-heads "${bundle}" | awk '$2 ~ /^refs\/heads\// {print $1}')"
+    [[ "${full_sha}" =~ ^[0-9a-f]{40}$ ]] || {
+        printf 'FAIL: bundle must expose exactly one branch head: %s\n' "${bundle}" >&2
+        exit 1
+    }
+    short_sha="${full_sha:0:7}"
+    release="${root}/releases/GDRNPP-RGBD-${short_sha}"
+    [[ -e "${release}" ]] || candidates+=("${bundle}")
+done
+
+if ((${#candidates[@]} == 0)); then
+    if ! test -s "${marker}"; then
+        printf 'FAIL: no new bundle and no current-release marker\n' >&2
+        printf 'TRANSFER_BUNDLE %s\n' "${bundles[@]}" >&2
+        exit 1
+    fi
+    release="$(<"${marker}")"
+    [[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
+    test -d "${release}/.git"
+    test -z "$(git -C "${release}" status --short)"
+    printf 'RELEASE_ALREADY_READY path=%s commit=%s\n' "${release}" "$(git -C "${release}" rev-parse HEAD)"
+    exit 0
+fi
+
+if ((${#candidates[@]} != 1)); then
+    printf 'FAIL: expected one new bundle, found %d\n' "${#candidates[@]}" >&2
+    printf 'CANDIDATE %s\n' "${candidates[@]}" >&2
+    exit 1
+fi
+
+bundle="${candidates[0]}"
+full_sha="$(git bundle list-heads "${bundle}" | awk '$2 ~ /^refs\/heads\// {print $1}')"
+short_sha="${full_sha:0:7}"
+release="${root}/releases/GDRNPP-RGBD-${short_sha}"
 test ! -e "${release}"
 
 verify_repo="$(mktemp -d "/tmp/gdrnpp-bundle-${short_sha}.XXXXXX")"
+trap 'test -n "${verify_repo:-}" && rm -rf -- "${verify_repo}"' EXIT
 git -c init.defaultBranch=main -C "${verify_repo}" init --bare --quiet
 git -C "${verify_repo}" bundle verify "${bundle}"
 
@@ -54,165 +100,269 @@ git clone --no-checkout "${bundle}" "${release}"
 git -C "${release}" checkout --detach "${full_sha}"
 test "$(git -C "${release}" rev-parse HEAD)" = "${full_sha}"
 test -z "$(git -C "${release}" status --short)"
-git -C "${release}" status --short --branch
+printf '%s\n' "${release}" > "${marker}"
+printf 'RELEASE_READY path=%s commit=%s\n' "${release}" "${full_sha}"
 )
 ```
 
-## 安装 EXP025 hierarchy
+## 3. 镜像策略
 
-把本地 `.local/dataset_cache/exp025/consistent_v3.npz` 传到两台服务器的 transfer 目录，
-然后分别执行：
+普通 Python、config 和文档变化复用稳定镜像。只有 Dockerfile、locked requirements、vendor、
+C++/CUDA 或 ABI 输入变化才重建。当前文档整理不需要重建镜像。
+
+若后续只读预检明确报告 native/environment 不兼容，再在对应服务器原样执行：
 
 ```bash
 (
 set -Eeuo pipefail
 
-machine=lab0
+machine="$(id -un)"
+case "${machine}" in
+    lab0|lab1) ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
+
 root="/data/labs/${machine}/docker_data/chx"
-source_file="${root}/transfer/consistent_v3.npz"
-target="${root}/cache/gdrnpp_datasets/exp025/consistent_v3.npz"
-expected=02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373
-
-test "$(id -un)" = "${machine}"
-test -r "${source_file}"
-install -D -m 644 "${source_file}" "${target}"
-test "$(sha256sum "${target}" | awk '{print $1}')" = "${expected}"
-)
-```
-
-## 受控替换项目容器
-
-本轮更新了 Dockerfile 的构建期测试集合与镜像环境验证入口，因此必须从新 release 重建
-项目镜像。依赖、C++/CUDA 和 ABI 没有变化；重建用于让镜像 revision 与当前验证契约一致。
-
-```bash
-(
-set -Eeuo pipefail
-
-machine=lab0
-short_sha=REPLACE_SHORT_SHA
-release="/data/labs/${machine}/docker_data/chx/releases/GDRNPP-RGBD-${short_sha}"
-
-test "$(id -un)" = "${machine}"
+release="$(<"${root}/transfer/GDRNPP-RGBD-current-release.txt")"
+[[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
+test -d "${release}/.git"
 test -z "$(git -C "${release}" status --short)"
+
 cd "${release}"
 docker/l40/build_image.sh
+image="gdrnpp-research:torch220-cu121-sm89-$(git rev-parse --short=12 HEAD)"
+/usr/bin/docker image inspect "${image}" >/dev/null
+printf '%s\n' "${image}" > "${root}/transfer/GDRNPP-RGBD-current-image.txt"
+printf 'IMAGE_READY image=%s\n' "${image}"
 )
 ```
 
-记录 `build_image.sh` 最后输出的 `image=...`，在下面填写为 `image_ref`。lab1 使用相同
-commit 构建；两台镜像都应记录同一个 source revision。
+## 4. 容器替换前只读预检
 
-先运行 `check` 和 `docker inspect`，确认精确容器标签、旧 repo mount，且容器内除
-`sleep infinity` 外无进程。只有满足这些条件才停止并删除该项目容器，再从新 release
-执行 `create`。不要操作其他容器。
+先运行本节，只读解析当前 release、受管容器、挂载和镜像。不要把输出中的名称抄到下一段；
+下一段会重新解析和校验。若当前容器不存在，则必须已有上节生成的 image marker。
 
 ```bash
 (
 set -Eeuo pipefail
 
-machine=lab0
-short_sha=REPLACE_SHORT_SHA
-expected_old_repo=REPLACE_EXACT_OLD_RELEASE
-image_ref=REPLACE_IMAGE_FROM_BUILD_OUTPUT
+machine="$(id -un)"
+case "${machine}" in
+    lab0) gpu=0 ;;
+    lab1) gpu=1 ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
+
 root="/data/labs/${machine}/docker_data/chx"
-release="${root}/releases/GDRNPP-RGBD-${short_sha}"
+release="$(<"${root}/transfer/GDRNPP-RGBD-current-release.txt")"
+[[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
 container="gdrnpp_chx_${machine}"
+image_marker="${root}/transfer/GDRNPP-RGBD-current-image.txt"
+native_inputs=(
+    docker/l40/Dockerfile
+    docker/l40/requirements.lock
+    docker/l40/build_native.sh
+    docker/l40/verify_environment.py
+    docker/l40/verify_native.sh
+    docker/l40/vendor
+    core/csrc
+    lib/egl_renderer
+)
 
-test "$(id -un)" = "${machine}"
+test -d "${release}/.git"
 test -z "$(git -C "${release}" status --short)"
-test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.project"}}')" = GDRNPP-RGBD
-test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.machine"}}')" = "${machine}"
-/usr/bin/docker image inspect "${image_ref}" >/dev/null
+/usr/bin/docker info >/dev/null
+nvidia-smi -i "${gpu}"
 
-mounted_repo="$(/usr/bin/docker inspect "${container}" --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
-test "${mounted_repo}" = "${expected_old_repo}"
+if /usr/bin/docker container inspect "${container}" >/dev/null 2>&1; then
+    test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.project"}}')" = GDRNPP-RGBD
+    test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.machine"}}')" = "${machine}"
+    mounted_repo="$(/usr/bin/docker inspect "${container}" --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
+    [[ "${mounted_repo}" == "${root}/releases/GDRNPP-RGBD-"* ]]
+    active="$(/usr/bin/docker top "${container}" -eo pid,args | awk 'NR>1 {$1=""; sub(/^[[:space:]]+/,""); if ($0!="sleep infinity") print}')"
+    test -z "${active}"
+    image="$(/usr/bin/docker inspect "${container}" --format '{{.Config.Image}}')"
+else
+    test -s "${image_marker}"
+    image="$(<"${image_marker}")"
+    mounted_repo=MISSING
+fi
 
-active="$(/usr/bin/docker top "${container}" -eo pid,args | awk 'NR>1 {$1=""; sub(/^[[:space:]]+/,""); if ($0!="sleep infinity") print}')"
-test -z "${active}"
+if test -s "${image_marker}"; then
+    image="$(<"${image_marker}")"
+fi
+/usr/bin/docker image inspect "${image}" >/dev/null
+revision="$(/usr/bin/docker image inspect "${image}" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+git -C "${release}" cat-file -e "${revision}^{commit}"
+git -C "${release}" merge-base --is-ancestor "${revision}" HEAD
+changed="$(git -C "${release}" diff --name-only "${revision}..HEAD" -- "${native_inputs[@]}")"
+test -z "${changed}"
 
-/usr/bin/docker stop "${container}"
-/usr/bin/docker rm "${container}"
+printf 'REPLACEMENT_PRECHECK PASS\n'
+printf 'machine=%s gpu=%s\n' "${machine}" "${gpu}"
+printf 'release=%s\n' "${release}"
+printf 'container=%s\n' "${container}"
+printf 'current_mount=%s\n' "${mounted_repo}"
+printf 'image=%s\n' "${image}"
+)
+```
+
+## 5. 受控替换项目容器
+
+这是破坏性操作。只有用户核对上节输出并明确同意后才执行。代码块自动重新解析目标；如果容器
+已经挂载目标 release，则只运行检查，不重复删除。
+
+```bash
+(
+set -Eeuo pipefail
+
+machine="$(id -un)"
+case "${machine}" in
+    lab0|lab1) ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
+
+root="/data/labs/${machine}/docker_data/chx"
+release="$(<"${root}/transfer/GDRNPP-RGBD-current-release.txt")"
+[[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
+container="gdrnpp_chx_${machine}"
+image_marker="${root}/transfer/GDRNPP-RGBD-current-image.txt"
+native_inputs=(
+    docker/l40/Dockerfile
+    docker/l40/requirements.lock
+    docker/l40/build_native.sh
+    docker/l40/verify_environment.py
+    docker/l40/verify_native.sh
+    docker/l40/vendor
+    core/csrc
+    lib/egl_renderer
+)
+
+test -d "${release}/.git"
+test -z "$(git -C "${release}" status --short)"
+
+if /usr/bin/docker container inspect "${container}" >/dev/null 2>&1; then
+    test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.project"}}')" = GDRNPP-RGBD
+    test "$(/usr/bin/docker inspect "${container}" --format '{{index .Config.Labels "gdrnpp.machine"}}')" = "${machine}"
+    mounted_repo="$(/usr/bin/docker inspect "${container}" --format '{{range .Mounts}}{{if eq .Destination "/workspace/gdrnpp"}}{{.Source}}{{end}}{{end}}')"
+    [[ "${mounted_repo}" == "${root}/releases/GDRNPP-RGBD-"* ]]
+    active="$(/usr/bin/docker top "${container}" -eo pid,args | awk 'NR>1 {$1=""; sub(/^[[:space:]]+/,""); if ($0!="sleep infinity") print}')"
+    test -z "${active}"
+    image="$(/usr/bin/docker inspect "${container}" --format '{{.Config.Image}}')"
+else
+    mounted_repo=MISSING
+    test -s "${image_marker}"
+    image="$(<"${image_marker}")"
+fi
+
+if test -s "${image_marker}"; then
+    image="$(<"${image_marker}")"
+fi
+/usr/bin/docker image inspect "${image}" >/dev/null
+revision="$(/usr/bin/docker image inspect "${image}" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+git -C "${release}" cat-file -e "${revision}^{commit}"
+git -C "${release}" merge-base --is-ancestor "${revision}" HEAD
+changed="$(git -C "${release}" diff --name-only "${revision}..HEAD" -- "${native_inputs[@]}")"
+test -z "${changed}"
+
+if test "${mounted_repo}" = "${release}"; then
+    cd "${release}"
+    docker/l40/experiment.sh "${machine}" check
+    docker/l40/experiment.sh "${machine}" status
+    exit 0
+fi
+
+if test "${mounted_repo}" != MISSING; then
+    /usr/bin/docker stop "${container}"
+    /usr/bin/docker rm "${container}"
+fi
+
 cd "${release}"
-docker/l40/experiment.sh "${machine}" create "${image_ref}"
+docker/l40/experiment.sh "${machine}" create "${image}"
 docker/l40/experiment.sh "${machine}" check
 docker/l40/experiment.sh "${machine}" status
 )
 ```
 
-lab1 使用同一代码块并把 `machine=lab1`；两台都必须绑定相同 source commit 的 release。
+## 6. 启动 formal
 
-## 真实 batch48 gate
-
-2026-09-20 这两条 gate 已在 lab0/lab1 执行：65536 在两臂同一步、同一张量
-（`cad_attention_head.mask_predictor.weight`）缩放后溢出，32768 两臂均 PASS，共同 scale
-定为 32768 并写入 `common.py`。此后 lab1 的主干 lr 由 3e-5 改为 3e-4（见 RECORD 的 Decision），
-因此 **lab1 需要在最终配置下再跑一次同一条 gate 命令**（scale 仍给 32768）；lab0 的配置未变，
-其 32768 结果继续有效。命令模板如下（把 `REPLACE_SHORT_SHA` 换成当次 release）。lab0：
+在两台服务器分别原样执行同一个代码块。登录账户决定 arm；launcher 仍会再次校验映射并自动
+生成唯一 run ID。
 
 ```bash
 (
 set -Eeuo pipefail
 
-release=/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-REPLACE_SHORT_SHA
-experiment=EXP-20260920-025-hierarchical-cad-attention
-config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py
+machine="$(id -un)"
+case "${machine}" in
+    lab0) config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py ;;
+    lab1) config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_imagenet_full.py ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
 
+root="/data/labs/${machine}/docker_data/chx"
+release="$(<"${root}/transfer/GDRNPP-RGBD-current-release.txt")"
+[[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
+experiment=EXP-20260920-025-hierarchical-cad-attention
+
+test -d "${release}/.git"
+test -z "$(git -C "${release}" status --short)"
 cd "${release}"
-docker/l40/experiment.sh lab0 gate "${experiment}" "${config}" 65536
+docker/l40/experiment.sh "${machine}" run "${experiment}" "${config}" formal
 )
 ```
 
-lab1：
+启动后 15–30 分钟首次检查数值、显存和吞吐；之后约每 6 小时或固定 checkpoint 节点检查。
+正式训练期间不 pull、不修改 release、不替换镜像。
+
+## 7. 状态与最新日志
+
+状态检查可在任一服务器原样执行：
 
 ```bash
 (
 set -Eeuo pipefail
-
-release=/data/labs/lab1/docker_data/chx/releases/GDRNPP-RGBD-REPLACE_SHORT_SHA
-experiment=EXP-20260920-025-hierarchical-cad-attention
-config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_imagenet_full.py
-
+machine="$(id -un)"
+case "${machine}" in
+    lab0|lab1) ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
+root="/data/labs/${machine}/docker_data/chx"
+release="$(<"${root}/transfer/GDRNPP-RGBD-current-release.txt")"
+[[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
 cd "${release}"
-docker/l40/experiment.sh lab1 gate "${experiment}" "${config}" 65536
+docker/l40/experiment.sh "${machine}" status
 )
 ```
 
-若某臂仅因 AMP 非有限失败，使用新的唯一 run 依次重跑 32768、16384。选择两臂共同通过的
-最高 scale。gate 必须报告 EGL、batch48、8 步、0 skipped step、有限 loss/gradient、正确的
-backbone 冻结或更新、全部 Image-SA stage 更新、checkpoint roundtrip 和峰值显存。batch48
-OOM 或 16384 仍失败时停止，不启动 formal，不自行改梯度累积。
-
-gate 通过后把紧凑 `report.json`（与 `run_metadata.json`）同步回本地，记录进 EXP025 RECORD
-的 evidence。两个正式配置现已共享 `SOLVER.AMP.INIT_SCALE=32768` 且 `FORMAL_READY=True`；
-后续只需按上节用第二段 bundle/release 替换容器，即可进入正式训练。若某臂在最终配置下
-失败在 32768（且失败点仍只是 Mask 头），按同一口径降到 16384 并同步改两臂共享的
-`INIT_SCALE`，届时共同 scale 变为 16384。
-
-## 正式训练
-
-lab0：
+查看该服务器最新 EXP025 run 的日志，无需记 run ID：
 
 ```bash
 (
 set -Eeuo pipefail
-
-release=/data/labs/lab0/docker_data/chx/releases/GDRNPP-RGBD-REPLACE_FORMAL_SHA
+machine="$(id -un)"
+case "${machine}" in
+    lab0|lab1) ;;
+    *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
+esac
+root="/data/labs/${machine}/docker_data/chx"
+release="$(<"${root}/transfer/GDRNPP-RGBD-current-release.txt")"
+[[ "${release}" == "${root}/releases/GDRNPP-RGBD-"* ]]
 experiment=EXP-20260920-025-hierarchical-cad-attention
-config=configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_official_frozen.py
-
+run_root="${root}/outputs/experiments/${experiment}"
+mapfile -t runs < <(find "${run_root}" -mindepth 1 -maxdepth 1 -type d -printf '%T@\t%f\n' | sort -nr)
+test "${#runs[@]}" -ge 1
+latest="${runs[0]#*$'\t'}"
 cd "${release}"
-docker/l40/experiment.sh lab0 run "${experiment}" "${config}" formal
+docker/l40/experiment.sh "${machine}" logs "${experiment}/${latest}"
 )
 ```
 
-lab1 使用 `train_imagenet_full.py` 和 `experiment.sh lab1`。启动后 15–30 分钟首次检查数值、
-显存和吞吐，之后约每 6 小时或固定 checkpoint 节点检查。使用短命令：
+若需要手工评价某个 checkpoint，checkpoint 是科学目标而非机械标识；Agent 应先根据固定评价点
+和 RECORD 选定目标，再给用户一段已经填好精确路径的完整命令，不能让用户自行回忆或拼接。
 
-```bash
-docker/l40/experiment.sh lab0 status
-docker/l40/experiment.sh lab0 logs EXP-20260920-025-hierarchical-cad-attention/RUN-...
-```
+## 8. 完成后的记录
 
-正式训练期间不 pull、不修改 release、不替换镜像。每个 E5–E40 点记录聚合指标；完成后记录
-run ID、source commit、checkpoint、exit code 和结论，不提交 checkpoint 或完整日志。
+每个 E5–E40 点记录聚合指标；完成后记录 run ID、source commit、image revision、checkpoint
+文件名与 epoch、exit code、全部预定指标和结论。完整日志、checkpoint 与 BOP 输出继续外置，
+Git 只保存 RECORD 和直接支撑结论的紧凑 evidence。

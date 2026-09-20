@@ -1,44 +1,45 @@
 # 当前研究状态
 
-最后核对：2026-09-20。
+最后核对：2026-09-20
+verified commit：`0ec5f9ad72777d37f47b4489e252ffb09cb68413`
 
-## EXP025
+## Active experiment
 
-状态：`SERVER_GATE_PASS_AT_32768 / FORMAL_READY / FORMAL_NOT_STARTED`。
+`EXP-20260920-025-hierarchical-cad-attention` — 在统一 T3=512 CAD attention 结构上比较
+两条 LM-O 主干策略。
 
-当前模型使用四级 Image-SA 写回、统一 T3=512 分类、T2/T1 marginal NLL、预测 soft-T3
-条件化的 Residual V2、可见 mask BCE 和固定 `consistent_v3` hierarchy。optimizer resume、
-GradScaler 跳步时 scheduler gate 与可配置 `SOLVER.AMP.INIT_SCALE` 已接入生产训练路径。
+状态：`ACTIVE / FORMAL_NOT_STARTED`（formal 前置条件已满足）。
 
-正式比较包含两个明确 arm：
+正式比较包含两个组合策略，不能解释为单一冻结消融：
 
-| arm | server | initialization | backbone |
+| arm | server | initialization | trainable parameters |
 |---|---|---|---|
-| `official_frozen` | lab0 / GPU 0 | 原 GDRNPP LM-O checkpoint | frozen |
-| `imagenet_full` | lab1 / GPU 1 | ConvNeXt ImageNet checkpoint | trainable，LR×0.1 |
+| `official_frozen` | lab0 / GPU 0 | 原 GDRNPP LM-O checkpoint | CAD head；backbone frozen |
+| `imagenet_full` | lab1 / GPU 1 | ConvNeXt ImageNet checkpoint | CAD head + backbone，均为 3e-4 |
 
-两臂共享 LM-O PBR40、GT-box、seed42、真实 batch48、AdamW、40 epoch、E5–E40 固定评价点
-和相同 EXP025 head。初始化和训练范围同时变化，不能作单因素冻结消融。
+两臂共享 LM-O PBR40、GT-box、seed42、真实 batch48、AdamW、40 epoch、E5–E40 固定评价点、
+AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=1.0`。
 
-2026-09-20 两臂各在服务器跑完 EGL 真实 batch48 gate：65536 在**两臂同一步、同一张量**
-（`cad_attention_head.mask_predictor.weight`）溢出，32768 两臂均 PASS（0 skipped step、
-四级 Image-SA 90/90 参数更新、checkpoint 往返一致）。共同 scale = **32768**，已写入
-`common.py` 的 `SOLVER.AMP.INIT_SCALE`，`FORMAL_READY=True`。
+已完成前置：
 
-同期做了一次 formal 前的协议修订：`train_imagenet_full.py` 的 `BACKBONE_LR_MULT` 由 `.1`
-改为 `1.`（主干与头同为 AdamW 3e-4）。依据是官方 LM-O PBR 配方对本干不加乘子
-（`GDRN_double_mask.py:912-914`，base lr 8e-4），而原来的 3e-5 继承自 LM13 的 GDR-Net 协议、
-无实验证据支持；否则"全量训练"臂的主干几乎不更新，组合对比的信息量会下降。该改动只影响
-lab1 臂。
+- lab0 在 EGL 真实 batch48、scale 32768 上 PASS；0 skipped step、四级 Image-SA 90/90
+  参数更新、checkpoint 往返一致。
+- lab1 已在最终 backbone/head 均为 3e-4 的配置上重跑同一 gate 并 PASS，证据来自
+  `exp025_server_gate_imagenet_full_a03.json`。
+- 65536 的历史 gate 在 Mask 头出现缩放后 fp16 非有限；共同正式初始 scale 固定为 32768。
+- `SOLVER.AMP.INIT_SCALE=32768` 与 `RESEARCH_PROTOCOL.FORMAL_READY=True` 已写入正式配置。
 
-剩余两步：**lab1 需要在最终配置（主干 3e-4）下重跑一次 gate**（gate 报告记录 optimizer lr），
-然后两臂启动 formal。第二轮不需要重建镜像。
+当前唯一下一步：
 
-LM13 后续臂状态：`PREPARED / LOCAL_CPU_AND_CUDA_SMOKE_PASS / SERVER_NOT_ENABLED /
-FORMAL_NOT_READY`。配置为 ImageNet ConvNeXt 全量训练，沿用历史 GDR-Net LM 协议：real LM +
-DeepIM renders、Ranger 1e-4、backbone LR×0.1、effective batch24、160 epoch、1000-step
-warmup、72% 后 cosine 到0、每20 epoch checkpoint/eval。LM-O 完成前不把 `exp025_lm13`
-加入 launcher。
+- 从同一 clean source release 启动 lab0 `official_frozen` 与 lab1 `imagenet_full` 的 40 epoch
+  formal；按 E5/E10/E15/E20/E25/E30/E35/E40 记录全部预定指标，不按中间结果选模。
 
-历史 EXP000–024 已退出 HEAD 的执行面。所有原始状态、结论和证据缺口继续由
-[实验索引](EXPERIMENT_INDEX.md) 链接的 RECORD 保存。
+## Next stage
+
+LM13 已完成 ImageNet ConvNeXt 全量训练配置、hierarchy 和本地 CPU/CUDA smoke；服务器
+profile 仍禁用，LM-O 完成前不启动。
+
+## Historical experiments
+
+EXP000–024 的事实、结论与证据缺口只以 [实验索引](EXPERIMENT_INDEX.md) 和各实验
+`RECORD.md` 为准。

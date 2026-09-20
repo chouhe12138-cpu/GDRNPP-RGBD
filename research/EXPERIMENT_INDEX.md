@@ -1,23 +1,14 @@
 # 实验索引
 
-本页是实验状态的唯一中央索引。详细协议、结果和结论只写在对应 `RECORD.md`。
-
-2026-09-20：EXP000–024 的活动配置、runner、诊断与服务器 profile 已退出 HEAD；RECORD、
-紧凑证据和稳定 core 历史实现保留。EXP022–024 未启动的 formal 不再继续，统一标为被
-EXP025 取代。被清退入口的最终完整快照是 commit
-`8c6ca86aa0668777548d4f30b8cc6f6ad9864067`；精确历史复现优先按 RECORD 的 run source，
-缺少精确 source 时从该快照定位，并使用独立 worktree。
-
-EXP025 当前拆为 lab0 `official_frozen` 与 lab1 `imagenet_full` 两条正式 arm；服务器真实
-batch48/EGL gate 已完成：65536 在两臂同一步同一张量溢出，32768 两臂均通过，共同 scale
-写入 `SOLVER.AMP.INIT_SCALE`，`FORMAL_READY=True`。lab1 主干 lr 在 formal 前由 3e-5 改为
-3e-4（见 RECORD 的 Decision），需在最终配置下重跑一次 gate 后启动 formal。
+本页只提供实验目录。当前进展和下一步见 [STATUS_CN.md](STATUS_CN.md)；详细协议、结果、
+结论和证据边界只写在对应 `RECORD.md`。退出 HEAD 的历史入口按 RECORD 中的 source commit
+使用独立 worktree 恢复。
 LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，保持 server-disabled，
 待 LM-O 完成后再独立开放。
 
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
-| EXP025 统一 T3 CAD attention | ACTIVE / SERVER_GATE_PASS_AT_32768 / FORMAL_READY / FORMAL_NOT_STARTED | 四级 Image-SA 写回、统一 T3=512 与 Residual V2 已完成本地验证。正式比较为 lab0 原 GDRNPP 主干冻结臂与 lab1 ImageNet ConvNeXt 全量训练臂；两臂 gate 均通过（65536 溢出、32768 PASS），lab1 主干 lr 在 formal 前由 3e-5 改为 3e-4 并需重跑一次 gate | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | ACTIVE / FORMAL_NOT_STARTED | 两条 LM-O 组合策略的最终 batch48/EGL gate 已通过，formal 尚未启动 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |
@@ -40,9 +31,9 @@ LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，�
 | EXP017 Rotation Residual | COMPLETE / FAIL | E40 3/5 gate，rotation/BOP 未过 | [RECORD](experiments/EXP-20260902-017-support-aware-rotation-residual/RECORD.md) |
 | EXP017-B Detached Adapter Geometry | COMPLETE / NO_OVERALL_GAIN | E40 rotation/BOP 略升，ADD 下降 | [RECORD](experiments/EXP-20260903-017-b-detached-adapter-geometry/RECORD.md) |
 | EXP018 Geometry-Consistency Residual | COMPLETE / MARGINAL_GAIN / CLOSED | E40 四项均略高于 EXP013A，rotation 增幅最大；BOP +0.002346 未达到设计阶段建议的 +0.003，单 seed 证据不足以支持继续投入 | [RECORD](experiments/EXP-20260906-018-geometry-consistency-residual/RECORD.md) |
-| EXP019 EPro Geometry Utilization | RUN_COMPLETE | 1,445 targets；原 Gate A/B 通过，历史复现 5/6 越界；原 evaluator decision 为 PROTOCOL_REPRODUCTION_FAILED_STOP（保留）；2026-09-08 用户 review 判定机制通过，后续 gate 改用相对阈值 | [RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md) |
-| EXP020 Geometry-Aware Correspondence Loss | CLOSED / E40_DIRECT_POSE_RECORDED / MATCHED_PNP_NOT_RUN / EXIT_CODE_UNCONFIRMED | 用户决定结束后续补证；A/B E5–E40 direct-pose 已记录，正式 matched PnP 未运行，历史证据缺口保留 | [RECORD](experiments/EXP-20260909-020-geometry-aware-correspondence-loss/RECORD.md) |
-| EXP021 Global-Guided Hierarchical CAD Correspondence | CLOSED / FORMAL_BC_E40_COMPLETE / EXIT_CODE_UNCONFIRMED / MATCHED_PNP_NOT_RUN | B/C E5–E40 已记录；退出码与 fixed-support matched PnP 未生成，旧入口已退出 HEAD | [RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md) |
-| EXP022 Progressive Hierarchical CAD PCC | CLOSED / SUPERSEDED_BY_EXP025 / FORMAL_NOT_RUN | 本地工程验证保留；服务器 EGL、formal 与 matched PnP 未运行 | [RECORD](experiments/EXP-20260916-022-progressive-pcc/RECORD.md) |
-| EXP023 LM13 Progressive PCC Fulltrain | CLOSED / SUPERSEDED_BY_EXP025 / FORMAL_NOT_RUN | 本地协议与接线证据保留；服务器 EGL 与 formal 未运行 | [RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md) |
-| EXP024 LM-O Progressive PCC ImageNet Fulltrain | CLOSED / SUPERSEDED_BY_EXP025 / FORMAL_NOT_RUN | lab1 batch4 EGL smoke 曾通过，但 formal 未启动；组合策略转入 EXP025 的真实 batch48 arm | [RECORD](experiments/EXP-20260919-024-lmo-progressive-pcc-fulltrain/RECORD.md) |
+| EXP019 EPro Geometry Utilization | COMPLETE / DIAGNOSTIC_ONLY | Gate A/B 通过、历史复现 5/6 越界；原 evaluator STOP 与后续用户机制通过 review 并列保留 | [RECORD](experiments/EXP-20260907-019-epro-geometry-utilization/RECORD.md) |
+| EXP020 Geometry-Aware Correspondence Loss | CLOSED / FORMAL_RESULTS_PARTIAL | A/B E5–E40 direct-pose 已记录；matched PnP 与 exit code 未生成，用户结束补证 | [RECORD](experiments/EXP-20260909-020-geometry-aware-correspondence-loss/RECORD.md) |
+| EXP021 Global-Guided Hierarchical CAD Correspondence | CLOSED / FORMAL_RESULTS_PARTIAL | B/C E5–E40 direct-pose 已记录；exit code 与 fixed-support matched PnP 未生成 | [RECORD](experiments/EXP-20260914-021-global-guided-hierarchical-cad-correspondence/RECORD.md) |
+| EXP022 Progressive Hierarchical CAD PCC | SUPERSEDED / FORMAL_NOT_STARTED | 本地工程验证保留；服务器 EGL、formal 与 matched PnP 未运行 | [RECORD](experiments/EXP-20260916-022-progressive-pcc/RECORD.md) |
+| EXP023 LM13 Progressive PCC Fulltrain | SUPERSEDED / FORMAL_NOT_STARTED | 本地协议与接线证据保留；服务器 EGL 与 formal 未运行 | [RECORD](experiments/EXP-20260918-023-lm13-progressive-pcc-fulltrain/RECORD.md) |
+| EXP024 LM-O Progressive PCC ImageNet Fulltrain | SUPERSEDED / FORMAL_NOT_STARTED | lab1 batch4 EGL smoke 通过，但 formal 未启动；组合策略转入 EXP025 | [RECORD](experiments/EXP-20260919-024-lmo-progressive-pcc-fulltrain/RECORD.md) |
