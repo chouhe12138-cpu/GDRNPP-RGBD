@@ -20,8 +20,12 @@ if [[ -n "$(git -C "${repo_root}" status --porcelain=v1 --untracked-files=all)" 
 fi
 mkdir -p "${audit_dir}"
 
+# The lab network routes IPv4 egress nowhere (the archive host and the mirrors both
+# time out on 101.6.15.130) while IPv6 works, and the default bridge gives a build
+# container no IPv6 at all, so apt and pip can only reach the mirrors through the
+# host's network stack.
 set +e
-/usr/bin/docker build --progress=plain --file "${script_dir}/Dockerfile" --build-arg GDRN_UID="$(id -u)" --build-arg GDRN_GID="$(id -g)" --build-arg GIT_COMMIT="${commit}" --build-arg GIT_REMOTE="${remote}" --tag "${image}" "${repo_root}" 2>&1 | tee "${build_log}"
+/usr/bin/docker build --network=host --progress=plain --file "${script_dir}/Dockerfile" --build-arg GDRN_UID="$(id -u)" --build-arg GDRN_GID="$(id -g)" --build-arg GIT_COMMIT="${commit}" --build-arg GIT_REMOTE="${remote}" --tag "${image}" "${repo_root}" 2>&1 | tee "${build_log}"
 build_code=${PIPESTATUS[0]}
 set -e
 
