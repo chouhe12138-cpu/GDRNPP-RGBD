@@ -53,10 +53,18 @@ RUN python3 -m venv "${VIRTUAL_ENV}" \
     && python -m pip install --no-cache-dir pip==24.0 setuptools==69.5.1 wheel==0.43.0
 
 COPY docker/l40/requirements.lock /tmp/requirements.lock
+# The cu121 index links every nvidia dependency wheel at pypi.nvidia.com, which this network
+# cannot reach, so resolving torch together with the nvidia wheels makes pip pick an
+# unreachable candidate.  torch and torchvision are the only pins that index is needed for
+# (their +cu121 local version), so they are installed from it alone and without dependencies;
+# the nvidia wheels then come from the PyPI mirror, which serves the same files under the
+# lock's hashes.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --no-deps --no-build-isolation --require-hashes \
+    python -m pip install --no-cache-dir --no-deps \
+        --index-url https://download.pytorch.org/whl/cu121 \
+        torch==2.2.0+cu121 torchvision==0.17.0+cu121 \
+    && python -m pip install --no-deps --no-build-isolation --require-hashes \
         --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
-        --extra-index-url https://download.pytorch.org/whl/cu121 \
         --requirement /tmp/requirements.lock \
     && python -m pip install --no-cache-dir \
         --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
