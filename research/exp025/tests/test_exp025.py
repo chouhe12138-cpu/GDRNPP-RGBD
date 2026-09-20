@@ -138,11 +138,21 @@ def test_modes_and_batch_contract(train, init):
     # empty whatever the backbone initialization is.
     assert cfg.MODEL.WEIGHTS == ''
     from research.run_contract import validate_research_run_config
-    from core.gdrn_modeling.models.GDRN_CAD import dataset_context
-    assert dataset_context(cfg).hierarchy_path.name == 'consistent_v3.npz'
     validate_research_run_config(cfg, mode='prepare')
     with pytest.raises(ValueError, match='not ready'):
         validate_research_run_config(cfg, mode='formal')
+
+
+@pytest.mark.parametrize('train,init', [(False, 'official_lmo'), (True, 'imagenet')])
+def test_modes_resolve_the_hierarchy_artifact(train, init):
+    """The dataset cache is a run-time mount, so the image build has no artifact to resolve."""
+    from core.gdrn_modeling.models.GDRN_CAD import dataset_context
+    cfg = set_mode(read_config(), train, init)
+    try:
+        context = dataset_context(cfg)
+    except FileNotFoundError:
+        pytest.skip('EXP025 hierarchy artifact is not installed here')
+    assert context.hierarchy_path.name == 'consistent_v3.npz'
 
 
 @pytest.mark.parametrize('train,init', [(False, 'official_lmo'), (True, 'imagenet')])
