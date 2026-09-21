@@ -1,14 +1,14 @@
 # 当前研究状态
 
 最后核对：2026-09-21
-verified commit：`0ec5f9ad72777d37f47b4489e252ffb09cb68413`
+verified commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
 
 `EXP-20260920-025-hierarchical-cad-attention` — 在统一 T3=512 CAD attention 结构上比较
 两条 LM-O 主干策略。
 
-状态：`ACTIVE / FORMAL_NOT_STARTED`（formal 前置条件已满足）。
+状态：`ACTIVE / FORMAL_IN_PROGRESS`（两臂均已运行到 E15）。
 
 正式比较包含两个组合策略，不能解释为单一冻结消融：
 
@@ -20,19 +20,19 @@ verified commit：`0ec5f9ad72777d37f47b4489e252ffb09cb68413`
 两臂共享 LM-O PBR40、GT-box、seed42、真实 batch48、AdamW、40 epoch、E5–E40 固定评价点、
 AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=1.0`。
 
-已完成前置：
+已完成：
 
-- lab0 在 EGL 真实 batch48、scale 32768 上 PASS；0 skipped step、四级 Image-SA 90/90
-  参数更新、checkpoint 往返一致。
-- lab1 已在最终 backbone/head 均为 3e-4 的配置上重跑同一 gate 并 PASS，证据来自
-  `exp025_server_gate_imagenet_full_a03.json`。
-- 65536 的历史 gate 在 Mask 头出现缩放后 fp16 非有限；共同正式初始 scale 固定为 32768。
-- `SOLVER.AMP.INIT_SCALE=32768` 与 `RESEARCH_PROTOCOL.FORMAL_READY=True` 已写入正式配置。
+- 前置 gate：lab0 与 lab1 分别在 EGL 真实 batch48、scale 32768 上 PASS（0 skipped step、
+  四级 Image-SA 90/90 参数更新、checkpoint 往返一致）；65536 的历史 gate 在 Mask 头
+  缩放后 fp16 非有限，两臂共同正式初始 scale 固定为 32768。
+- 两臂 formal 已于 2026-09-20 从同一 release（`b9bddcc`）启动，run 分别为 lab0
+  `RUN-20260920-120844-formal-s42-a01`、lab1 `RUN-20260920-120843-formal-s42-a01`。
+- 六个预定评价点（两臂各 E5/E10/E15）的指标已记录，见 EXP025 RECORD；E20–E40 未生成。
 
 当前唯一下一步：
 
-- 从同一 clean source release 启动 lab0 `official_frozen` 与 lab1 `imagenet_full` 的 40 epoch
-  formal；按 E5/E10/E15/E20/E25/E30/E35/E40 记录全部预定指标，不按中间结果选模。
+- 等两臂 E20/E25/E30/E35/E40 完成并按预定评价点逐点记录；不按中间结果选模、不改协议、
+  不追加 seed。
 
 ## Next stage
 
