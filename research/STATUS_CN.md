@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-20
+最后核对：2026-09-21
 verified commit：`0ec5f9ad72777d37f47b4489e252ffb09cb68413`
 
 ## Active experiment
@@ -35,6 +35,9 @@ AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=
   formal；按 E5/E10/E15/E20/E25/E30/E35/E40 记录全部预定指标，不按中间结果选模。
 
 ## Next stage
+
+EXP026 已完成独立三层 GA-HFPS 本地离线比较；λ1 可作为 EXP025 formal 完成后
+`official_frozen` matched 训练的候选，但尚无训练或姿态精度证据，详见其 RECORD。
 
 LM13 已完成 ImageNet ConvNeXt 全量训练配置、hierarchy 和本地 CPU/CUDA smoke；服务器
 profile 仍禁用，LM-O 完成前不启动。

@@ -21,7 +21,7 @@ report = hierarchy_sanity(levels, h.object_ids.tolist())
 层级从 1 开始，支持完整固定分支树；T0 不存入 artifact。`h.depth`、
 `h.branch_factor`、`h.level_counts` 从数组推导，若 NPZ 已声明这些 metadata 则交叉核对。
 loader 保留 dtype、已有 metadata 与可选 `source_leaf_indices`，不改写文件，也不要求
-旧文件新增 schema。新 schema/builder 的设计与新版 artifact 生成留给后续实验。
+旧文件新增 schema。EXP026 的独立三层 builder 见下；旧 artifact 契约保持不变。
 
 `dataset_key` 在显式指定时必须一致；缺失 metadata 默认拒绝，历史适配器可显式使用
 `allow_missing_dataset=True`。该选项不允许实际存储的数据集名称不匹配。
@@ -49,3 +49,10 @@ surface_representation 与 residual_stats。sanity 检查所有相邻层的父�
 测试：激活 Conda `pytorch22` 后运行 `python -m pytest -q research/cad_hierarchy/tests`。
 合成测试无需数据集；EXP025 真实 artifact 回归在本地文件缺失时 skip。生产公共模块
 不依赖历史实验包。
+
+EXP026 的独立三层 `8/64/512` 几何自适应构造使用
+`python -m research.cad_hierarchy.build_geometry_adaptive --config <EXP025 LMO config> --output-dir <new local directory>`；
+它同时生成同采样点的 λ=0/1/2 三个 NPZ，且拒绝覆盖既有目录。离线比较使用
+`python -m research.cad_hierarchy.compare_geometry_adaptive --config <same config> --artifact-dir <directory> --old-artifact <locked EXP025 NPZ>`。
+新 builder 不修改旧 `build_consistent.py`、EXP025 artifact 或 head；完整协议和结果只见
+[EXP026 RECORD](../experiments/EXP-20260921-026-geometry-adaptive-hfps/RECORD.md)。
