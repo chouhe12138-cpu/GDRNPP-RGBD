@@ -30,6 +30,8 @@
   使用同一 forward，不读取 GT id。
 - residual 经 `tanh` 限制后按 T3 anchor/radius 解码，SmoothL1 beta=.1、权重1；可见 mask
   使用 BCE、权重1。
+- 运行中的 EXP025 formal 仍采用历史 GT-route residual target；后续 EXP026 才显式切换到
+  predicted-route target，不回改 EXP025 已冻结的训练协议。
 - 推理以 `argmax(T3 logits)` 选择 leaf，不使用 marginal argmax、hard routing、beam 或
   teacher forcing。
 

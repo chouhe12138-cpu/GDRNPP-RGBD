@@ -29,6 +29,9 @@
 ## 轻量实验记录
 
 - 一个科学问题使用唯一 `experiment_id`，一次执行使用唯一 `run_id`。
+- 临时诊断、checkpoint audit、oracle、fixed-batch、smoke 和可视化默认归属母实验的
+  `diagnostics/` 或 `evidence/`；仅用户明确指定或研究计划预注册独立问题/干预/评价协议时
+  才新建 EXP 编号。诊断不自动改变正在运行的 formal 协议。
 - 每个实验目录只维护一份叙述性 `RECORD.md`；实验导航维护在
   `research/EXPERIMENT_INDEX.md`，当前进展和唯一下一步只维护在
   `research/STATUS_CN.md`。README、RUNBOOK、INDEX 和 RECORD 不复制当前状态段落。

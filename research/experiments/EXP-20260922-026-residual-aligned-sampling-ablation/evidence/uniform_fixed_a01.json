@@ -1,0 +1,105 @@
+{
+  "status": "PASS",
+  "mode": "fixed",
+  "arm": "uniform_full",
+  "hierarchy_sha256": "35287beb3dc67b5f3cd376cc445f7727857aefa888dd11d639ab65b9193235c1",
+  "config": "configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_uniform_full.py",
+  "source_batch": "output/diagnostics/exp026_shared_batch_20260922_a01.pth",
+  "batch_size": 1,
+  "steps": 100,
+  "amp_init_scale": 16384.0,
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 10787652
+    },
+    {
+      "name": "backbone",
+      "lr": 0.0003,
+      "parameters": 87564416
+    }
+  ],
+  "route_gradient": true,
+  "residual_gradient": true,
+  "checkpoint_roundtrip": "covered_by_matched_smoke",
+  "history": [
+    {
+      "step": 0,
+      "route_loss": 12.84410285949707,
+      "residual_loss": 0.29242536425590515,
+      "representable": 0.010612244717776775,
+      "residual_valid_points": 13,
+      "anchor_error_mm": 65.54057312011719,
+      "full_error_mm": 65.54056549072266,
+      "residual_gain_mm": 7.62939453125e-06,
+      "residual_norm_max": 0.0,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 20,
+      "amp_scale": 16384.0,
+      "route_loss": 4.8450822830200195,
+      "residual_loss": 0.24818377196788788,
+      "representable": 0.49714285135269165,
+      "residual_valid_points": 609,
+      "anchor_error_mm": 10.766377449035645,
+      "full_error_mm": 10.636272430419922,
+      "residual_gain_mm": 0.13010501861572266,
+      "residual_norm_max": 0.3185160160064697,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 40,
+      "amp_scale": 16384.0,
+      "route_loss": 2.166884422302246,
+      "residual_loss": 0.22060203552246094,
+      "representable": 0.7828571200370789,
+      "residual_valid_points": 959,
+      "anchor_error_mm": 6.633087635040283,
+      "full_error_mm": 6.391294956207275,
+      "residual_gain_mm": 0.2417926788330078,
+      "residual_norm_max": 0.28449752926826477,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 60,
+      "amp_scale": 16384.0,
+      "route_loss": 1.2690317630767822,
+      "residual_loss": 0.20637796819210052,
+      "representable": 0.8816326260566711,
+      "residual_valid_points": 1080,
+      "anchor_error_mm": 5.551792621612549,
+      "full_error_mm": 5.3036603927612305,
+      "residual_gain_mm": 0.24813222885131836,
+      "residual_norm_max": 0.28109052777290344,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 80,
+      "amp_scale": 16384.0,
+      "route_loss": 0.7913687229156494,
+      "residual_loss": 0.1913243681192398,
+      "representable": 0.9510204195976257,
+      "residual_valid_points": 1165,
+      "anchor_error_mm": 4.965821266174316,
+      "full_error_mm": 4.554043292999268,
+      "residual_gain_mm": 0.41177797317504883,
+      "residual_norm_max": 0.3584754168987274,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 100,
+      "amp_scale": 16384.0,
+      "route_loss": 0.7012693285942078,
+      "residual_loss": 0.18565064668655396,
+      "representable": 0.9608163237571716,
+      "residual_valid_points": 1177,
+      "anchor_error_mm": 4.8907928466796875,
+      "full_error_mm": 4.380003929138184,
+      "residual_gain_mm": 0.5107889175415039,
+      "residual_norm_max": 0.4636857211589813,
+      "residual_saturated_fraction": 0.0
+    }
+  ]
+}

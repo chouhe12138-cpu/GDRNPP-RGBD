@@ -5,11 +5,11 @@
 使用独立 worktree 恢复。
 LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，保持 server-disabled，
 待 LM-O 完成后再独立开放。
+临时诊断归属母实验，不自动占用 EXP 编号。
 
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
-| EXP027 Full E15 checkpoint 诊断 | DIAGNOSTIC_COMPLETE | 保持预测 T3 route 的 oracle 残差在 122 ROI 上将 ADD(-S)0.1d 成功从 57 提至 105；主瓶颈指向 residual/精细 XYZ 解码，非 E40 正式结论 | [RECORD](experiments/EXP-20260922-027-exp025-e15-full-diagnostic/RECORD.md) |
-| EXP026 GA-HFPS 三层采样 | LOCAL_OFFLINE_COMPLETE / TRAINING_NOT_STARTED | 三层 λ1 离线工程 gate 通过；复杂区域改善但平滑区域及物体 12 连通性有代价，仅建议后续 matched 训练验证 | [RECORD](experiments/EXP-20260921-026-geometry-adaptive-hfps/RECORD.md) |
+| EXP026 Residual-Aligned Full Sampling Ablation | LOCAL_FORMAL_READY / SERVER_BLOCKED | 两臂同为预测路由残差 + ImageNet Full，仅比较三层 uniform 与 GA-HFPS λ1；本地 gate 通过，尚无正式训练姿态结果 | [RECORD](experiments/EXP-20260922-026-residual-aligned-sampling-ablation/RECORD.md) |
 | EXP025 统一 T3 CAD attention | ACTIVE / FORMAL_IN_PROGRESS | Frozen 已评估到 E20、Full 已评估到 E25；其余固定点未交付 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |

@@ -1,9 +1,40 @@
-# EXP026 — 三层几何自适应 CAD 采样（GA-HFPS）
+# EXP026 — Residual-Aligned Full Sampling Ablation
+
+## 新阶段协议（`LOCAL_FORMAL_READY / SERVER_BLOCKED`）
+
+- experiment ID：`EXP-20260922-026-residual-aligned-sampling-ablation`。
+- 问题：在两臂都修复 predicted-route residual 监督、同为 ImageNet ConvNeXt Full training 的条件下，三层 GA-HFPS λ1 相对三层 uniform_512 对 correspondence 与 LM-O 6D pose 有何影响？
+- 两臂唯一变量为 hierarchy artifact：`uniform_full` 使用下表 `uniform_512`，`adaptive_l1_full` 使用下表 `adaptive_512_l1`。旧 λ2 只留作离线设计证据，不进入 formal。
+- 两臂共同使用 LM-O PBR40、GT box、seed42、真实 batch48、AdamW 3e-4（backbone/head 同 LR）、weight decay .01、40 epoch、4% linear warmup + cosine、AMP 初始 scale **16384**、E5/E10/E15/E20/E25/E30/E35/E40 固定评价、RANSAC-PnP；均从同一 ImageNet backbone 初始化重新训练，不从 EXP025 权重续训，也不选 best checkpoint。16384 是下述本地数值 gate 后两臂共同修订的初值，未来仍须服务器真实 batch48 重新 gate。
+- 正式输出预定保留每个固定点的 BOP AR、ADD(-S)0.1d、AR_reS、AR_teS，及 predicted-cell representability、anchor/full XYZ error、residual gain。**不预设采样优胜门槛；最终研究判断由用户结合完整证据决定。**
+- 配置位于 `configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/`。EXP025 两臂全部固定点评价入档、EXP026 本地 gate PASS、用户另行明确放行，三者缺一不可。当前不生成 release、不执行服务器 gate/训练。
+- 新 residual target 以 detached 预测 T3 argmax 的 anchor/radius 计算；GT route NLL 和历史 symmetry branch score 不变。仅可见且预测球可达的点参与 residual loss；默认无 warmup。
+
+## 本地验证（Observed，2026-09-22）
+
+- 本地准备代码基于 `8fb92422179f7aaa41cae5caa9fd919dc90ade3a` 的未提交工作树；本节不是可凭该 commit 单独复现的正式 run。本次未启动服务器、未提交或 push。
+- 两份原始 NPZ 的 SHA 分别为 `35287beb3dc67b5f3cd376cc445f7727857aefa888dd11d639ab65b9193235c1`、`7ac75daa756ed7ae59463614737ccc46cd746173452cd1943a4a024d0817c631`；object IDs `1/5/6/8/9/10/11/12`，mode=`geometry_adaptive`、version=1、depth=3、counts=8/64/512、variant/λ 与配置一致，`hierarchy_sanity` 两臂 PASS。EXP025 仍由旧 SHA gate 锁定。
+- 两臂 resolved config 差异只在 arm、output 和 hierarchy path/SHA/variant/λ；ImageNet Full、head/backbone LR `3e-4`、batch48、seed42、调度、mask、PnP、评价点、predicted-route residual mode 相同。CPU 构造、forward/loss/backward、残差梯度、ImageNet 权重 340 tensors 精确装载、strict state_dict 往返均 PASS。
+- `pytorch22` 回归测试（EXP026、EXP025、hierarchy、launcher/run contract/active config）`94 passed`；额外公共研究与 EXP025 checkpoint 诊断测试 `43 passed, 4 skipped`（部分测试与前组重叠）。`bash -n`、Python compile、`git diff --check` PASS。旧 EXP025 `official_frozen` CPU preflight 在当前代码下仍 PASS，旧 hierarchy SHA `02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373` 未放宽。
+- 同一固定 LM-O PBR object 11（ROI class 6，1225 个可见像素）和本地 RTX 4060，batch1、CPP 生成目标。`uniform` 的 32768 8-step smoke PASS；`adaptive` 的 32768 run `exp026_adaptive_smoke_20260922_a01` 在第 4 步出现 `backbone.stages_0.blocks.0.conv_dw.bias` 非有限梯度，**不进入通过证据**，失败摘要见 [failure](evidence/adaptive_smoke_a01_failure.json)。因此两臂共同采用初始 scale 16384；两臂重新跑的 8-step AMP smoke 均无 skip/非有限梯度，backbone、classifier、residual predictor 更新和 model/optimizer/scaler checkpoint 往返 PASS，见 [uniform](evidence/uniform_smoke_a02.json) 与 [adaptive](evidence/adaptive_smoke_a02.json)。16384 只经本地 batch1 gate，不能替代未来服务器 batch48 gate。
+- 同一批次、相同 seed42 初始权重、共同 scale16384、无 warmup、各 100 步 fixed-batch：结果如下。对象 11 有对称分支；XYZ 误差选与锚点最近的同一等价分支评估，两臂口径一致，仅用于工程可学习性，不是 BOP 姿态结果。原始步进记录见 [uniform](evidence/uniform_fixed_a01.json) 与 [adaptive](evidence/adaptive_fixed_a01.json)。
+
+| arm | route loss 0→100 | predicted-cell 可达率 0→100 | residual 有效像素 0→100 | anchor/full XYZ@100 (mm) | residual gain@100 (mm) |
+|---|---:|---:|---:|---:|---:|
+| uniform | 12.844→0.701 | 1.06%→96.08% | 13→1177 | 4.891 / 4.380 | +0.511 |
+| adaptive λ1 | 12.696→0.456 | 0%→98.29% | 0→1204 | 4.789 / 4.245 | +0.545 |
+
+- adaptive 在 step0 无 residual 有效点，但 step1 有 21、step20 有 492、step100 有 1204；持续有效监督已建立，因此没有理由加入 warmup。两臂最后三个记录点都有正 residual gain，预测残差无近饱和像素，classifier 与 residual predictor 梯度/更新存在。此单批次不能比较两种 sampling 的泛化或正式精度，也不能把 adaptive 的小幅数值差当作胜出。
+- 本地 gate：编号/证据迁移、单元测试、artifact identity、配置匹配、CPU、CUDA、fixed-batch 均 PASS；正式服务器仍由 `SERVER_RELEASE_ALLOWED=False` 和 `FORMAL_READY=False` 双重阻断。仅在 EXP025 全部预定固定点完成且用户明确放行后，才生成新 release 并分别运行真实 batch48 server gate。用户未预设采样优胜门槛。
+
+## Preliminary offline sampling evidence（原 EXP026）
+
+以下为 2026-09-21 离线设计阶段的原始记录与当时决策，保留 run、源码和 artifact 溯源；当时建议的 `official_frozen` 后续方案已由上方新的两臂 Full 协议取代，不作为当前执行指令。
 
 ## Status / research question
 
 - lifecycle：`LOCAL_OFFLINE_COMPLETE`；server training：`NOT_STARTED`
-- experiment ID：`EXP-20260921-026-geometry-adaptive-hfps`
+- 当时记录的 experiment ID：`EXP-20260921-026-geometry-adaptive-hfps`（历史离线 run 身份；当前 EXP026 ID 见上）。
 - canonical local run ID：`RUN-20260921-ga-hfps-s20260919-a01`
 - source commit：`d9b4ab95d431a40284036490e7a4911357a6ae61`。本地 artifact 在该提交前、同一份实现代码上生成；提交仅固化源码与测试，未改变算法或产物。本地诊断不是正式训练。
 - 问题：在固定 T1/T2/T3=8/64/512、相同表面采样和最近 child route 下，按局部几何复杂度加权 FPS 能否改善 T3 复杂区域锚点覆盖？同时隔离旧 T4→T3 radius 回传的影响。

@@ -55,4 +55,4 @@ EXP026 的独立三层 `8/64/512` 几何自适应构造使用
 它同时生成同采样点的 λ=0/1/2 三个 NPZ，且拒绝覆盖既有目录。离线比较使用
 `python -m research.cad_hierarchy.compare_geometry_adaptive --config <same config> --artifact-dir <directory> --old-artifact <locked EXP025 NPZ>`。
 新 builder 不修改旧 `build_consistent.py`、EXP025 artifact 或 head；完整协议和结果只见
-[EXP026 RECORD](../experiments/EXP-20260921-026-geometry-adaptive-hfps/RECORD.md)。
+[EXP026 RECORD](../experiments/EXP-20260922-026-residual-aligned-sampling-ablation/RECORD.md)。

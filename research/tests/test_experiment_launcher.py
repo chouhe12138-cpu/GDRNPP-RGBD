@@ -15,7 +15,7 @@ def shell(body, check=True):
     return result
 
 
-def test_launcher_is_valid_shell_and_exp025_only():
+def test_launcher_is_valid_shell_and_retired_protocols_stay_disabled():
     subprocess.run(['bash', '-n', str(LAUNCHER)], check=True)
     source = LAUNCHER.read_text()
     assert 'exp025_lmo)' in source
@@ -24,12 +24,31 @@ def test_launcher_is_valid_shell_and_exp025_only():
     assert 'datasets/lm_imgn' not in source
 
 
-def test_profile_mapping_accepts_only_exp025():
+def test_profile_mapping_accepts_exp025_and_rejects_unknown_protocols():
     ok = shell("container_config_value() { echo exp025_lmo; }\nresolve_resource_profile train.py")
     assert ok.stdout.strip() == 'exp025_lmo'
     for value in ('', 'legacy_lmo', 'lm13_gdrn', 'exp025_lm13', 'typo'):
         bad = shell(f"container_config_value() {{ echo {value!r}; }}\nresolve_resource_profile train.py", False)
         assert bad.returncode != 0 and 'unknown TRAIN_PROTOCOL.NAME' in bad.stderr
+
+
+def test_exp026_server_profile_is_explicitly_blocked_until_release():
+    blocked = shell('''container_config_value() {
+  case "$2" in
+    TRAIN_PROTOCOL.NAME) echo exp026_lmo ;;
+    RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED) echo False ;;
+  esac
+}
+resolve_resource_profile train.py''', False)
+    assert blocked.returncode != 0 and 'EXP026 SERVER_BLOCKED' in blocked.stderr
+    released = shell('''container_config_value() {
+  case "$2" in
+    TRAIN_PROTOCOL.NAME) echo exp026_lmo ;;
+    RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED) echo True ;;
+  esac
+}
+resolve_resource_profile train.py''')
+    assert released.stdout.strip() == 'exp026_lmo'
 
 
 @pytest.mark.parametrize('arm,machine,initialization', [

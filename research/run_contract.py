@@ -40,6 +40,11 @@ def validate_research_run_config(
             f"launcher={expected_experiment_id!r}"
         )
 
+    protocol_name = str(cfg.get('TRAIN_PROTOCOL', {}).get('NAME', ''))
+    if protocol_name == 'exp026_lmo' and mode != 'prepare' \
+            and not bool(cfg.get('RESEARCH_PROTOCOL', {}).get('SERVER_RELEASE_ALLOWED', False)):
+        raise ValueError('EXP026 SERVER_BLOCKED: release not authorized')
+
     training_supervision = geometry_supervision_enabled(cfg)
     evaluation_renderer = _evaluation_renderer(cfg)
 
@@ -86,7 +91,6 @@ def validate_research_run_config(
                 raise ValueError("Evaluation period exceeds total epochs")
             if str(cfg.TEST.TEST_BBOX_TYPE).lower() != "gt" or evaluation_renderer is None:
                 raise ValueError("Formal protocol requires GT box and evaluation renderer")
-            protocol_name = str(cfg.get("TRAIN_PROTOCOL", {}).get("NAME", ""))
             if protocol_name == "exp025_lmo":
                 expected = {
                     "SEED": 42,
@@ -118,6 +122,26 @@ def validate_research_run_config(
                 arm = str(cfg.get("EXP025_ARM", ""))
                 if arm not in {"official_frozen", "imagenet_full"}:
                     raise ValueError(f"Unknown EXP025 arm: {arm}")
+            elif protocol_name == 'exp026_lmo':
+                actual = (int(cfg.SEED), int(cfg.SOLVER.TOTAL_EPOCHS),
+                          int(cfg.SOLVER.IMS_PER_BATCH), int(cfg.SOLVER.REFERENCE_BS),
+                          int(cfg.SOLVER.CHECKPOINT_PERIOD), int(cfg.TEST.EVAL_PERIOD))
+                if actual != (42, 40, 48, 48, 5, 5):
+                    raise ValueError(f'EXP026 formal protocol mismatch: {actual}')
+                if tuple(cfg.DATASETS.TRAIN) != ('lmo_pbr_train',) or tuple(cfg.DATASETS.TEST) != ('lmo_bop_test',):
+                    raise ValueError('EXP026 formal requires LM-O PBR40 and BOP test')
+                if str(cfg.MODEL.POSE_NET.XYZ_RENDERER).lower() != 'egl' or evaluation_renderer != 'cpp':
+                    raise ValueError('EXP026 formal requires EGL training and CPP evaluation')
+                if str(cfg.TEST.TEST_BBOX_TYPE).lower() != 'gt' or not bool(cfg.SOLVER.CHECKPOINT_BY_EPOCH):
+                    raise ValueError('EXP026 formal requires GT boxes and epoch checkpoints')
+                if (cfg.BACKBONE_INIT, bool(cfg.TRAIN_BACKBONE), float(cfg.BACKBONE_LR_MULT)) != ('imagenet', True, 1.):
+                    raise ValueError('EXP026 formal requires ImageNet Full training')
+                if cfg.MODEL.WEIGHTS or cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.INIT_CFG.residual_target_mode != 'predicted_route':
+                    raise ValueError('EXP026 formal requires fresh predicted-route residual training')
+                if str(cfg.EXP026_ARM) not in ('uniform_full', 'adaptive_l1_full'):
+                    raise ValueError(f'Unknown EXP026 arm: {cfg.EXP026_ARM}')
+                if float(cfg.SOLVER.AMP.get('INIT_SCALE', 0)) != 16384:
+                    raise ValueError('EXP026 formal requires locally gated AMP initial scale 16384')
             elif protocol_name == "exp025_lm13":
                 expected = {
                     "SEED": 42,

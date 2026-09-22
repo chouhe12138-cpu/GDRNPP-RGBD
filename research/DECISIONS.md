@@ -6,3 +6,4 @@
 - Git 只保存代码、有效配置、RECORD 和紧凑证据；数据、权重、完整日志和缓存外置。
 - 服务器只运行本地提交生成的只读 release；正式训练期间不修改 checkout 或镜像。
 - 正式模型只按预定评价点判断，不事后改变 gate，不自动多 seed 或按中间结果选模。
+- 临时诊断、debug、checkpoint audit、oracle、fixed-batch、smoke、可视化和机制排查默认归属母实验的 `diagnostics/` 或 `evidence/`，不自动分配新 EXP 编号。仅用户明确指定或研究计划预注册为独立研究问题、干预与评价协议时创建新 `EXP###`；诊断可影响下一阶段设计，但不自动改变运行中的 formal 协议。

@@ -217,8 +217,14 @@ build_eval_command() {
 }
 
 build_gate_command() {
-    local config="$1" run_container="$2" scale="$3"
-    printf 'python -m research.exp025.real_smoke --config %q --output %q --renderer egl --batch-size 48 --steps 8 --amp-scale %q' \
+    local config="$1" run_container="$2" scale="$3" profile="${4:-exp025_lmo}" module
+    case "${profile}" in
+        exp025_lmo) module=research.exp025.real_smoke ;;
+        exp026_lmo) module=research.exp026.local_validation ;;
+        *) fail "unknown gate profile: ${profile}" ;;
+    esac
+    printf 'python -m %q --config %q --output %q --renderer egl --batch-size 48 --steps 8 --amp-scale %q' \
+        "${module}" \
         "${config}" "${run_container}/gate" "${scale}"
 }
 
@@ -317,20 +323,27 @@ from mmcv import Config
 value = Config.fromfile(sys.argv[1])
 for part in sys.argv[2].split("."):
     value = value.get(part, {}) if hasattr(value, "get") else {}
-print(value if isinstance(value, str) else "")
+print(value if isinstance(value, (str, bool)) else "")
 ' "/workspace/gdrnpp/${config}" "${key}"
 }
 
-# The active launcher accepts only EXP025. Historical protocols are recovered
-# from their recorded source commit, not run against the current core.
+# Historical protocols are recovered from their recorded source commit. EXP026
+# remains explicitly blocked until a later authorized release flips its gate.
 resolve_resource_profile() {
-    local config="$1" name
+    local config="$1" name allowed
     name="$(container_config_value "${config}" TRAIN_PROTOCOL.NAME)" || \
         fail "cannot read TRAIN_PROTOCOL from container config: ${config}"
     # Keep only the last line so import warnings cannot alter profile selection.
     name="${name##*$'\n'}"
     case "${name}" in
         exp025_lmo) printf 'exp025_lmo\n' ;;
+        exp026_lmo)
+            allowed="$(container_config_value "${config}" RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED)" || \
+                fail "cannot read EXP026 release gate"
+            allowed="${allowed##*$'\n'}"
+            [[ "${allowed}" == "True" ]] || fail "EXP026 SERVER_BLOCKED: release not authorized"
+            printf 'exp026_lmo\n'
+            ;;
         *) fail "unknown TRAIN_PROTOCOL.NAME: ${name} (config ${config})" ;;
     esac
 }
@@ -379,10 +392,37 @@ require_exp025_resources() {
     "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp "${container}" python -m research.exp025.preflight --config "/workspace/gdrnpp/${config}" || fail "EXP025 preflight failed"
 }
 
+require_exp026_resources() {
+    local config="$1" arm hierarchy expected_machine
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lm/train_pbr -d
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lmo/test -d
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/models_info.json -r
+    require_voc_data
+    require_convnext_weights
+    arm="$(container_config_value "${config}" EXP026_ARM)" || fail "cannot read EXP026 arm"
+    arm="${arm##*$'\n'}"
+    case "${arm}" in
+        uniform_full) expected_machine=lab0 ;;
+        adaptive_l1_full) expected_machine=lab1 ;;
+        *) fail "unknown EXP026_ARM: ${arm}" ;;
+    esac
+    [[ "${machine}" == "${expected_machine}" ]] || \
+        fail "EXP026 arm ${arm} must run on ${expected_machine}, got ${machine}"
+    hierarchy="$(container_config_value "${config}" MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)" || \
+        fail "cannot read EXP026 hierarchy"
+    hierarchy="${hierarchy##*$'\n'}"
+    [[ -n "${hierarchy}" ]] || fail "empty EXP026 hierarchy path"
+    require_container_path "${hierarchy}" -f
+    "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp \
+        "${container}" python -m research.exp026.preflight --config "/workspace/gdrnpp/${config}" || \
+        fail "EXP026 preflight failed"
+}
+
 require_profile_resources() {
     local profile="$1" config="$2"
     case "${profile}" in
         exp025_lmo) require_exp025_resources "${config}" ;;
+        exp026_lmo) require_exp026_resources "${config}" ;;
         *) fail "unknown resource profile: ${profile}" ;;
     esac
     printf 'RESOURCE_PROFILE %s\n' "${profile}"
@@ -507,7 +547,7 @@ launch() {
     if [[ "${mode}" == "eval" ]]; then
         command="$(build_eval_command "${config}" "${checkpoint_container}" "${run_container}")"
     elif [[ "${mode}" == "gate" ]]; then
-        command="$(build_gate_command "${config}" "${run_container}" "${gate_scale}")"
+        command="$(build_gate_command "${config}" "${run_container}" "${gate_scale}" "$(resolve_resource_profile "${config}")")"
     else
         command="$(build_train_command "${config}" "${run_container}")"
     fi

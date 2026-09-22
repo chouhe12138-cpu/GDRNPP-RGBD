@@ -98,14 +98,17 @@ class HierarchicalCADAttentionHead(nn.Module):
     def __init__(self, hierarchy_path, token_dim=256, num_heads=8,
                  expected_object_ids=None, dataset_key='lmo', route_weight=1.,
                  residual_weight=1., mask_weight=1., residual_beta=.1,
-                 residual_context_dim=64, residual_detach_route=True):
+                 residual_context_dim=64, residual_detach_route=True,
+                 residual_target_mode='gt_route'):
         super().__init__()
         hierarchy = load_cad_hierarchy(hierarchy_path, expected_object_ids=expected_object_ids,
                                        dataset_key=dataset_key)
-        if hierarchy.metadata.get('mode') != 'consistent' or hierarchy.metadata.get('generator_version') != 3:
-            raise ValueError('EXP025 requires consistent_v3')
-        if hierarchy.level_counts[:3] != (8, 64, 512) or int(hierarchy.symmetry_counts.max()) > 2:
-            raise ValueError('EXP025 requires T1/T2/T3=8/64/512 and at most two symmetries')
+        if hierarchy.depth < 3 or hierarchy.level_counts[:3] != (8, 64, 512) \
+                or int(hierarchy.symmetry_counts.max()) > 2:
+            raise ValueError('CAD head requires T1/T2/T3=8/64/512 and at most two symmetries')
+        if residual_target_mode not in ('gt_route', 'predicted_route'):
+            raise ValueError(f'Unknown residual target mode: {residual_target_mode}')
+        self.residual_target_mode = residual_target_mode
         self.num_objects = len(hierarchy.object_ids)
         for name in ('object_ids', 'extents', 'diameters', 'symmetry_counts', 'symmetry_transforms'):
             self.register_buffer(name, getattr(hierarchy, name), persistent=False)
@@ -196,10 +199,11 @@ class HierarchicalCADAttentionHead(nn.Module):
         return (xyz / self.extents[classes, None] + .5).transpose(1, 2).reshape(len(classes), 3, *shape[-2:])
 
     @torch.no_grad()
-    def targets(self, xyz_norm, mask, classes, branch):
+    def targets(self, xyz_norm, mask, classes, branch, return_points=False):
         # Geometry and symmetry transforms must not inherit training AMP.
         with torch.autocast(device_type=xyz_norm.device.type, enabled=False):
-            return self._targets_fp32(xyz_norm, mask, classes, branch)
+            result = self._targets_fp32(xyz_norm, mask, classes, branch)
+            return result if return_points else result[:3]
 
     def _targets_fp32(self, xyz_norm, mask, classes, branch):
         xyz = xyz_norm.float().flatten(2).transpose(1, 2)
@@ -212,7 +216,7 @@ class HierarchicalCADAttentionHead(nn.Module):
         anchor = self.level3_anchors[classes[:, None], path[2]]
         radius = self.level3_radii[classes[:, None], path[2]]
         target = (points - anchor) / radius[..., None]
-        return path, target, valid
+        return path, target, valid, points
 
     def loss(self, prediction, classes, xyz_norm, mask, route_weight=None, return_targets=False):
         if mask.ndim == 3:
@@ -225,20 +229,37 @@ class HierarchicalCADAttentionHead(nn.Module):
         for branch in range(self.symmetry_transforms.shape[1]):
             if branch >= 2:
                 break
-            path, target, valid = self.targets(xyz_norm, mask, classes, branch)
+            path, target, valid, points = self.targets(
+                xyz_norm, mask, classes, branch, return_points=True)
             levels = [masked_mean(F.nll_loss(lp.flatten(2), ids, reduction='none'), valid)
                       for lp, ids in zip(log_probs, path)]
             res = masked_mean(F.smooth_l1_loss(residual, target, beta=self.residual_beta,
                                               reduction='none').mean(-1), valid)
             per_branch.append(torch.stack((*levels, res), -1))
-            targets.append((path, target, valid))
+            targets.append((path, target, valid, points))
         values = torch.stack(per_branch, 1)
         scores = route_weight * values[:, :, :3].sum(-1) + self.residual_weight * values[:, :, 3]
         allowed = torch.arange(values.shape[1], device=classes.device)[None] < self.symmetry_counts[classes, None]
         branch = scores.detach().masked_fill(~allowed, float('inf')).argmin(1)
         selected = values[torch.arange(len(classes), device=classes.device), branch]
         losses = {f'loss_cad_t{d+1}': selected[:, d].mean() * route_weight for d in range(3)}
-        losses['loss_cad_residual'] = selected[:, 3].mean() * self.residual_weight
+        if self.residual_target_mode == 'predicted_route':
+            # Branch choice retains the historical GT-route score above. Only the
+            # optimization target changes, in exactly the cell used by decode().
+            predicted_ids = prediction['t3_logits'].detach().argmax(1).flatten(1)
+            selected_points = torch.stack([item[3] for item in targets], 1)[
+                torch.arange(len(classes), device=classes.device), branch]
+            anchor = self.level3_anchors[classes[:, None], predicted_ids].float()
+            radius = self.level3_radii[classes[:, None], predicted_ids].float()
+            aligned_target = (selected_points - anchor) / radius[..., None]
+            representable = torch.isfinite(aligned_target).all(-1) & (aligned_target.norm(dim=-1) <= 1.)
+            residual_valid = targets[0][2] & representable
+            aligned_loss = masked_mean(F.smooth_l1_loss(
+                residual.float(), aligned_target, beta=self.residual_beta,
+                reduction='none').mean(-1), residual_valid)
+            losses['loss_cad_residual'] = aligned_loss.mean() * self.residual_weight
+        else:
+            losses['loss_cad_residual'] = selected[:, 3].mean() * self.residual_weight
         losses['loss_cad_mask'] = F.binary_cross_entropy_with_logits(prediction['mask_logit'].float(), mask.float()) * self.mask_weight
         valid = targets[0][2]
         norms = torch.stack([t[1].norm(dim=-1) for t in targets], 1)
@@ -246,6 +267,16 @@ class HierarchicalCADAttentionHead(nn.Module):
         stats = dict(cad_route_sum=selected[:, :3].sum(-1).mean().detach(),
                      cad_symmetry_branch=branch.float().mean(), cad_valid_points=valid.sum().float(),
                      cad_target_outside=masked_mean((chosen_norms > 1).float(), valid).mean())
+        if self.residual_target_mode == 'predicted_route':
+            gt_ids = torch.stack([item[0][2] for item in targets], 1)[
+                torch.arange(len(classes), device=classes.device), branch]
+            stats.update(cad_pred_route_representable=masked_mean(
+                             representable.float(), valid).mean().detach(),
+                         cad_pred_route_residual_valid_points=residual_valid.sum().float().detach(),
+                         cad_pred_route_residual_norm=masked_mean(
+                             aligned_target.norm(dim=-1), residual_valid).mean().detach(),
+                         cad_gt_route_equals_pred_route=masked_mean(
+                             (gt_ids == predicted_ids).float(), valid).mean().detach())
         if return_targets:
             paths = torch.stack([t[0][2] for t in targets], 1)
             chosen_ids = paths[torch.arange(len(classes), device=classes.device), branch]

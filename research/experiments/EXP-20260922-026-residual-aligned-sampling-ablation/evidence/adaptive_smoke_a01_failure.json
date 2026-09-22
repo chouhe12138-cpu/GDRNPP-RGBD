@@ -1,0 +1,4 @@
+{
+  "status": "FAIL",
+  "error": "Non-finite gradient (AMP): ['backbone.stages_0.blocks.0.conv_dw.bias']"
+}

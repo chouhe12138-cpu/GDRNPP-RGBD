@@ -1,0 +1,105 @@
+{
+  "status": "PASS",
+  "mode": "fixed",
+  "arm": "adaptive_l1_full",
+  "hierarchy_sha256": "7ac75daa756ed7ae59463614737ccc46cd746173452cd1943a4a024d0817c631",
+  "config": "configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_adaptive_full.py",
+  "source_batch": "output/diagnostics/exp026_shared_batch_20260922_a01.pth",
+  "batch_size": 1,
+  "steps": 100,
+  "amp_init_scale": 16384.0,
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 10787652
+    },
+    {
+      "name": "backbone",
+      "lr": 0.0003,
+      "parameters": 87564416
+    }
+  ],
+  "route_gradient": true,
+  "residual_gradient": true,
+  "checkpoint_roundtrip": "covered_by_matched_smoke",
+  "history": [
+    {
+      "step": 0,
+      "route_loss": 12.696039199829102,
+      "residual_loss": 0.0,
+      "representable": 0.0,
+      "residual_valid_points": 0,
+      "anchor_error_mm": 75.602783203125,
+      "full_error_mm": 75.602783203125,
+      "residual_gain_mm": 0.0,
+      "residual_norm_max": 0.0,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 20,
+      "amp_scale": 16384.0,
+      "route_loss": 5.358351230621338,
+      "residual_loss": 0.253314346075058,
+      "representable": 0.4016326665878296,
+      "residual_valid_points": 492,
+      "anchor_error_mm": 13.23100471496582,
+      "full_error_mm": 13.142189979553223,
+      "residual_gain_mm": 0.08881473541259766,
+      "residual_norm_max": 0.22346992790699005,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 40,
+      "amp_scale": 16384.0,
+      "route_loss": 2.4011645317077637,
+      "residual_loss": 0.21826668083667755,
+      "representable": 0.7534694075584412,
+      "residual_valid_points": 923,
+      "anchor_error_mm": 7.10821008682251,
+      "full_error_mm": 6.987318992614746,
+      "residual_gain_mm": 0.12089109420776367,
+      "residual_norm_max": 0.2478928416967392,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 60,
+      "amp_scale": 16384.0,
+      "route_loss": 1.3571898937225342,
+      "residual_loss": 0.20180657505989075,
+      "representable": 0.8808163404464722,
+      "residual_valid_points": 1079,
+      "anchor_error_mm": 5.75071907043457,
+      "full_error_mm": 5.510775566101074,
+      "residual_gain_mm": 0.2399435043334961,
+      "residual_norm_max": 0.36313095688819885,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 80,
+      "amp_scale": 16384.0,
+      "route_loss": 0.8311055898666382,
+      "residual_loss": 0.18968188762664795,
+      "representable": 0.9428571462631226,
+      "residual_valid_points": 1155,
+      "anchor_error_mm": 5.143959045410156,
+      "full_error_mm": 4.779272556304932,
+      "residual_gain_mm": 0.3646864891052246,
+      "residual_norm_max": 0.47388872504234314,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 100,
+      "amp_scale": 16384.0,
+      "route_loss": 0.4564141631126404,
+      "residual_loss": 0.17382001876831055,
+      "representable": 0.9828571677207947,
+      "residual_valid_points": 1204,
+      "anchor_error_mm": 4.78936243057251,
+      "full_error_mm": 4.244724750518799,
+      "residual_gain_mm": 0.5446376800537109,
+      "residual_norm_max": 0.4944417178630829,
+      "residual_saturated_fraction": 0.0
+    }
+  ]
+}

@@ -37,12 +37,14 @@ AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=
 
 ## Next stage
 
-EXP027 已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route 的 oracle residual 显示
+EXP025 内部已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route 的 oracle residual 显示
 明显 headroom，ImageNet backbone reset 降低姿态表现；它是单 checkpoint 的机制证据，
-不改变 EXP025 formal 评价与选模协议，详见 EXP027 RECORD。
+不改变 EXP025 formal 评价与选模协议，详见 EXP025 内部诊断 RECORD。
 
-EXP026 已完成独立三层 GA-HFPS 本地离线比较；λ1 可作为 EXP025 formal 完成后
-`official_frozen` matched 训练的候选，但尚无训练或姿态精度证据，详见其 RECORD。
+EXP026 已保留三层 GA-HFPS 离线比较证据；共同修复 residual 的 ImageNet Full
+`uniform_512` vs `adaptive_512_l1` 两臂 matched 配置和本地 unit/CPU/CUDA/fixed-batch
+gate 已通过，状态 `LOCAL_FORMAL_READY / SERVER_BLOCKED`。本地 object-11 固定批次只证明
+可学习性，尚无正式训练或姿态精度证据；需等待 EXP025 完成并由用户另行放行，详见其 RECORD。
 
 LM13 已完成 ImageNet ConvNeXt 全量训练配置、hierarchy 和本地 CPU/CUDA smoke；服务器
 profile 仍禁用，LM-O 完成前不启动。

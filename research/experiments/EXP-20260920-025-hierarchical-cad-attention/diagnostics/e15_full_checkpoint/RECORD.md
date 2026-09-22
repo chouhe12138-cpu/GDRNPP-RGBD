@@ -1,8 +1,8 @@
-# EXP027 — EXP025 Full E15 checkpoint 主瓶颈诊断
+# EXP025 内部诊断 — Full E15 checkpoint 主瓶颈
 
 ## Identity / status
 
-- experiment ID：`EXP-20260922-027-exp025-e15-full-diagnostic`
+- 母实验 ID：`EXP-20260920-025-hierarchical-cad-attention`；不另占 EXP 编号。
 - run ID：`RUN-20260922-e15-full-s20260922-a03`；状态 `DIAGNOSTIC_COMPLETE`，不属于 EXP025 formal 评价点。
 - 诊断源码 commit：`b7606405ae05cb8319ed3fd94651fe2c79837bc9`；正式模型源码 commit：
   `b9bddccef2f12b4365e0e1e2e68222d733de572b`。

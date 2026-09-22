@@ -18,10 +18,17 @@ def dataset_context(cfg):
     # Explicit path extension; the shared resolver's legacy default is unchanged.
     context = resolve_dataset_context(
         cfg, hierarchy_path=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)
-    # Every EXP025 entry point resolves the dataset, so the artifact identity is checked
-    # here: nothing downstream can train or score against a different hierarchy.
-    from research.exp025.configuration import require_hierarchy
-    require_hierarchy(context.hierarchy_path, context.key)
+    protocol = str(cfg.TRAIN_PROTOCOL.NAME)
+    if protocol in ('exp025_lmo', 'exp025_lm13'):
+        # Keep the historical EXP025 identity gate, even if a caller injects a
+        # different contract into an old config.
+        from research.exp025.configuration import require_hierarchy
+        require_hierarchy(context.hierarchy_path, context.key)
+    elif protocol == 'exp026_lmo':
+        from research.exp026.configuration import require_arm_hierarchy
+        require_arm_hierarchy(cfg, context)
+    else:
+        raise ValueError(f'Unsupported CAD training protocol: {protocol}')
     return context
 
 
