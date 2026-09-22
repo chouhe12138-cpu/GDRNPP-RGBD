@@ -179,6 +179,8 @@ Full 的已交付 BOP/ADD/teS 最佳点在 E25、reS 在 E25。这些最佳点�
 
 ## Known gaps / boundaries
 
+- E15 Full 的本地 checkpoint 机制诊断另见 [EXP027](../EXP-20260922-027-exp025-e15-full-diagnostic/RECORD.md)；
+  其 122 ROI 的 oracle/ablation 不代替 EXP025 正式全量评分或最终组合策略比较。
 - 未交付：Frozen E25–E40、Full E30–E40 与最终 E40 评估；跨 seed 复验未开始。
 - 未确认：两臂在最后已交付评价点之后是否继续运行、以及两个 run 的 exit code。
 - 未运行：重构后结构的 route/residual fixed-batch 机制复验；重构前数值不能迁移。

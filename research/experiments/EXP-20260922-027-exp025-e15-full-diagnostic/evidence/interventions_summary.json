@@ -1,0 +1,296 @@
+{
+  "sample_count": 32,
+  "variants": {
+    "full": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.027225681532431264,
+        "median": 0.01438607182353735,
+        "p90": 0.058659350872039766
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.07049121171195905,
+        "median": 0.017156020555991105,
+        "p90": 0.05752283488298373
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.4482758620689655,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 43.3148957550237,
+        "median": 6.018572999298651,
+        "p90": 176.63162138368324
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.07524054368068255,
+        "median": 0.01908366445640549,
+        "p90": 0.10468129782366085
+      }
+    },
+    "bypass_1": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.027426974318022358,
+        "median": 0.014428948983550072,
+        "p90": 0.058297680318355534
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.06865119580751318,
+        "median": 0.0162101227491421,
+        "p90": 0.04900853491312092
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.4827586206896552,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 43.96100678902227,
+        "median": 7.253952655453387,
+        "p90": 174.93810697953552
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.07247943608718761,
+        "median": 0.015932364809722353,
+        "p90": 0.06168301331460224
+      }
+    },
+    "bypass_2": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.027385370436541993,
+        "median": 0.014927164651453495,
+        "p90": 0.05776578038930891
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.07013840583791436,
+        "median": 0.015178087578733904,
+        "p90": 0.05546245456438314
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.4482758620689655,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 43.774229892958196,
+        "median": 6.648259206303976,
+        "p90": 175.09611675001543
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.07508443894755101,
+        "median": 0.021636924183303582,
+        "p90": 0.08246217894010245
+      }
+    },
+    "bypass_3": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.027359181196139806,
+        "median": 0.014815273694694042,
+        "p90": 0.05812476277351376
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.06781117941984734,
+        "median": 0.01778418757513585,
+        "p90": 0.045234675863003636
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.41379310344827586,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 43.64675490508014,
+        "median": 5.825646130313684,
+        "p90": 177.25218420876323
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.07309802564095935,
+        "median": 0.021612844285572953,
+        "p90": 0.06762314956400577
+      }
+    },
+    "bypass_all": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.028708432512036686,
+        "median": 0.01846752129495144,
+        "p90": 0.05714755356311796
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.07234874158661334,
+        "median": 0.0180627131022923,
+        "p90": 0.10888011982826734
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.3793103448275862,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 45.52902420248923,
+        "median": 7.95578434515174,
+        "p90": 177.63378516267153
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.07861393353129864,
+        "median": 0.018742373596931237,
+        "p90": 0.163478359701617
+      }
+    },
+    "scramble_t3_channels": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.027224562853446294,
+        "median": 0.014370307326316833,
+        "p90": 0.05866664201021192
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.07057852710256035,
+        "median": 0.015865778371659346,
+        "p90": 0.0441605555924016
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.4827586206896552,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 43.34468887570944,
+        "median": 5.989885421703496,
+        "p90": 175.2306365135801
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.07504218406462675,
+        "median": 0.016499250036002073,
+        "p90": 0.07059758318735031
+      }
+    },
+    "imagenet_reset": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.0607984080139933,
+        "median": 0.06092255935072899,
+        "p90": 0.08167226314544677
+      },
+      "add_s_m": {
+        "count": 24,
+        "mean": 0.9223374816121116,
+        "median": 0.9212828062730476,
+        "p90": 1.1053168224382388
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.0,
+        "median": 0.0,
+        "p90": 0.0
+      },
+      "rotation_deg": {
+        "count": 24,
+        "mean": 128.79186029134934,
+        "median": 134.05097987622764,
+        "p90": 170.02661835276368
+      },
+      "translation_m": {
+        "count": 24,
+        "mean": 0.9287181717695338,
+        "median": 0.9185124470376725,
+        "p90": 1.126642008770308
+      }
+    },
+    "official_transplant": {
+      "xyz_error_m": {
+        "count": 29,
+        "mean": 0.022025123126162536,
+        "median": 0.020084306597709656,
+        "p90": 0.04294327646493912
+      },
+      "add_s_m": {
+        "count": 29,
+        "mean": 0.13452959715768695,
+        "median": 0.028856577066062924,
+        "p90": 0.13037321876074393
+      },
+      "add_s_0_1d": {
+        "count": 29,
+        "mean": 0.20689655172413793,
+        "median": 0.0,
+        "p90": 1.0
+      },
+      "rotation_deg": {
+        "count": 29,
+        "mean": 33.077436008665714,
+        "median": 9.415263404309211,
+        "p90": 119.25658578801982
+      },
+      "translation_m": {
+        "count": 29,
+        "mean": 0.1409993631746351,
+        "median": 0.0352087133463919,
+        "p90": 0.1591854087565601
+      }
+    }
+  },
+  "cka": {
+    "0": {
+      "full_vs_imagenet_reset": 0.5660934585848223,
+      "full_vs_official_transplant": 0.9199658884731229,
+      "imagenet_reset_vs_official_transplant": 0.5235684415101018
+    },
+    "1": {
+      "full_vs_imagenet_reset": 0.7859149904698137,
+      "full_vs_official_transplant": 0.8022953090614887,
+      "imagenet_reset_vs_official_transplant": 0.41343843223441407
+    },
+    "2": {
+      "full_vs_imagenet_reset": 0.0038456095841501296,
+      "full_vs_official_transplant": 0.49014233391578216,
+      "imagenet_reset_vs_official_transplant": 0.03567087536224971
+    },
+    "3": {
+      "full_vs_imagenet_reset": 0.5785692788382593,
+      "full_vs_official_transplant": 0.8745373049463645,
+      "imagenet_reset_vs_official_transplant": 0.6404835630823509
+    }
+  },
+  "backbone_weight_relative_l2": {
+    "full_vs_imagenet": 0.6560700282959478
+  },
+  "figures": [
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_003.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_010.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_014.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_015.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_019.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_020.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_022.png",
+    "output/diagnostics/exp025_e15_full_interventions_20260922_a03/figures/sample_024.png"
+  ]
+}

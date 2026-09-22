@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "checkpoint": "/mnt/e/6D姿态估计/EXP025/Full/model_epoch_015.pth",
+  "checkpoint_sha256": "7fbbfb8e168a9b8eec8cbb2ba621c07981a5c4c2c3e8045f78e6f4af2014b658",
+  "checkpoint_size": 1180966608,
+  "config": "configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_imagenet_full.py",
+  "arm": "imagenet_full",
+  "hierarchy_sha256": "02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373",
+  "top_level_keys": [
+    "epoch",
+    "gradscaler",
+    "iteration",
+    "model",
+    "optimizer",
+    "scheduler"
+  ],
+  "iteration": 95969,
+  "epoch": 15,
+  "state_tensors": 611,
+  "state_groups": {
+    "backbone": {
+      "tensors": 340,
+      "numel": 87564416
+    },
+    "cad_attention_head": {
+      "tensors": 271,
+      "numel": 10787652
+    }
+  },
+  "model_parameters": 98352068,
+  "strict_restore": true,
+  "nonfinite_tensors": []
+}

@@ -37,6 +37,10 @@ AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=
 
 ## Next stage
 
+EXP027 已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route 的 oracle residual 显示
+明显 headroom，ImageNet backbone reset 降低姿态表现；它是单 checkpoint 的机制证据，
+不改变 EXP025 formal 评价与选模协议，详见 EXP027 RECORD。
+
 EXP026 已完成独立三层 GA-HFPS 本地离线比较；λ1 可作为 EXP025 formal 完成后
 `official_frozen` matched 训练的候选，但尚无训练或姿态精度证据，详见其 RECORD。
 
