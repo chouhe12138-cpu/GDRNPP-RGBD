@@ -11,24 +11,14 @@ from torch import nn
 from core.utils.solver_utils import build_optimizer_with_params
 from .backbone_factory import BACKBONES, get_backbone_init_args
 from .heads.hierarchical_cad_attention_head import HierarchicalCADAttentionHead
-from research.exp025.dataset_context import resolve_dataset_context
+from core.gdrn_modeling.datasets.research_context import resolve_dataset_context
+from research.cad_hierarchy.contracts import require_configured_hierarchy
 
 
 def dataset_context(cfg):
-    # Explicit path extension; the shared resolver's legacy default is unchanged.
     context = resolve_dataset_context(
         cfg, hierarchy_path=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)
-    protocol = str(cfg.TRAIN_PROTOCOL.NAME)
-    if protocol in ('exp025_lmo', 'exp025_lm13'):
-        # Keep the historical EXP025 identity gate, even if a caller injects a
-        # different contract into an old config.
-        from research.exp025.configuration import require_hierarchy
-        require_hierarchy(context.hierarchy_path, context.key)
-    elif protocol == 'exp026_lmo':
-        from research.exp026.configuration import require_arm_hierarchy
-        require_arm_hierarchy(cfg, context)
-    else:
-        raise ValueError(f'Unsupported CAD training protocol: {protocol}')
+    require_configured_hierarchy(cfg, context)
     return context
 
 

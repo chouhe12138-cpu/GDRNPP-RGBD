@@ -13,5 +13,7 @@
 历史实验只保留 `research/experiments/*/RECORD.md` 与紧凑证据；精确复现按 RECORD 中的
 source commit 建独立 worktree，不把旧配置或 runner 放回当前 HEAD。
 
+LM13 的非正式 CAD 候选配置与本地检查见 [LM candidate](research/lm_candidate/README.md)。
+
 数据、权重、checkpoint、完整日志、缓存和 secrets 不进入 Git；`output/` 与 `.local/`
 只属于本机。

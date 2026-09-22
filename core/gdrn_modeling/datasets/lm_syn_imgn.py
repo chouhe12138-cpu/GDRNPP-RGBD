@@ -253,7 +253,9 @@ class LM_SYN_IMGN_Dataset:
     @lazy_property
     def models(self):
         """Load models into a list."""
-        cache_path = osp.join(self.models_root, "models_{}.pkl".format("_".join(self.objs)))
+        identity = f"{osp.realpath(self.models_root)}|{self.scale_to_meter}|{'_'.join(self.objs)}"
+        digest = hashlib.md5(identity.encode('utf-8')).hexdigest()
+        cache_path = osp.join(self.cache_dir, f"models_{digest}.pkl")
         if osp.exists(cache_path) and self.use_cache:
             return mmcv.load(cache_path)
 
@@ -271,8 +273,10 @@ class LM_SYN_IMGN_Dataset:
             model["bbox3d_and_center"] = misc.get_bbox3d_and_center(model["pts"])
 
             models.append(model)
-        logger.info("cache models to {}".format(cache_path))
-        mmcv.dump(models, cache_path, protocol=4)
+        if self.use_cache:
+            mmcv.mkdir_or_exist(self.cache_dir)
+            logger.info("cache models to {}".format(cache_path))
+            mmcv.dump(models, cache_path, protocol=4)
         return models
 
     def image_aspect_ratio(self):

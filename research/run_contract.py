@@ -41,6 +41,9 @@ def validate_research_run_config(
         )
 
     protocol_name = str(cfg.get('TRAIN_PROTOCOL', {}).get('NAME', ''))
+    run_stage = str(cfg.get('RESEARCH_PROTOCOL', {}).get('STAGE', ''))
+    if run_stage == 'candidate' and mode == 'formal':
+        raise ValueError('Candidate configuration cannot enter formal training')
     if protocol_name == 'exp026_lmo' and mode != 'prepare' \
             and not bool(cfg.get('RESEARCH_PROTOCOL', {}).get('SERVER_RELEASE_ALLOWED', False)):
         raise ValueError('EXP026 SERVER_BLOCKED: release not authorized')

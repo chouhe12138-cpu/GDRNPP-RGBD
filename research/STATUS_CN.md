@@ -46,8 +46,10 @@ EXP026 已保留三层 GA-HFPS 离线比较证据；共同修复 residual 的 Im
 gate 已通过，状态 `LOCAL_FORMAL_READY / SERVER_BLOCKED`。本地 object-11 固定批次只证明
 可学习性，尚无正式训练或姿态精度证据；需等待 EXP025 完成并由用户另行放行，详见其 RECORD。
 
-LM13 已完成 ImageNet ConvNeXt 全量训练配置、hierarchy 和本地 CPU/CUDA smoke；服务器
-profile 仍禁用，LM-O 完成前不启动。
+LM13 已整理为独立 CAD candidate 配置入口，与 LM-O 仅靠配置切换；真实数据、CPU 模型、
+本地 CUDA/CPP batch4 和 legacy GT-oracle evaluator 短测通过。本机 EGL 因 bindless textures
+不支持而阻塞，服务器 profile 仍禁用；没有 formal 或模型精度结论，详见
+[候选记录](lm_candidate/README.md)。LM-O 完成前不启动。
 
 ## Historical experiments
 

@@ -7,6 +7,10 @@ OUTPUT_DIR = 'output/experiments/' + EXPERIMENT_ID + '/RUN-SET-BY-LAUNCHER'
 SEED = 42
 DATASET_CONTEXT = dict(KEY='lmo', CAD_REF_KEY='lm_full', BOP_DATASET='lmo',
                        BOP_TARGETS_FILENAME='test_targets_bop19.json')
+CAD_HIERARCHY_CONTRACT = dict(
+    SHA256='02ce090949bc40b2732417fec23984f3f748431098c5f67c853839d10ff1a373',
+    DATASET_KEY='lmo', MODE='consistent', GENERATOR_VERSION=3,
+    DEPTH=4, LEVEL_COUNTS=(8, 64, 512, 4096))
 MODEL = dict(POSE_NET=dict(
     NAME='GDRN_CAD', XYZ_ONLINE=True, XYZ_RENDERER='egl', XYZ_BP=True,
     GEO_HEAD=dict(FREEZE=True, TRAIN_SUPERVISION=False),

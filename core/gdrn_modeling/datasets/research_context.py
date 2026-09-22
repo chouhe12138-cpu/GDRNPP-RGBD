@@ -43,6 +43,8 @@ def resolve_dataset_context(cfg, *, require_hierarchy: bool = True, hierarchy_pa
     train_name = str(cfg.DATASETS.TRAIN[0])
     train_meta = MetadataCatalog.get(train_name)
     data_ref_key = str(train_meta.ref_key)
+    if not str(settings.KEY) or not str(settings.CAD_REF_KEY):
+        raise ValueError("Dataset and CAD reference keys must be nonempty")
     data_ref = ref.__dict__[data_ref_key]
     names = tuple(train_meta.objs)
     ids = tuple(int(data_ref.obj2id[name]) for name in names)
@@ -52,7 +54,7 @@ def resolve_dataset_context(cfg, *, require_hierarchy: bool = True, hierarchy_pa
         extra_meta = MetadataCatalog.get(str(extra_name))
         extra_ref = ref.__dict__[extra_meta.ref_key]
         extra_ids = tuple(int(extra_ref.obj2id[name]) for name in extra_meta.objs)
-        if extra_ids != ids:
+        if extra_ids != ids or tuple(extra_meta.objs) != names:
             raise ValueError(f"Training split object order mismatch: {extra_name} -> {extra_ids} != {ids}")
     if len(cfg.DATASETS.TEST) > 1:
         raise ValueError("The research context supports at most one test split")
@@ -61,7 +63,7 @@ def resolve_dataset_context(cfg, *, require_hierarchy: bool = True, hierarchy_pa
         test_meta = MetadataCatalog.get(test_name)
         test_ref = ref.__dict__[test_meta.ref_key]
         test_ids = tuple(int(test_ref.obj2id[name]) for name in test_meta.objs)
-        if test_ids != ids:
+        if test_ids != ids or tuple(test_meta.objs) != names:
             raise ValueError(f"Train/test object order mismatch: {ids} != {test_ids}")
     if int(cfg.MODEL.POSE_NET.NUM_CLASSES) != len(ids):
         raise ValueError("NUM_CLASSES does not match the dataset")
