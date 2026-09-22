@@ -9,7 +9,7 @@ LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，�
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
 | EXP026 GA-HFPS 三层采样 | LOCAL_OFFLINE_COMPLETE / TRAINING_NOT_STARTED | 三层 λ1 离线工程 gate 通过；复杂区域改善但平滑区域及物体 12 连通性有代价，仅建议后续 matched 训练验证 | [RECORD](experiments/EXP-20260921-026-geometry-adaptive-hfps/RECORD.md) |
-| EXP025 统一 T3 CAD attention | ACTIVE / FORMAL_IN_PROGRESS | 两条 LM-O 组合策略 formal 均已到 E15，E5/E10/E15 固定点指标已记录；E20–E40 未生成 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | ACTIVE / FORMAL_IN_PROGRESS | Frozen 已评估到 E20、Full 已评估到 E25；其余固定点未交付 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

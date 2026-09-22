@@ -18,6 +18,9 @@
   实验差异优先由 `configs/gdrn/lmo_pbr/research/` 表达。
 - 本地 Python、测试和实验命令先激活 Conda `pytorch22`；服务器深度学习任务只在
   项目 Docker 容器内运行，不修改宿主机 Python、CUDA 或全局包。
+- 本地 GPU 诊断先在 `pytorch22` 检查 CUDA；若沙箱内不可见而用户已授权使用 GPU，
+  可在精确、只限本项目的命令上提权复核并运行。不要仅凭沙箱内的 `nvidia-smi` /
+  `torch.cuda.is_available()` 失败断言本机没有 GPU；确实不可用时记录复核证据。
 - 新建正式研究训练配置默认显式开启 AMP；因算子兼容性或数值稳定性关闭时，先做
   CUDA smoke，并在对应实验 RECORD 中记录证据和例外范围。历史配置不追溯修改。
 - dataset、checkpoint、完整日志、缓存和 secrets 不进入 Git；`output/` 与
