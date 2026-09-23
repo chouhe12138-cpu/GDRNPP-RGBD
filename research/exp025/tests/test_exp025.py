@@ -183,13 +183,13 @@ def test_eval_requires_a_complete_exp025_checkpoint(tmp_path):
             'cad_attention_head.mask_predictor.weight')
     legacy = tmp_path / 'legacy_official.pth'
     torch.save({'model': {'backbone.stem.weight': torch.zeros(1), 'pnet.conv.weight': torch.zeros(1)}}, legacy)
-    with pytest.raises(ValueError, match='not a complete EXP025 checkpoint') as caught:
+    with pytest.raises(ValueError, match='not a complete GDRN_CAD checkpoint') as caught:
         require_full_checkpoint(str(legacy))
     assert all(name in str(caught.value) for name in head)
 
     partial = tmp_path / 'partial.pth'
     torch.save({'model': {'backbone.stem.weight': torch.zeros(1), head[0]: torch.zeros(1)}}, partial)
-    with pytest.raises(ValueError, match='is not a complete EXP025 checkpoint'):
+    with pytest.raises(ValueError, match='is not a complete GDRN_CAD checkpoint'):
         require_full_checkpoint(str(partial))
 
     complete = tmp_path / 'complete.pth'

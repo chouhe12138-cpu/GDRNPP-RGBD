@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-22
+最后核对：2026-09-23
 verified commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
@@ -49,7 +49,9 @@ gate 已通过，状态 `LOCAL_FORMAL_READY / SERVER_BLOCKED`。本地 object-11
 LM13 已整理为独立 CAD candidate 配置入口，与 LM-O 仅靠配置切换；真实数据、CPU 模型、
 本地 CUDA/CPP batch4 和 legacy GT-oracle evaluator 短测通过。本机 EGL 因 bindless textures
 不支持而阻塞，服务器 profile 仍禁用；没有 formal 或模型精度结论，详见
-[候选记录](lm_candidate/README.md)。LM-O 完成前不启动。
+[候选记录](lm_candidate/README.md)。第二轮结构收口已将 LM/LM-O 都切到中性 CAD
+config/helper 公共层，六个入口的完整 effective config 与 `d0bd434` 基线一致；旧 EXP025
+import 保留兼容，科学协议与安全 gate 未变。LM-O 完成前不启动。
 
 ## Historical experiments
 

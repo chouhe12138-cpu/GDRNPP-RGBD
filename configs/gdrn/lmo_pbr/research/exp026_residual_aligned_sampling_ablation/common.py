@@ -1,5 +1,5 @@
 """EXP026 matched Full protocol; only the hierarchy differs between arms."""
-from research.exp025.configuration import backbone_settings
+from research.cad_common.configuration import backbone_settings
 
 _base_ = ['../exp025_hierarchical_cad_attention/common.py']
 EXPERIMENT_ID = 'EXP-20260922-026-residual-aligned-sampling-ablation'

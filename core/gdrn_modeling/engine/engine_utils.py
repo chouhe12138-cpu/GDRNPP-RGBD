@@ -132,7 +132,7 @@ def geometry_supervision_enabled(cfg):
     net_cfg = cfg.MODEL.POSE_NET
     if net_cfg.get('CAD_ATTENTION_HEAD', {}).get('ENABLED', False):
         if net_cfg.NAME != 'GDRN_CAD' or training_geometry_renderer_type(cfg) is None:
-            raise ValueError('EXP025 requires GDRN_CAD and an online geometry renderer')
+            raise ValueError('Online CAD geometry requires GDRN_CAD and a renderer')
         return True
     pcc_cfg = net_cfg.get("PCC_HEAD", {})
     if pcc_cfg.get("ENABLED", False):

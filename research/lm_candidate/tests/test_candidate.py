@@ -1,5 +1,6 @@
 """LM candidate isolation and fail-closed contract regression."""
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 
@@ -14,6 +15,25 @@ LM = ROOT / 'configs/gdrn/lm/research/candidate_cad/train_imagenet_full.py'
 LM_SMOKE = LM.with_name('smoke.py')
 LMO = ROOT / 'configs/gdrn/lmo_pbr/research/exp025_hierarchical_cad_attention/train_imagenet_full.py'
 OLD_LM = LMO.with_name('train_lm13_imagenet_full.py')
+SHARED_BASE = ROOT / 'configs/gdrn/research/cad/_base_/common.py'
+
+
+def test_candidate_inherits_only_neutral_cad_base():
+    source = LM.read_text()
+    assert "../../../research/cad/_base_/common.py" in source
+    assert 'lmo_pbr' not in source
+    assert 'exp025_hierarchical_cad_attention' not in source
+    shared = runpy.run_path(str(SHARED_BASE))
+    for forbidden in ('DATASETS', 'DATASET_CONTEXT', 'CAD_HIERARCHY_CONTRACT',
+                      'SOLVER', 'VAL', 'EXPERIMENT_ID', 'RESEARCH_PROTOCOL'):
+        assert forbidden not in shared
+
+    def nested_keys(value):
+        if not isinstance(value, dict):
+            return set()
+        return set(value) | set().union(*(nested_keys(child) for child in value.values()))
+
+    assert not {'NUM_CLASSES', 'HIERARCHY_PATH'} & nested_keys(shared['MODEL'])
 
 
 @pytest.mark.parametrize('path,identity,count', [(LM, 'lm13', 13), (LMO, 'lmo', 8)])

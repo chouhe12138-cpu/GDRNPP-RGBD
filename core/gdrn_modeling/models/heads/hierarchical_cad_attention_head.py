@@ -166,7 +166,7 @@ class HierarchicalCADAttentionHead(nn.Module):
 
     def forward(self, feature, classes, diagnostics=None):
         if feature.ndim != 4 or feature.shape[1:] != (1024, 8, 8):
-            raise ValueError('EXP025 requires [B,1024,8,8] backbone features')
+            raise ValueError('GDRN_CAD requires [B,1024,8,8] backbone features')
         if classes.shape != (len(feature),) or torch.any((classes < 0) | (classes >= self.num_objects)):
             raise ValueError('Invalid EXP025 ROI classes')
         tokens, banks = self.encode(feature, classes)

@@ -11,7 +11,7 @@ from mmcv import Config
 from core.gdrn_modeling.cad.hierarchy import load_cad_hierarchy
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer, dataset_context
 from research.cad_hierarchy.diagnostics import hierarchy_sanity
-from research.exp025.preflight import audit_optimizer, verify_imagenet_backbone
+from research.cad_common.preflight import audit_optimizer, verify_imagenet_backbone
 from research.run_contract import validate_research_run_config
 from .configuration import EXPERIMENT_ID, require_arm_hierarchy
 

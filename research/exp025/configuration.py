@@ -9,9 +9,10 @@ empty `MODEL.WEIGHTS`, and resume goes through the output directory as before.
 from __future__ import annotations
 
 import hashlib
-import os
 from functools import lru_cache
 from pathlib import Path
+
+from research.cad_common.configuration import backbone_settings
 
 OFFICIAL_WEIGHTS = 'pretrained_models/lmo_pbr/model_final_wo_optim.pth'
 
@@ -57,18 +58,6 @@ def require_hierarchy(path, dataset_key):
     if actual != expected:
         raise ValueError(f'EXP025 {dataset_key} hierarchy requires {expected}, got {actual} at {path}')
     return actual
-
-
-def backbone_settings(train_backbone=False, backbone_init='official_lmo', lr_mult=.1):
-    if backbone_init not in ('official_lmo', 'imagenet'):
-        raise ValueError(f'Unknown BACKBONE_INIT: {backbone_init}')
-    if not isinstance(train_backbone, bool) or lr_mult <= 0:
-        raise ValueError('TRAIN_BACKBONE must be bool and LR multiplier positive')
-    imagenet = backbone_init == 'imagenet'
-    # WEIGHTS stays empty: the backbone initialization above is not a full checkpoint.
-    return dict(WEIGHTS='', POSE_NET=dict(BACKBONE=dict(
-        FREEZE=not train_backbone, LR_MULT=lr_mult, INIT_CFG=dict(pretrained=False,
-        checkpoint_path=os.environ.get('GDRN_CONVNEXT_BASE_WEIGHTS', '') if imagenet else ''))))
 
 
 def set_mode(cfg, train_backbone, backbone_init):

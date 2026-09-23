@@ -2,6 +2,9 @@
 
 本候选将现有 LM13 real + DeepIM/ImageNet-render 协议与 LM-O 的执行入口分开。
 切换数据集只选择配置；模型 `GDRN_CAD`、CAD head、loss、decode 无 LM/LM-O 分支。
+LM 与 LM-O 配置分别继承 `configs/gdrn/research/cad/_base_/common.py`；该 base
+只保存跨数据集相同的 CAD 模型结构。LM 配置不再继承
+`lmo_pbr/research/exp025_hierarchical_cad_attention/`。
 
 | 用途 | 配置 |
 |---|---|
@@ -15,7 +18,17 @@
 20 epoch checkpoint/eval、GT box、EGL 训练/CPP legacy 评价。它没有服务器 profile；
 `RESEARCH_PROTOCOL.STAGE=candidate` 永不允许 formal。
 
+公共的 backbone 配置、ImageNet/optimizer 审计、AMP、批次与遥测位于
+`research/cad_common/`。旧 `research.exp025.configuration/preflight/runtime`
+仍导出历史 API；EXP025 的 hierarchy SHA、official weight、arm 与 metadata 约束
+继续留在 EXP025 私有模块。共享批次读取按当前 dataset context 校验身份，只有
+EXP025 wrapper 兼容旧的未标记 LM-O 保存批次。
+
 ## 本地检查（2026-09-22）
+
+- 2026-09-23 结构收口回归：LM、EXP025 两臂、EXP026 两臂及旧 LM13 兼容入口的完整
+  effective config 与 `d0bd434` 基线一致；共享 helper compatibility、LM/LM-O saved-batch
+  身份、CPU preflight、CPP CUDA 两步更新及 legacy evaluator 均通过。
 
 - 两个 `consistent_v3.npz` 的实际文件均有四级 `8/64/512/4096` 数组；CAD head 只读取
   T1–T3。契约如实描述 artifact，EXP025 仍保持原 SHA 锁，不重建正式 artifact。

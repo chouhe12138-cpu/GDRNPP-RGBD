@@ -9,8 +9,8 @@ import torch
 from mmcv import Config
 
 from core.gdrn_modeling.models.GDRN_CAD import build_model_optimizer
-from research.exp025.preflight import audit_optimizer
-from research.exp025.runtime import (amp_step, real_batch, seed_all)
+from research.cad_common.preflight import audit_optimizer
+from research.cad_common.runtime import (amp_step, real_batch, seed_all)
 from .preflight import inspect_config
 
 
