@@ -135,12 +135,12 @@ def test_resolved_configs_have_only_predeclared_arm_differences():
                          'CAD_HIERARCHY_CONTRACT.LAMBDA_GEO'}
     assert uniform.MODEL.WEIGHTS == adaptive.MODEL.WEIGHTS == ''
     assert uniform.SOLVER.IMS_PER_BATCH == adaptive.SOLVER.IMS_PER_BATCH == 48
-    assert uniform.RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED is False
+    assert uniform.RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED is True
+    assert uniform.RESEARCH_PROTOCOL.FORMAL_READY is True
     for cfg in (uniform, adaptive):
         validate_research_run_config(cfg, mode='prepare')
-        for mode in ('smoke', 'formal', 'eval'):
-            with pytest.raises(ValueError, match='SERVER_BLOCKED'):
-                validate_research_run_config(cfg, mode=mode)
+        validate_research_run_config(cfg, mode='formal')
+        validate_research_run_config(cfg, mode='eval')
 
 
 @pytest.mark.parametrize('arm', tuple(ARMS))

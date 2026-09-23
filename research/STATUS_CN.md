@@ -1,9 +1,22 @@
 # 当前研究状态
 
 最后核对：2026-09-23
-verified commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
+EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
+
+`EXP-20260922-026-residual-aligned-sampling-ablation` — 在 matched ImageNet Full 与
+predicted-route residual 条件下比较三层普通采样和几何自适应采样。
+
+状态：`SERVER_RELEASE_AUTHORIZED / BATCH48_GATE_PENDING`。用户于 2026-09-23 明确要求
+lab0 运行 `uniform_full`、lab1 运行 `adaptive_l1_full`，并准备 bundle 与服务器命令。
+本地 gate 已通过；服务器真实 batch48/EGL gate 尚未运行。两臂必须分别通过 gate 后才启动 formal。
+
+当前唯一下一步：将本次 release bundle 与两份 hierarchy NPZ 分别传至对应服务器，建立只读
+release、核对受管容器和 GPU 占用、各运行一次 batch48/EGL gate；确认 PASS 后按机器映射启动
+两臂 formal。配置允许 formal，实际启动仍以服务器 gate 结果为前置条件。
+
+## Prior experiment
 
 `EXP-20260920-025-hierarchical-cad-attention` — 在统一 T3=512 CAD attention 结构上比较
 两条 LM-O 主干策略。
@@ -30,10 +43,8 @@ AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=
 - 全部 16 个预定评价点（两臂各 E5/E10/E15/E20/E25/E30/E35/E40）已记录，见 EXP025
   RECORD；console 显示两臂自然完成 E40 并 `FINAL_EVAL_REUSED`，无 error/NaN。
 
-当前唯一下一步：
-
-- 等待用户审阅 EXP025 两臂全部固定点结果并作出收官判定；在此之前不自动选模、不改协议、
-  不追加 seed，EXP026 不放行、LM13 不启动。
+EXP025 的最终组合策略结论仍待用户判定；本次仅授权推进独立的 EXP026，不选 EXP025 模型、
+不改其协议，也不追加 seed。
 
 ## Next stage
 
@@ -45,8 +56,8 @@ EXP025 内部已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route
 
 EXP026 已保留三层 GA-HFPS 离线比较证据；共同修复 residual 的 ImageNet Full
 `uniform_512` vs `adaptive_512_l1` 两臂 matched 配置和本地 unit/CPU/CUDA/fixed-batch
-gate 已通过，状态 `LOCAL_FORMAL_READY / SERVER_BLOCKED`。本地 object-11 固定批次只证明
-可学习性，尚无正式训练或姿态精度证据；需 EXP025 收官判定后由用户另行放行，详见其 RECORD。
+gate 已通过。本地 object-11 固定批次只证明可学习性，尚无正式训练或姿态精度证据；
+服务器真实 batch48 gate 是本次 release 后 formal 的前置检查，详见其 RECORD。
 
 LM13 已整理为独立 CAD candidate 配置入口，与 LM-O 仅靠配置切换；真实数据、CPU 模型、
 本地 CUDA/CPP batch4 和 legacy GT-oracle evaluator 短测通过。本机 EGL 因 bindless textures

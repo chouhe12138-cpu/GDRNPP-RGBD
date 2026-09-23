@@ -328,7 +328,7 @@ print(value if isinstance(value, (str, bool)) else "")
 }
 
 # Historical protocols are recovered from their recorded source commit. EXP026
-# remains explicitly blocked until a later authorized release flips its gate.
+# requires its explicit release gate in the selected configuration.
 resolve_resource_profile() {
     local config="$1" name allowed
     name="$(container_config_value "${config}" TRAIN_PROTOCOL.NAME)" || \

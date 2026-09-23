@@ -1,13 +1,19 @@
 # EXP026 — Residual-Aligned Full Sampling Ablation
 
-## 新阶段协议（`LOCAL_FORMAL_READY / SERVER_BLOCKED`）
+## 新阶段协议（`SERVER_RELEASE_AUTHORIZED / BATCH48_GATE_PENDING`）
+
+- 2026-09-23 用户明确授权启动 EXP026：lab0=`uniform_full`（普通采样），
+  lab1=`adaptive_l1_full`（几何自适应采样）。EXP025 的两臂 E5–E40 已全部归档；
+  其最终组合策略结论仍待用户判定，本次授权不构成 EXP025 选模或结论。
+- release 配置已解除 `SERVER_RELEASE_ALLOWED` 和 `FORMAL_READY` 阻断；两臂真实
+  batch48/EGL gate 尚未产生服务器证据。须分别得到 PASS 后才启动相应 formal。
 
 - experiment ID：`EXP-20260922-026-residual-aligned-sampling-ablation`。
 - 问题：在两臂都修复 predicted-route residual 监督、同为 ImageNet ConvNeXt Full training 的条件下，三层 GA-HFPS λ1 相对三层 uniform_512 对 correspondence 与 LM-O 6D pose 有何影响？
 - 两臂唯一变量为 hierarchy artifact：`uniform_full` 使用下表 `uniform_512`，`adaptive_l1_full` 使用下表 `adaptive_512_l1`。旧 λ2 只留作离线设计证据，不进入 formal。
 - 两臂共同使用 LM-O PBR40、GT box、seed42、真实 batch48、AdamW 3e-4（backbone/head 同 LR）、weight decay .01、40 epoch、4% linear warmup + cosine、AMP 初始 scale **16384**、E5/E10/E15/E20/E25/E30/E35/E40 固定评价、RANSAC-PnP；均从同一 ImageNet backbone 初始化重新训练，不从 EXP025 权重续训，也不选 best checkpoint。16384 是下述本地数值 gate 后两臂共同修订的初值，未来仍须服务器真实 batch48 重新 gate。
 - 正式输出预定保留每个固定点的 BOP AR、ADD(-S)0.1d、AR_reS、AR_teS，及 predicted-cell representability、anchor/full XYZ error、residual gain。**不预设采样优胜门槛；最终研究判断由用户结合完整证据决定。**
-- 配置位于 `configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/`。EXP025 两臂全部固定点评价入档、EXP026 本地 gate PASS、用户另行明确放行，三者缺一不可。当前不生成 release、不执行服务器 gate/训练。
+- 配置位于 `configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/`。EXP025 两臂全部固定点评价入档、EXP026 本地 gate PASS、用户另行明确放行三项均已满足；本次准备 release，服务器 gate/训练状态仍待回填。
 - 新 residual target 以 detached 预测 T3 argmax 的 anchor/radius 计算；GT route NLL 和历史 symmetry branch score 不变。仅可见且预测球可达的点参与 residual loss；默认无 warmup。
 
 ## 本地验证（Observed，2026-09-22）
@@ -25,7 +31,7 @@
 | adaptive λ1 | 12.696→0.456 | 0%→98.29% | 0→1204 | 4.789 / 4.245 | +0.545 |
 
 - adaptive 在 step0 无 residual 有效点，但 step1 有 21、step20 有 492、step100 有 1204；持续有效监督已建立，因此没有理由加入 warmup。两臂最后三个记录点都有正 residual gain，预测残差无近饱和像素，classifier 与 residual predictor 梯度/更新存在。此单批次不能比较两种 sampling 的泛化或正式精度，也不能把 adaptive 的小幅数值差当作胜出。
-- 本地 gate：编号/证据迁移、单元测试、artifact identity、配置匹配、CPU、CUDA、fixed-batch 均 PASS；正式服务器仍由 `SERVER_RELEASE_ALLOWED=False` 和 `FORMAL_READY=False` 双重阻断。仅在 EXP025 全部预定固定点完成且用户明确放行后，才生成新 release 并分别运行真实 batch48 server gate。用户未预设采样优胜门槛。
+- 本地 gate：编号/证据迁移、单元测试、artifact identity、配置匹配、CPU、CUDA、fixed-batch 均 PASS；当时正式服务器仍由 `SERVER_RELEASE_ALLOWED=False` 和 `FORMAL_READY=False` 双重阻断。2026-09-23 用户放行后另在本记录顶部登记 release 状态；该历史本地检查不代替真实 batch48 server gate。用户未预设采样优胜门槛。
 
 ## Preliminary offline sampling evidence（原 EXP026）
 
