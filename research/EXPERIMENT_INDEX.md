@@ -3,14 +3,14 @@
 本页只提供实验目录。当前进展和下一步见 [STATUS_CN.md](STATUS_CN.md)；详细协议、结果、
 结论和证据边界只写在对应 `RECORD.md`。退出 HEAD 的历史入口按 RECORD 中的 source commit
 使用独立 worktree 恢复。
-LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，保持 server-disabled，
-待 LM-O 完成后再独立开放。
+EXP025 formal 全部固定点已交付，EXP026 server 放行与 LM13 启动均待用户收官判定。
+LM13 ImageNet full 后续臂已完成配置、hierarchy 与本地 CUDA smoke，保持 server-disabled。
 临时诊断归属母实验，不自动占用 EXP 编号。
 
 | 实验 | 状态 | 结论 | 记录 |
 |---|---|---|---|
 | EXP026 Residual-Aligned Full Sampling Ablation | LOCAL_FORMAL_READY / SERVER_BLOCKED | 两臂同为预测路由残差 + ImageNet Full，仅比较三层 uniform 与 GA-HFPS λ1；本地 gate 通过，尚无正式训练姿态结果 | [RECORD](experiments/EXP-20260922-026-residual-aligned-sampling-ablation/RECORD.md) |
-| EXP025 统一 T3 CAD attention | ACTIVE / FORMAL_IN_PROGRESS | Frozen 已评估到 E20、Full 已评估到 E25；其余固定点未交付 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
+| EXP025 统一 T3 CAD attention | ACTIVE / FORMAL_COMPLETE | 两臂 E5–E40 十六个固定点全部交付；E40 BOP AR Full 0.703682 / Frozen 0.690254，收官判定待用户 | [RECORD](experiments/EXP-20260920-025-hierarchical-cad-attention/RECORD.md) |
 | EXP000 官方基线 | COMPLETE | LM-O GT-box 官方基线 | [RECORD](experiments/EXP-20260729-000-official-gdrnpp-baseline/RECORD.md) |
 | EXP001 Pose Aggregation | COMPLETE | FAIL，RANSAC 信号不稳定 | [RECORD](experiments/EXP-20260730-001-gdrnpp-pose-aggregation-diagnostic/RECORD.md) |
 | EXP002 Causal Oracle | COMPLETE | PASS，XYZ geometry 是主因 | [RECORD](experiments/EXP-20260731-002-gdrnpp-causal-oracle/RECORD.md) |

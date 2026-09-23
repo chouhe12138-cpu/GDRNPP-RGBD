@@ -3,9 +3,9 @@
 ## Status
 
 - lifecycle：`ACTIVE`
-- execution：`FORMAL_IN_PROGRESS`（Frozen 已评估到 E20；Full 已评估到 E25；其余固定点未生成）
-- last verified：`2026-09-22 / formal source b9bddccef2f12b4365e0e1e2e68222d733de572b`
-- decision：formal 前置条件已满足，两臂 formal 已于 2026-09-20 启动。
+- execution：`FORMAL_COMPLETE`（两臂 E5–E40 八个固定评价点全部交付）
+- last verified：`2026-09-23 / formal source b9bddccef2f12b4365e0e1e2e68222d733de572b`
+- decision：formal 前置条件已满足，两臂 formal 已于 2026-09-20 启动；全部固定点已于 2026-09-23 核对交付，最终结论待用户判定。
 
 ## Research question
 
@@ -66,15 +66,15 @@
 | lab1 gate 65536 a01 | `e3e0e65` | EGL batch48, 8-step gate | FAIL step 1 | negative control | 当时 backbone lr 为 3e-5；同一 Mask 权重非有限 |
 | lab1 gate 32768 a02 | `e3e0e65` | EGL batch48 gate | PASS | superseded integrity | backbone lr 3e-5，后由最终配置重跑取代 |
 | lab1 gate 32768 a03 | `b9bddcc` | final-config EGL batch48 gate | PASS | canonical integrity | backbone/head 均 3e-4；0 skipped；90/90 更新；roundtrip |
-| `RUN-20260920-120844-formal-s42-a01` | `b9bddcc` | lab0 official_frozen 40-epoch formal | IN PROGRESS（已到 E20） | canonical formal | E5/E10/E15/E20 固定点已评估 |
-| `RUN-20260920-120843-formal-s42-a01` | `b9bddcc` | lab1 imagenet_full 40-epoch formal | IN PROGRESS（已到 E25） | canonical formal | E5/E10/E15/E20/E25 固定点已评估 |
+| `RUN-20260920-120844-formal-s42-a01` | `b9bddcc` | lab0 official_frozen 40-epoch formal | COMPLETE（E5–E40 全部固定点已评估） | canonical formal | console 显示完成 E40 训练与 `FINAL_EVAL_REUSED periodic_epoch=40` |
+| `RUN-20260920-120843-formal-s42-a01` | `b9bddcc` | lab1 imagenet_full 40-epoch formal | COMPLETE（E5–E40 全部固定点已评估） | canonical formal | console 显示完成 E40 训练与 `FINAL_EVAL_REUSED periodic_epoch=40` |
 
 服务器报告中的 `device=cuda:0` 是容器内可见设备编号；物理映射仍为 lab0→GPU0、lab1→GPU1。
 
 ## Formal results
 
-Frozen 已评估到 E20、Full 已评估到 E25；后续固定点未生成。不得用 smoke、fixed-batch、profile 或 gate loss
-替代正式精度指标。
+两臂八个固定评价点（E5/E10/E15/E20/E25/E30/E35/E40）全部交付，共 16 个点。
+不得用 smoke、fixed-batch、profile 或 gate loss 替代正式精度指标。
 
 | Epoch | arm | BOP AR | ADD(-S)0.1d | AR_reS | AR_teS |
 |---:|---|---:|---:|---:|---:|
@@ -86,28 +86,33 @@ Frozen 已评估到 E20、Full 已评估到 E25；后续固定点未生成。不
 | 15 | imagenet_full | 0.661326 | 0.480277 | 0.504037 | 0.766321 |
 | 20 | official_frozen | 0.679033 | 0.492734 | 0.548789 | 0.787082 |
 | 20 | imagenet_full | 0.667956 | 0.460208 | 0.526644 | 0.770934 |
-| 25 | official_frozen | 未交付 | 未交付 | 未交付 | 未交付 |
+| 25 | official_frozen | 0.690955 | 0.526644 | 0.556171 | 0.798847 |
 | 25 | imagenet_full | 0.693580 | 0.523183 | 0.539100 | 0.806920 |
-| 30–40 | 两臂 | 未交付 | 未交付 | 未交付 | 未交付 |
+| 30 | official_frozen | 0.692291 | 0.534948 | 0.560784 | 0.798616 |
+| 30 | imagenet_full | 0.691954 | 0.532180 | 0.556863 | 0.791234 |
+| 35 | official_frozen | 0.689696 | 0.519031 | 0.551557 | 0.798385 |
+| 35 | imagenet_full | 0.700330 | 0.545329 | 0.563552 | 0.804152 |
+| 40 | official_frozen | 0.690254 | 0.520415 | 0.557093 | 0.800461 |
+| 40 | imagenet_full | 0.703682 | 0.557093 | 0.562168 | 0.814994 |
 
 BOP AR、AR_reS、AR_teS 来自各 epoch 的 `scores_bop19_*epoch.json`；ADD(-S)0.1d 来自
-同一运行日志的 `EVAL_SUMMARY.add_s_0.1d`，不以 BOP toolkit 的 AD 口径替代。两臂共 9 个
-BOP AR 点与同 epoch score JSON 一致。
+同一运行日志的 `EVAL_SUMMARY.add_s_0.1d`，不以 BOP toolkit 的 AD 口径替代。两臂共 16 个
+BOP AR 点与同 epoch score JSON 一致，且与 `eval_summary.jsonl` 的 `bop_ar` 逐点相等。
 
-### 已交付各臂最后点及共同 E15 的逐物体 ADD(-S)0.1d
+### 共同 E15 与两臂最终 E40 的逐物体 ADD(-S)0.1d
 
-| object | Frozen E15 | Full E15 | Frozen E20 | Full E25 |
+| object | Frozen E15 | Full E15 | Frozen E40 | Full E40 |
 |---|---:|---:|---:|---:|
-| ape | 0.411429 | 0.245714 | 0.320000 | 0.422857 |
-| can | 0.768844 | 0.698492 | 0.748744 | 0.778894 |
-| cat | 0.532164 | 0.444444 | 0.456140 | 0.409357 |
-| driller | 0.790000 | 0.740000 | 0.805000 | 0.825000 |
-| duck | 0.255556 | 0.333333 | 0.200000 | 0.261111 |
-| eggbox | 0.372222 | 0.311111 | 0.377778 | 0.438889 |
-| glue | 0.714286 | 0.728571 | 0.671429 | 0.764286 |
-| holepuncher | 0.275000 | 0.350000 | 0.350000 | 0.295000 |
+| ape | 0.411429 | 0.245714 | 0.434286 | 0.508571 |
+| can | 0.768844 | 0.698492 | 0.778894 | 0.839196 |
+| cat | 0.532164 | 0.444444 | 0.491228 | 0.508772 |
+| driller | 0.790000 | 0.740000 | 0.810000 | 0.810000 |
+| duck | 0.255556 | 0.333333 | 0.272222 | 0.316667 |
+| eggbox | 0.372222 | 0.311111 | 0.400000 | 0.472222 |
+| glue | 0.714286 | 0.728571 | 0.678571 | 0.764286 |
+| holepuncher | 0.275000 | 0.350000 | 0.295000 | 0.255000 |
 
-E5/E10、Full E20 的逐物体 recall 见两臂 `eval_summary.jsonl`；E25 Frozen 未交付。
+全部 16 个点的逐物体 recall 见两臂 `eval_summary.jsonl`。
 
 ## Key engineering and integrity evidence
 
@@ -136,9 +141,9 @@ E5/E10、Full E20 的逐物体 recall 见两臂 `eval_summary.jsonl`；E25 Froze
 - lab1 最终 LR 配置没有重新测试 65536；其 canonical 结论仅为 32768 PASS。旧 LR 的 65536
   FAIL 作为 scale 选择过程的 negative control 保留，不冒充最终配置结果。
 
-### 两臂中间点差（imagenet_full − official_frozen，截至共同 E20）
+### 两臂固定点差（imagenet_full − official_frozen，E5–E40 全部八个点）
 
-单位为百分点；只作描述，中间点不用于选模、不改变协议。
+单位为百分点；只作描述，固定点是预定评价，不构成按中间结果选模。
 
 | Epoch | Δ BOP AR | Δ ADD(-S)0.1d | Δ AR_reS | Δ AR_teS |
 |---:|---:|---:|---:|---:|
@@ -146,19 +151,29 @@ E5/E10、Full E20 的逐物体 recall 见两臂 `eval_summary.jsonl`；E25 Froze
 | 10 | −2.430 | −4.844 | −6.574 | −2.191 |
 | 15 | −2.573 | −3.322 | −3.945 | −2.907 |
 | 20 | −1.108 | −3.253 | −2.215 | −1.615 |
+| 25 | +0.263 | −0.346 | −1.707 | +0.807 |
+| 30 | −0.034 | −0.277 | −0.392 | −0.738 |
+| 35 | +1.063 | +2.630 | +1.200 | +0.567 |
+| 40 | +1.343 | +3.668 | +0.507 | +1.453 |
 
-各指标并非单调。Frozen 的已交付 BOP/teS 最佳点在 E15、ADD 在 E10、reS 在 E10；
-Full 的已交付 BOP/ADD/teS 最佳点在 E25、reS 在 E25。这些最佳点是事后描述，不改变
-固定点评价协议，也不支持从中间点推断最终结论。两臂同时改变初始化来源与可训练范围，
-上述差值是组合策略差，不是单一冻结消融效应。
+各指标并非单调。Frozen 的已交付最佳点：BOP/ADD/reS 在 E30（0.692291 / 0.534948 /
+0.560784），teS 在 E40（0.800461）；Full 的已交付最佳点：BOP/ADD/teS 在 E40
+（0.703682 / 0.557093 / 0.814994），reS 在 E35（0.563552）。这些最佳点是事后描述，
+不改变固定点评价协议。两臂同时改变初始化来源与可训练范围，上述差值是组合策略差，
+不是单一冻结消融效应；共同 E5–E20 为 Frozen 领先，E25 起 BOP AR 差距收敛并在
+E35/E40 转为 Full 领先，此为对固定点序列的描述，不构成选模或显著性结论。
 
 ## Decision
 
 - `FORMAL_READY=True`；两臂共同使用 `SOLVER.AMP.INIT_SCALE=32768`。
-- 两臂 formal 已于 2026-09-20 从同一 release（`b9bddcc`）启动；Frozen E5–E20、Full E5–E25 已按预定评价点记录。
-- 按全部固定评价点记录结果，不根据中间点改变协议、选模或追加 seed。
-- formal 期间不 pull、不改 release、不替换镜像。
-- LM13 仅为下一阶段准备项；当前保持 server-disabled，LM-O 完成前不启动。
+- 两臂 formal 已于 2026-09-20 从同一 release（`b9bddcc`）启动；八个固定评价点
+  E5–E40 已于 2026-09-23 全部按预定协议记录（紧凑副本来自用户保留的
+  `E:\6D姿态估计\EXP025\Frozen` 与 `...\Full`）。
+- console 证据显示两臂训练自然到达 E40 并 `FINAL_EVAL_REUSED periodic_epoch=40`；
+  未见 error/NaN/traceback。最终组合策略结论待用户判定，不根据固定点结果自动选模、
+  改协议或追加 seed。
+- formal 期间不 pull、不改 release、不替换镜像；该约束随两臂训练结束而完成。
+- LM13 仅为下一阶段准备项；当前保持 server-disabled，EXP025 收官判定前不启动。
 
 ## Evidence map
 
@@ -169,8 +184,8 @@ Full 的已交付 BOP/ADD/teS 最佳点在 E25、reS 在 E25。这些最佳点�
 | lab0 run/source/image provenance | [official_frozen a02 metadata](evidence/exp025_server_gate_official_frozen_a02_metadata.json) |
 | lab1 旧 LR 65536 Mask overflow | [imagenet_full a01](evidence/exp025_server_gate_imagenet_full_a01.json) |
 | lab1 最终 LR 32768 PASS | [imagenet_full a03](evidence/exp025_server_gate_imagenet_full_a03.json) |
-| lab0 formal E5/E10/E15/E20 指标 | [official_frozen run](evidence/RUN-20260920-120844-formal-s42-a01/) |
-| lab1 formal E5/E10/E15/E20/E25 指标 | [imagenet_full run](evidence/RUN-20260920-120843-formal-s42-a01/) |
+| lab0 formal E5–E40 指标 | [official_frozen run](evidence/RUN-20260920-120844-formal-s42-a01/) |
+| lab1 formal E5–E40 指标 | [imagenet_full run](evidence/RUN-20260920-120843-formal-s42-a01/) |
 | 当前结构、配置与 contract | 当前 source tree、正式 configs 与 `research/exp025/tests` |
 
 被后续配置取代的 a02/recheck、重构前 fixed-batch、工具调试和重复 smoke JSON 已从当前 HEAD
@@ -181,11 +196,14 @@ Full 的已交付 BOP/ADD/teS 最佳点在 E25、reS 在 E25。这些最佳点�
 
 - E15 Full 的本地 checkpoint 机制诊断见[内部诊断记录](diagnostics/e15_full_checkpoint/RECORD.md)；
   其 122 ROI 的 oracle/ablation 不代替 EXP025 正式全量评分或最终组合策略比较。
-- 未交付：Frozen E25–E40、Full E30–E40 与最终 E40 评估；跨 seed 复验未开始。
-- 未确认：两臂在最后已交付评价点之后是否继续运行、以及两个 run 的 exit code。
+- 未交付：无——两臂全部 16 个固定评价点已交付；跨 seed 复验未开始。
+- 未确认：两个 run 的容器 exit code 无独立记录（console 以
+  `FINAL_EVAL_REUSED periodic_epoch=40` 收尾，训练进度 100%）。
 - 未运行：重构后结构的 route/residual fixed-batch 机制复验；重构前数值不能迁移。
 - 未运行：lab1 最终 3e-4 配置的 65536 gate；不据旧 LR negative control声称已测试。
-- 不能推出：单个 gate 的短程 loss、资源或梯度覆盖不代表正式姿态精度。
+- 不能推出：单个 gate 的短程 loss、资源或梯度覆盖不代表正式姿态精度；固定点序列
+  的事后最佳点不构成显著性或选模结论。
 - 外置原始产物：服务器 run 目录、本地 `output/diagnostics`、checkpoint 和完整 console log。
   本记录的紧凑副本来自用户保留目录 `E:\6D姿态估计\EXP025\Frozen` 与 `...\Full`（两臂
-  `scores_bop19_*epoch.json` 原样复制、`EVAL_SUMMARY` 行提取为 `eval_summary.jsonl`）。
+  `scores_bop19_*epoch.json` 原样复制、`EVAL_SUMMARY` 行提取为 `eval_summary.jsonl`，
+  2026-09-23 核对时两目录均含 E5–E40 全部分数与完整 console）。

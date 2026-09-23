@@ -8,7 +8,7 @@ verified commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 `EXP-20260920-025-hierarchical-cad-attention` — 在统一 T3=512 CAD attention 结构上比较
 两条 LM-O 主干策略。
 
-状态：`ACTIVE / FORMAL_IN_PROGRESS`（Frozen 已评估到 E20；Full 已评估到 E25）。
+状态：`ACTIVE / FORMAL_COMPLETE`（两臂 E5–E40 八个固定评价点全部交付，2026-09-23 核对）。
 
 正式比较包含两个组合策略，不能解释为单一冻结消融：
 
@@ -27,15 +27,17 @@ AMP 初始 scale 32768 和相同 EXP025 head。lab1 的最终 `BACKBONE_LR_MULT=
   缩放后 fp16 非有限，两臂共同正式初始 scale 固定为 32768。
 - 两臂 formal 已于 2026-09-20 从同一 release（`b9bddcc`）启动，run 分别为 lab0
   `RUN-20260920-120844-formal-s42-a01`、lab1 `RUN-20260920-120843-formal-s42-a01`。
-- 九个预定评价点（Frozen E5/E10/E15/E20；Full E5/E10/E15/E20/E25）的指标已记录，
-  见 EXP025 RECORD；其余固定点未交付。
+- 全部 16 个预定评价点（两臂各 E5/E10/E15/E20/E25/E30/E35/E40）已记录，见 EXP025
+  RECORD；console 显示两臂自然完成 E40 并 `FINAL_EVAL_REUSED`，无 error/NaN。
 
 当前唯一下一步：
 
-- 等两臂剩余 E25/E30/E35/E40 完成并按预定评价点逐点记录；不按中间结果选模、不改协议、
-  不追加 seed。
+- 等待用户审阅 EXP025 两臂全部固定点结果并作出收官判定；在此之前不自动选模、不改协议、
+  不追加 seed，EXP026 不放行、LM13 不启动。
 
 ## Next stage
+
+EXP025 formal 已完成全部固定点交付；最终组合策略结论只由用户基于 RECORD 判定。
 
 EXP025 内部已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route 的 oracle residual 显示
 明显 headroom，ImageNet backbone reset 降低姿态表现；它是单 checkpoint 的机制证据，
@@ -44,14 +46,14 @@ EXP025 内部已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route
 EXP026 已保留三层 GA-HFPS 离线比较证据；共同修复 residual 的 ImageNet Full
 `uniform_512` vs `adaptive_512_l1` 两臂 matched 配置和本地 unit/CPU/CUDA/fixed-batch
 gate 已通过，状态 `LOCAL_FORMAL_READY / SERVER_BLOCKED`。本地 object-11 固定批次只证明
-可学习性，尚无正式训练或姿态精度证据；需等待 EXP025 完成并由用户另行放行，详见其 RECORD。
+可学习性，尚无正式训练或姿态精度证据；需 EXP025 收官判定后由用户另行放行，详见其 RECORD。
 
 LM13 已整理为独立 CAD candidate 配置入口，与 LM-O 仅靠配置切换；真实数据、CPU 模型、
 本地 CUDA/CPP batch4 和 legacy GT-oracle evaluator 短测通过。本机 EGL 因 bindless textures
 不支持而阻塞，服务器 profile 仍禁用；没有 formal 或模型精度结论，详见
 [候选记录](lm_candidate/README.md)。第二轮结构收口已将 LM/LM-O 都切到中性 CAD
 config/helper 公共层，六个入口的完整 effective config 与 `d0bd434` 基线一致；旧 EXP025
-import 保留兼容，科学协议与安全 gate 未变。LM-O 完成前不启动。
+import 保留兼容，科学协议与安全 gate 未变。EXP025 收官判定前不启动。
 
 ## Historical experiments
 
