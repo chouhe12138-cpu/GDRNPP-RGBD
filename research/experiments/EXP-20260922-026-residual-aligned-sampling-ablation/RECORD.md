@@ -1,6 +1,39 @@
 # EXP026 — Residual-Aligned Full Sampling Ablation
 
-## 新阶段协议（`SERVER_RELEASE_AUTHORIZED / BATCH48_GATE_PENDING`）
+## 正式训练阶段性记录（2026-09-24，等待完整结果）
+
+- 用户告知两臂已开始正式训练。本节依据 Windows 目录 `E:\6D姿态估计\EXP026\均匀` 与
+  `E:\6D姿态估计\EXP026\自适应` 中提供的 console 日志和 BOP19 评分 JSON 快照；不是
+  服务器实时状态检查。两臂日志 `RUN_INFO` 均指向 source commit
+  `8eebc5e50fec55b2dbe9bd655c0c1fffa8b7b4f5`、seed42 和同一镜像 ID
+  `sha256:73ced4b86b18e83b702f20b6192d3fc1274e043db8d445d0437edd290937441d`。
+- lab0 `uniform_full`：`RUN-20260923-030935-formal-s42-a01`；配置
+  `configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_uniform_full.py`。
+  已有 E5/E10 checkpoint 与评价；日志最后停在 2026-09-24 01:41:38 的 E11、iter 68499/255920。
+- lab1 `adaptive_l1_full`：`RUN-20260923-030930-formal-s42-a01`；配置
+  `configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_adaptive_full.py`。
+  已有 E5/E10/E15/E20 checkpoint 与评价；日志最后停在 2026-09-24 08:05:21 的 E21、
+  iter 128499/255920。两臂日志快照中未见 traceback 或非有限错误；这不证明快照之后的运行状态。
+- BOP AR、ADD(-S)0.1d 来自 console `EVAL_SUMMARY`；AR_reS/AR_teS 来自相同 epoch 的
+  `scores_bop19_*.json`。全部六份评分 JSON 原样保存在 [evidence](evidence/)；逐物体
+  ADD(-S) 原始摘要保存在 [uniform summaries](evidence/formal_uniform_eval_summaries.json) 与
+  [adaptive summaries](evidence/formal_adaptive_eval_summaries.json)。完整日志仍位于用户提供的外部目录。
+
+| arm | epoch / checkpoint | BOP AR | ADD(-S)0.1d | AR_reS | AR_teS |
+|---|---|---:|---:|---:|---:|
+| uniform | E5 / `model_epoch_005.pth` | 0.618215 | 0.404152 | 0.451672 | 0.720646 |
+| uniform | E10 / `model_epoch_010.pth` | 0.642948 | 0.435294 | 0.480277 | 0.737486 |
+| adaptive λ1 | E5 / `model_epoch_005.pth` | 0.620406 | 0.427682 | 0.442907 | 0.728950 |
+| adaptive λ1 | E10 / `model_epoch_010.pth` | 0.642272 | 0.459516 | 0.478893 | 0.749020 |
+| adaptive λ1 | E15 / `model_epoch_015.pth` | 0.669384 | 0.489965 | 0.508420 | 0.775548 |
+| adaptive λ1 | E20 / `model_epoch_020.pth` | 0.673746 | 0.487197 | 0.523183 | 0.781084 |
+
+- 尚未收到 uniform E15–E40、adaptive E25–E40 的评分；predicted-cell representability、
+  anchor/full XYZ error、residual gain 也未生成或未提供。服务器真实 batch48/EGL gate 原始
+  结果未在本次材料中，故不能独立验证其 PASS。E10 两臂 BOP AR 近似（uniform 0.642948、
+  adaptive 0.642272），其他早期指标有差异；完整固定点和机制指标到齐前不作采样优胜判断。
+
+## 新阶段协议（2026-09-23 授权时记录；现已启动 formal）
 
 - 2026-09-23 用户明确授权启动 EXP026：lab0=`uniform_full`（普通采样），
   lab1=`adaptive_l1_full`（几何自适应采样）。EXP025 的两臂 E5–E40 已全部归档；

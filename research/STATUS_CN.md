@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-23
+最后核对：2026-09-24（依据用户提供的训练日志与评分 JSON 快照）
 EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
@@ -8,13 +8,14 @@ EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 `EXP-20260922-026-residual-aligned-sampling-ablation` — 在 matched ImageNet Full 与
 predicted-route residual 条件下比较三层普通采样和几何自适应采样。
 
-状态：`SERVER_RELEASE_AUTHORIZED / BATCH48_GATE_PENDING`。用户于 2026-09-23 明确要求
-lab0 运行 `uniform_full`、lab1 运行 `adaptive_l1_full`，并准备 bundle 与服务器命令。
-本地 gate 已通过；服务器真实 batch48/EGL gate 尚未运行。两臂必须分别通过 gate 后才启动 formal。
+状态：`FORMAL_RUNNING / PARTIAL_EVAL_AVAILABLE`。两臂已从同一 source commit 启动正式训练：
+lab0 `uniform_full`、lab1 `adaptive_l1_full`。截至收到的日志快照，均匀臂完成 E5/E10
+评价，日志到 E11；自适应臂完成 E5/E10/E15/E20 评价，日志到 E21。服务器 batch48/EGL
+gate 的原始输出未包含在本次材料中，不能据此独立核验 gate。
 
-当前唯一下一步：将本次 release bundle 与两份 hierarchy NPZ 分别传至对应服务器，建立只读
-release、核对受管容器和 GPU 占用、各运行一次 batch48/EGL gate；确认 PASS 后按机器映射启动
-两臂 formal。配置允许 formal，实际启动仍以服务器 gate 结果为前置条件。
+当前唯一下一步：等待两臂正式训练及 E5–E40 其余固定点评价完成，收集完整评分与必要的
+逐物体、correspondence 指标；另补存两臂服务器 batch48/EGL gate 的原始证据，再按 EXP026
+RECORD 进行完整比较。现有阶段性结果不用于选优或最终结论。
 
 ## Prior experiment
 
@@ -56,8 +57,8 @@ EXP025 内部已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route
 
 EXP026 已保留三层 GA-HFPS 离线比较证据；共同修复 residual 的 ImageNet Full
 `uniform_512` vs `adaptive_512_l1` 两臂 matched 配置和本地 unit/CPU/CUDA/fixed-batch
-gate 已通过。本地 object-11 固定批次只证明可学习性，尚无正式训练或姿态精度证据；
-服务器真实 batch48 gate 是本次 release 后 formal 的前置检查，详见其 RECORD。
+gate 已通过。本地 object-11 固定批次只证明可学习性，本身不构成正式姿态精度证据；
+服务器真实 batch48 gate 的原始证据待补存；formal 已启动，现有阶段性指标见其 RECORD。
 
 LM13 已整理为独立 CAD candidate 配置入口，与 LM-O 仅靠配置切换；真实数据、CPU 模型、
 本地 CUDA/CPP batch4 和 legacy GT-oracle evaluator 短测通过。本机 EGL 因 bindless textures
