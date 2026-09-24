@@ -95,11 +95,13 @@ class SoftT3ResidualPredictor(nn.Module):
 
 
 class HierarchicalCADAttentionHead(nn.Module):
+    requires_multiscale_features = False
+
     def __init__(self, hierarchy_path, token_dim=256, num_heads=8,
                  expected_object_ids=None, dataset_key='lmo', route_weight=1.,
                  residual_weight=1., mask_weight=1., residual_beta=.1,
                  residual_context_dim=64, residual_detach_route=True,
-                 residual_target_mode='gt_route'):
+                 residual_target_mode='gt_route', image_stages=None, input_channels=1024):
         super().__init__()
         hierarchy = load_cad_hierarchy(hierarchy_path, expected_object_ids=expected_object_ids,
                                        dataset_key=dataset_key)
@@ -119,13 +121,17 @@ class HierarchicalCADAttentionHead(nn.Module):
         self.route_weight, self.residual_weight, self.mask_weight = route_weight, residual_weight, mask_weight
         self.residual_beta = residual_beta
         self.geometry = CADGeometryEncoder(token_dim, num_heads)
-        self.input_adapter = nn.Conv2d(1024, 512, 1)
+        image_stages = IMAGE_STAGES if image_stages is None else tuple(image_stages)
+        if len(image_stages) != 4:
+            raise ValueError('CAD head requires four image stages')
+        self.input_adapter = nn.Conv2d(input_channels, image_stages[0][0], 1)
         self.stages = nn.ModuleList(
             ImageSAStage(channels, resolution, attention, token_dim, num_heads,
-                         write_back=index < len(IMAGE_STAGES) - 1)
-            for index, (channels, resolution, attention) in enumerate(IMAGE_STAGES))
+                         write_back=index < len(image_stages) - 1)
+            for index, (channels, resolution, attention) in enumerate(image_stages))
         self.transitions = nn.ModuleList(
-            CADStageTransition(before, after) for before, after in ((512, 256), (256, 128), (128, 64)))
+            CADStageTransition(before[0], after[0])
+            for before, after in zip(image_stages[:-1], image_stages[1:]))
         self.cross_attention = nn.ModuleList(AttentionBlock(token_dim, num_heads) for _ in range(4))
         self.t3_classifier = nn.Linear(token_dim, 512)
         self.residual_predictor = SoftT3ResidualPredictor(token_dim, residual_context_dim,
@@ -176,7 +182,10 @@ class HierarchicalCADAttentionHead(nn.Module):
     def prediction_from_tokens(self, tokens, banks, t3_logits_tokens, diagnostics=None):
         """Shared dense output contract for the legacy and multiscale heads."""
         b = tokens.shape[0]
-        dense = lambda x: x.transpose(1, 2).reshape(b, -1, 64, 64)
+        size = self.stages[-1].resolution
+        if tokens.shape[1] != size * size or t3_logits_tokens.shape[:2] != (b, size * size):
+            raise ValueError('Final CAD tokens do not match the configured image resolution')
+        dense = lambda x: x.transpose(1, 2).reshape(b, -1, size, size)
         raw_tokens, context, probabilities = self.residual_predictor(tokens, banks[3], t3_logits_tokens)
         raw = dense(raw_tokens)
         prediction = dict(t3_logits=dense(t3_logits_tokens),

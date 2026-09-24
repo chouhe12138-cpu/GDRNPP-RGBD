@@ -86,3 +86,69 @@
 完整 E5–E40 固定点评价，以及逐物体、correspondence 指标判断。EXP026 formal 尚在运行，
 不得在其正式训练期间替换服务器 release/镜像。服务器 release 与 formal 仍受配置阻断；
 待用户另行授权及 EXP026 运行结束后，按 `research/exp027/SERVER_PREP_CN.md` 准备 release。
+
+## 2026-09-24 结构收口复核（审查基准 `d6234eb`）
+
+### 变更与协议边界
+
+- B 的三次 image-conditioned parent-query 传播加入可训练 scalar gate，初值均为 `0.01`。
+  原 B 固定批次在 step80→100 的 route loss 回升且 representability 下降；小初值旨在降低
+  早期动态父 query 对子 query 的扰动。原生 AMP 融合通过本地 smoke 与 100 步检查，未扩大
+  FP32 运算范围。checkpoint sentinel、strict roundtrip、梯度和参数更新均覆盖该参数。
+- EXP027 A/B 的 backbone channels `(128,256,512,1024)`、feature resolutions
+  `(64,32,16,8)`、pyramid channels `(64,128,256,512)` 现由 resolved config 显式给出；
+  多尺度 stage、transition、lateral 从该规格构建。现有四级 tensor 形状和 `[B,512,64,64]`
+  输出保持相同。wrapper 读取 head capability 路由单/四尺度，architecture 与
+  `out_indices` 仍 fail-closed。EXP025/026 legacy 配置未加这些字段。
+- A/B 并非仅改变 attention 方向：B 还以 pixel/query similarity 替换 dense classifier，
+  final residual/mask 使用最终 image token，而 A 使用 image-query/CAD interaction 后的
+  token。两臂 residual 的 CAD context 都保持 geometry-only T3 bank。
+- 保持两臂 40 epoch、E5–E40 固定评价；E15 仅观察，不设独立 screening 或停训判据。
+  数据、hierarchy、predicted-route residual、T2/T1 marginal、RANSAC-PnP、优化器、
+  LR、batch、seed 与原协议一致。formal/release 开关继续关闭。
+
+### Observed：resolved config 与本地验证
+
+- EXP027-A 相对 EXP026 adaptive 的 resolved-config 差异仅有实验/arm/output 身份、
+  `TRAIN_PROTOCOL.NAME`、backbone `out_indices`、head architecture、新增三组多尺度规格、
+  AMP 初值 `16384→4096`、release/formal flags；白名单 diff 和关键科学字段等值测试通过。
+  A/B resolved config 仍仅在 arm、output 和 architecture 三项不同。
+- `pytorch22` CPU preflight A/B PASS：hierarchy SHA 精确匹配、ImageNet backbone 340 tensors
+  精确加载、forward/loss/backward finite、optimizer 覆盖完整；B 的三枚 gate 有非零有限
+  gradient。参数统计见更新后的 [parameter report](evidence/parameter_report.json)：
+
+| arm | total=trainable | head | Δ vs EXP026 | Δ vs 收口前 |
+|---|---:|---:|---:|---:|
+| EXP026 adaptive | 98,352,068 | 10,787,652 | 0 | 0 |
+| A | 98,524,551 | 10,960,135 | +172,483 (+0.175%) | 0 |
+| B | 98,721,930 | 11,157,514 | +369,862 (+0.376%) | +3 |
+
+- 同一 `.local/exp025/fixed_batch4_a01.pt`，seed42、batch4、AMP4096、100 步，
+  新 run 为 `A-config-fixed-b4-a01` 与 `B-gate-fixed-b4-a01`；紧凑原始报告分别见
+  [A fixed](evidence/a_config_fixed_b4_s42.json)、[B fixed](evidence/b_gate_fixed_b4_s42.json)。
+  旧报告仍保留，均为单次固定批次诊断，不构成正式姿态精度或跨 seed 证据。
+
+| arm | route loss step80→100 | representability @100 | full XYZ @100 (mm) | median full step (ms) |
+|---|---:|---:|---:|---:|
+| A 原版 | 1.086→0.749 | 95.58% | 5.841 | 334.76 |
+| A 收口后 | 1.253→0.811 | 95.29% | 5.903 | 328.82 |
+| B 原版 | 1.652→2.037 | 70.39% | 8.578 | 336.41 |
+| B gate 后 | 1.713→1.607 | 77.48% | 7.982 | 361.68 |
+
+- B 的 step100 route loss 比原版低 `0.430`（`2.037−1.607`），representability 高
+  `7.09` 个百分点，full XYZ 低 `0.596 mm`；末段 route/representability 均继续改善，
+  不再出现原版后期回升。三个 gate 终值为 `0.01028/0.01640/0.01912`。A 末点 route
+  高 `0.062`、representability 低 `0.29` 个百分点，记录为本地运行差异。B 本次 step
+  中位数比原版高约 `25.26 ms`；本地计时不含 DataLoader/EGL，不推断服务器吞吐。
+- A/B batch4、8-step AMP4096 smoke 均 PASS：0 skipped、0 non-finite、相关参数梯度及
+  更新、model/optimizer/scaler strict checkpoint roundtrip PASS，见
+  [A smoke](evidence/a_config_smoke_b4_s42.json)、[B smoke](evidence/b_gate_smoke_b4_s42.json)。
+  EXP025/026/027 相关 pytest `52 passed`，compileall 和 `git diff --check` PASS。
+  原版失败记录及原始对照不覆盖。
+
+### Interpretation / Decision
+
+此次单批次证据支持 B gate 缓解后期 route 恶化；仍不能推断正式泛化、跨 run 稳定性或
+更高 batch 的数值稳定性。建议在 EXP026 正式运行结束、完成服务器只读检查且用户授权后，
+A/B 各自执行真实 batch48/EGL 八步 gate。只有对应 arm 的 0 skipped、0 non-finite、
+checkpoint roundtrip PASS 才进入其 40 epoch formal；当前 release/formal 仍阻断。

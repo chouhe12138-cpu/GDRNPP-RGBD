@@ -59,3 +59,20 @@ route loss 分别为 0.638/0.749/2.037，predicted-cell representability 为
 当前 `SERVER_RELEASE_ALLOWED=False`、`FORMAL_READY=False`，EXP026 formal 期间不修改服务器
 release/容器。具体 release、gate、formal 阶段和可整体复制的块见
 [SERVER_PREP_CN.md](SERVER_PREP_CN.md)；只在用户后续授权后使用。
+
+## 2026-09-24 修改包收口
+
+- B 新增三个可训练 parent-query gate（初值 0.01），参数总量 `98,721,927→98,721,930`；
+  A 仍为 `98,524,551`，EXP026 adaptive 仍为 `98,352,068`。
+- A/B 的四尺度 channel/resolution/pyramid 规格现在由 config 显式声明；core wrapper
+  通过 head capability 路由 backbone 特征，仍严格检查 architecture/out_indices。
+  EXP027-A vs EXP026 adaptive 的 resolved-config 白名单 diff 无意外差异。
+- 同批次 100 步：B route loss `2.037→1.607`，representability `70.39%→77.48%`，
+  step80→100 从旧版 `1.652→2.037` 改为 `1.713→1.607`；A route loss
+  `0.749→0.811`，representability `95.58%→95.29%`。新 B 整步中位时间
+  `361.68 ms`，A 为 `328.82 ms`；均为本地 batch4 工程计时。
+- A/B CPU preflight、batch4 8-step AMP smoke 和 100-step fixed-batch PASS，0 skipped，
+  strict checkpoint roundtrip PASS。新原始紧凑报告和判断边界见 EXP027 RECORD。
+- B 还替换 dense classifier，且 final residual/mask image token 路径与 A 不同；
+  因此两臂不构成单独的 attention-direction 消融。正式协议仍为完整 40 epoch，
+  E15 只观察；建议两臂分别进入服务器 batch48/EGL gate，当前不开放 release/formal。

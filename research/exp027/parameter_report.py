@@ -25,7 +25,8 @@ def report(config):
         fpn_lateral=count(head.laterals) + head.lateral_alpha.numel() if hasattr(head, 'laterals') else 0,
         cross_query=count(head.cross_attention) +
             sum(count(getattr(head, name)) for name in
-                ('query_parents', 'pixel_projection', 'query_projection') if hasattr(head, name)),
+                ('query_parents', 'pixel_projection', 'query_projection') if hasattr(head, name)) +
+            (head.query_parent_alpha.numel() if hasattr(head, 'query_parent_alpha') else 0),
         classifier=count(head.t3_classifier) if hasattr(head, 't3_classifier') else 0,
         residual_mask=count(head.residual_predictor) + count(head.mask_predictor),
     )

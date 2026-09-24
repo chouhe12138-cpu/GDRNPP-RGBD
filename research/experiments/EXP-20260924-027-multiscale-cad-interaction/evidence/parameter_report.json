@@ -15,15 +15,15 @@
   "B_cad_region_query": {
     "backbone": 87564416,
     "classifier": 0,
-    "cross_query": 2439424,
-    "delta_percent": 0.37605614962768247,
-    "delta_vs_exp026": 369859,
+    "cross_query": 2439427,
+    "delta_percent": 0.37605919989399716,
+    "delta_vs_exp026": 369862,
     "fpn_lateral": 172483,
-    "head": 11157511,
+    "head": 11157514,
     "other_head": 8445952,
     "residual_mask": 99652,
-    "total": 98721927,
-    "trainable": 98721927
+    "total": 98721930,
+    "trainable": 98721930
   },
   "EXP026_adaptive": {
     "backbone": 87564416,

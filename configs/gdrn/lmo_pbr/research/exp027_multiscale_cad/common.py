@@ -43,7 +43,10 @@ MODEL = dict(WEIGHTS='', BBOX_TYPE='AMODAL_CLIP', LOAD_DETS_TEST=False, POSE_NET
     CAD_ATTENTION_HEAD=dict(ENABLED=True, HIERARCHY_PATH=os.path.join(
         os.environ.get('GDRN_DATASET_CACHE_DIR', '.local/dataset_cache'), 'exp026',
         'RUN-20260921-ga-hfps-s20260919-a01', 'adaptive_512_l1.npz'),
-        INIT_CFG=dict(residual_target_mode='predicted_route')),
+        INIT_CFG=dict(residual_target_mode='predicted_route',
+                      backbone_channels=(128, 256, 512, 1024),
+                      feature_resolutions=(64, 32, 16, 8),
+                      pyramid_channels=(64, 128, 256, 512))),
     LOSS_CFG=dict(FULL_MASK_LOSS_TYPE='L1', FULL_MASK_LW=1., PM_LOSS_SYM=True,
                   CENTROID_LW=1., Z_LW=1.)))
 DATALOADER = dict(NUM_WORKERS=16, FILTER_VISIB_THR=.3)

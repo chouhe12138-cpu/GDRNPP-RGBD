@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-24（依据用户提供的训练日志与评分 JSON 快照）
+最后核对：2026-09-24（依据用户提供的训练日志与评分 JSON 快照、EXP027 本地收口证据）
 EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
@@ -49,7 +49,8 @@ EXP025 的最终组合策略结论仍待用户判定；本次仅授权推进独�
 
 ## Next stage
 
-EXP027 多尺度 CAD Interaction A/B 已完成本地实现与 batch4 工程 gate，formal 配置和服务器
+EXP027 多尺度 CAD Interaction A/B 已完成本地实现、parent-query gate 收口及 batch4 工程
+复核；B 固定批次后期 route 回升得到缓解，仍需各自真实 batch48/EGL gate。formal 配置和服务器
 release 仍阻断；EXP026 正式训练结束及用户另行授权前，不替换服务器 release/容器，详见
 [EXP027 RECORD](experiments/EXP-20260924-027-multiscale-cad-interaction/RECORD.md)。
 

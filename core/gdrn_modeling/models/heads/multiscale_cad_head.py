@@ -10,13 +10,34 @@ from .hierarchical_cad_attention_head import HierarchicalCADAttentionHead
 
 
 class _MultiscaleCADHead(HierarchicalCADAttentionHead):
-    feature_shapes = ((128, 64), (256, 32), (512, 16), (1024, 8))
+    requires_multiscale_features = True
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.laterals = nn.ModuleList((nn.Conv2d(512, 256, 1),
-                                       nn.Conv2d(256, 128, 1),
-                                       nn.Conv2d(128, 64, 1)))
+    def __init__(self, *args, backbone_channels, feature_resolutions, pyramid_channels, **kwargs):
+        def four_positive(name, values):
+            if not isinstance(values, (tuple, list)) or len(values) != 4 or any(
+                    isinstance(value, bool) or not isinstance(value, int) or value <= 0
+                    for value in values):
+                raise ValueError(f'{name} must contain four positive integers')
+            return tuple(values)
+
+        backbone_channels = four_positive('backbone_channels', backbone_channels)
+        feature_resolutions = four_positive('feature_resolutions', feature_resolutions)
+        pyramid_channels = four_positive('pyramid_channels', pyramid_channels)
+        if any(coarse * 2 != fine for fine, coarse in
+               zip(feature_resolutions[:-1], feature_resolutions[1:])):
+            raise ValueError('feature_resolutions must descend by powers of two')
+        if any(size % 8 for size in feature_resolutions[:2]):
+            raise ValueError('fine feature resolutions must support 8x8 window attention')
+        self.backbone_channels = backbone_channels
+        self.feature_resolutions = feature_resolutions
+        self.pyramid_channels = pyramid_channels
+        self.feature_shapes = tuple(zip(backbone_channels, feature_resolutions))
+        image_stages = tuple((channels, size, attention) for channels, size, attention in zip(
+            reversed(pyramid_channels), reversed(feature_resolutions),
+            ('global', 'global', 'window', 'window')))
+        super().__init__(*args, image_stages=image_stages, input_channels=backbone_channels[-1], **kwargs)
+        self.laterals = nn.ModuleList(nn.Conv2d(source, target, 1) for source, target in zip(
+            reversed(backbone_channels[:-1]), reversed(pyramid_channels[:-1])))
         self.lateral_alpha = nn.Parameter(torch.full((3,), .01))
 
     def _check_features(self, features, classes):
@@ -66,6 +87,7 @@ class HierarchicalCADRegionQueryHead(_MultiscaleCADHead):
         super().__init__(*args, **kwargs)
         del self.t3_classifier
         self.query_parents = nn.ModuleList(nn.Linear(self.token_dim, self.token_dim) for _ in range(3))
+        self.query_parent_alpha = nn.Parameter(torch.full((3,), .01))
         self.pixel_projection = nn.Linear(self.token_dim, self.token_dim)
         self.query_projection = nn.Linear(self.token_dim, self.token_dim)
 
@@ -82,7 +104,8 @@ class HierarchicalCADRegionQueryHead(_MultiscaleCADHead):
         query = None
         for index, (bank, tokens, block) in enumerate(zip(banks, image_tokens, self.cross_attention)):
             if index:
-                query = bank + self.query_parents[index-1](query).repeat_interleave(8, dim=1)
+                parent = self.query_parents[index-1](query).repeat_interleave(8, dim=1)
+                query = bank + self.query_parent_alpha[index-1] * parent
             else:
                 query = bank
             query = block(query, tokens)

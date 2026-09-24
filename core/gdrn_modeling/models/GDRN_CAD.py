@@ -60,6 +60,7 @@ def require_full_checkpoint(weights, architecture='legacy'):
         required.extend(('cad_attention_head.query_parents.0.weight',
                          'cad_attention_head.query_parents.1.weight',
                          'cad_attention_head.query_parents.2.weight',
+                         'cad_attention_head.query_parent_alpha',
                          'cad_attention_head.pixel_projection.weight',
                          'cad_attention_head.query_projection.weight'))
     missing = [name for name in required if name not in keys]
@@ -98,8 +99,7 @@ class GDRN_CAD(nn.Module):
         else:
             with torch.no_grad():
                 feature = self.backbone(image)
-        multiscale = isinstance(self.cad_attention_head,
-                                (MultiscaleImageQueryHead, HierarchicalCADRegionQueryHead))
+        multiscale = bool(getattr(self.cad_attention_head, 'requires_multiscale_features', False))
         if multiscale:
             if not isinstance(feature, (tuple, list)) or len(feature) != 4:
                 raise ValueError('EXP027 backbone must return four feature maps')

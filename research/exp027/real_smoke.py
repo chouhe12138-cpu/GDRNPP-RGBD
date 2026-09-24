@@ -42,10 +42,11 @@ def run(args):
     tracked = (['stages'] if baseline else ['laterals', 'lateral_alpha']) + [
         'cross_attention', 'residual_predictor', 'mask_predictor']
     tracked += ['t3_classifier'] if hasattr(head, 't3_classifier') else [
-        'query_parents', 'pixel_projection', 'query_projection']
+        'query_parents', 'query_parent_alpha', 'pixel_projection', 'query_projection']
     before_params = {name: {key: value.detach().clone() for key, value in
-                    getattr(head, name).named_parameters()} if name != 'lateral_alpha' else
-                    {'value': head.lateral_alpha.detach().clone()} for name in tracked}
+                    getattr(head, name).named_parameters()} if not isinstance(
+                    getattr(head, name), torch.nn.Parameter) else
+                    {'value': getattr(head, name).detach().clone()} for name in tracked}
     gradients = {name: False for name in tracked}
     timings, history = [], []
     scaler = torch.cuda.amp.GradScaler(init_scale=scale)
@@ -90,7 +91,7 @@ def run(args):
     updates = {}
     for name, old in before_params.items():
         item = getattr(head, name)
-        current = {'value': item} if name == 'lateral_alpha' else dict(item.named_parameters())
+        current = {'value': item} if isinstance(item, torch.nn.Parameter) else dict(item.named_parameters())
         updates[name] = sum(not torch.equal(value, current[key]) for key, value in old.items())
     if not all(gradients.values()) or not all(updates.values()):
         raise RuntimeError(f'EXP027 trainability failed: gradients={gradients}, updates={updates}')
@@ -119,7 +120,9 @@ def run(args):
                                     for key in steady[0]},
                   peak_allocated_gb=torch.cuda.max_memory_allocated()/1e9,
                   peak_reserved_gb=torch.cuda.max_memory_reserved()/1e9,
-                  lateral_alpha=[] if baseline else [float(v) for v in head.lateral_alpha.detach().cpu()])
+                  lateral_alpha=[] if baseline else [float(v) for v in head.lateral_alpha.detach().cpu()],
+                  query_parent_alpha=[float(v) for v in head.query_parent_alpha.detach().cpu()]
+                  if hasattr(head, 'query_parent_alpha') else [])
     (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     return report
 

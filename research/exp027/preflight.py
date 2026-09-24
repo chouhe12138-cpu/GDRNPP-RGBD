@@ -31,6 +31,11 @@ def inspect_config(cfg):
         raise ValueError('EXP027 architecture/arm mismatch')
     if tuple(net.BACKBONE.INIT_CFG.out_indices) != (0, 1, 2, 3):
         raise ValueError('EXP027 requires four ConvNeXt scales')
+    spec = net.CAD_ATTENTION_HEAD.INIT_CFG
+    if (tuple(spec.backbone_channels), tuple(spec.feature_resolutions),
+            tuple(spec.pyramid_channels)) != ((128, 256, 512, 1024), (64, 32, 16, 8),
+                                              (64, 128, 256, 512)):
+        raise ValueError('EXP027 frozen multiscale feature spec mismatch')
     if (cfg.BACKBONE_INIT, bool(cfg.TRAIN_BACKBONE), float(cfg.BACKBONE_LR_MULT)) != ('imagenet', True, 1.):
         raise ValueError('EXP027 requires ImageNet Full at the head LR')
     if cfg.MODEL.WEIGHTS or net.CAD_ATTENTION_HEAD.INIT_CFG.residual_target_mode != 'predicted_route':
@@ -75,7 +80,7 @@ def run_cpu(cfg):
         raise RuntimeError('EXP027 CPU loss non-finite')
     required = ('laterals', 'lateral_alpha', 'cross_attention', 'residual_predictor', 'mask_predictor')
     if cfg.EXP027_ARM == 'B_cad_region_query':
-        required += ('query_parents', 'pixel_projection', 'query_projection')
+        required += ('query_parents', 'query_parent_alpha', 'pixel_projection', 'query_projection')
     else:
         required += ('t3_classifier',)
     coverage = {}
