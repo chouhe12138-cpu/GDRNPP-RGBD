@@ -1,0 +1,155 @@
+{
+  "status": "PASS",
+  "arm": "B_cad_region_query",
+  "hierarchy_sha256": "7ac75daa756ed7ae59463614737ccc46cd746173452cd1943a4a024d0817c631",
+  "config": "configs/gdrn/lmo_pbr/research/exp027_multiscale_cad/train_b_cad_region_query.py",
+  "mode": "fixed",
+  "batch_size": 4,
+  "steps": 100,
+  "amp_init_scale": 4096.0,
+  "amp_skipped_steps": 0,
+  "optimizer_groups": [
+    {
+      "name": "cad_head",
+      "lr": 0.0003,
+      "parameters": 11157511
+    },
+    {
+      "name": "backbone",
+      "lr": 0.0003,
+      "parameters": 87564416
+    }
+  ],
+  "gradients": {
+    "laterals": true,
+    "lateral_alpha": true,
+    "cross_attention": true,
+    "residual_predictor": true,
+    "mask_predictor": true,
+    "query_parents": true,
+    "pixel_projection": true,
+    "query_projection": true
+  },
+  "parameter_updates": {
+    "laterals": 6,
+    "lateral_alpha": 1,
+    "cross_attention": 56,
+    "residual_predictor": 6,
+    "mask_predictor": 2,
+    "query_parents": 6,
+    "pixel_projection": 2,
+    "query_projection": 2
+  },
+  "checkpoint_roundtrip": "not_required_for_fixed_batch",
+  "history": [
+    {
+      "step": 0,
+      "route_loss": 12.553227424621582,
+      "loss_cad_t1": 2.083916187286377,
+      "loss_cad_t2": 4.1952924728393555,
+      "loss_cad_t3": 6.27401876449585,
+      "loss_cad_mask": 0.6653848886489868,
+      "residual_loss": 0.2342771291732788,
+      "representable": 0.004807962104678154,
+      "residual_valid_points": 21,
+      "anchor_error_mm": 88.8387680053711,
+      "full_error_mm": 88.8387680053711,
+      "residual_gain_mm": 0.0,
+      "residual_norm_max": 0.0,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 20,
+      "route_loss": 4.014131546020508,
+      "loss_cad_t1": 0.23582527041435242,
+      "loss_cad_t2": 1.0337350368499756,
+      "loss_cad_t3": 2.7445712089538574,
+      "loss_cad_mask": 0.15633457899093628,
+      "residual_loss": 0.2708131670951843,
+      "representable": 0.41312840580940247,
+      "residual_valid_points": 1532,
+      "anchor_error_mm": 15.220386505126953,
+      "full_error_mm": 15.128775596618652,
+      "residual_gain_mm": 0.09161090850830078,
+      "residual_norm_max": 0.3110935389995575,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 40,
+      "route_loss": 2.784491539001465,
+      "loss_cad_t1": 0.1199716329574585,
+      "loss_cad_t2": 0.5906631350517273,
+      "loss_cad_t3": 2.073856830596924,
+      "loss_cad_mask": 0.09622319787740707,
+      "residual_loss": 0.24057669937610626,
+      "representable": 0.5723128318786621,
+      "residual_valid_points": 2143,
+      "anchor_error_mm": 11.615116119384766,
+      "full_error_mm": 11.27286434173584,
+      "residual_gain_mm": 0.3422517776489258,
+      "residual_norm_max": 0.3147646486759186,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 60,
+      "route_loss": 2.34718918800354,
+      "loss_cad_t1": 0.12023106962442398,
+      "loss_cad_t2": 0.477995902299881,
+      "loss_cad_t3": 1.748962163925171,
+      "loss_cad_mask": 0.07245597243309021,
+      "residual_loss": 0.22764217853546143,
+      "representable": 0.6578423976898193,
+      "residual_valid_points": 2451,
+      "anchor_error_mm": 10.147049903869629,
+      "full_error_mm": 9.810443878173828,
+      "residual_gain_mm": 0.3366060256958008,
+      "residual_norm_max": 0.2997870147228241,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 80,
+      "route_loss": 1.6516059637069702,
+      "loss_cad_t1": 0.04354819282889366,
+      "loss_cad_t2": 0.25539112091064453,
+      "loss_cad_t3": 1.3526666164398193,
+      "loss_cad_mask": 0.060571566224098206,
+      "residual_loss": 0.21302959322929382,
+      "representable": 0.7582464218139648,
+      "residual_valid_points": 2843,
+      "anchor_error_mm": 8.339624404907227,
+      "full_error_mm": 7.972708702087402,
+      "residual_gain_mm": 0.3669157028198242,
+      "residual_norm_max": 0.3446039855480194,
+      "residual_saturated_fraction": 0.0
+    },
+    {
+      "step": 100,
+      "route_loss": 2.0367374420166016,
+      "loss_cad_t1": 0.10746465623378754,
+      "loss_cad_t2": 0.396587610244751,
+      "loss_cad_t3": 1.5326850414276123,
+      "loss_cad_mask": 0.06313307583332062,
+      "residual_loss": 0.21738353371620178,
+      "representable": 0.7039080262184143,
+      "residual_valid_points": 2664,
+      "anchor_error_mm": 8.968486785888672,
+      "full_error_mm": 8.578424453735352,
+      "residual_gain_mm": 0.3900623321533203,
+      "residual_norm_max": 0.4571203887462616,
+      "residual_saturated_fraction": 0.0
+    }
+  ],
+  "timing_median_ms": {
+    "forward_ms": 49.19725299987476,
+    "backward_ms": 245.87595999764744,
+    "optimizer_ms": 42.149601998971775,
+    "full_step_ms": 336.41425700261607
+  },
+  "peak_allocated_gb": 2.856708096,
+  "peak_reserved_gb": 2.917138432,
+  "lateral_alpha": [
+    0.010617885738611221,
+    0.017216645181179047,
+    0.01300183404237032
+  ]
+}

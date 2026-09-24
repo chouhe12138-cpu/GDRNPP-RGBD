@@ -11,6 +11,7 @@ from torch import nn
 from core.utils.solver_utils import build_optimizer_with_params
 from .backbone_factory import BACKBONES, get_backbone_init_args
 from .heads.hierarchical_cad_attention_head import HierarchicalCADAttentionHead
+from .heads.multiscale_cad_head import MultiscaleImageQueryHead, HierarchicalCADRegionQueryHead
 from core.gdrn_modeling.datasets.research_context import resolve_dataset_context
 from research.cad_hierarchy.contracts import require_configured_hierarchy
 
@@ -27,7 +28,12 @@ CAD_CHECKPOINT_TENSORS = ('cad_attention_head.t3_classifier.weight',
                           'cad_attention_head.mask_predictor.weight')
 
 
-def require_full_checkpoint(weights):
+HEAD_ARCHITECTURES = {'legacy': HierarchicalCADAttentionHead,
+                      'multiscale_image_query': MultiscaleImageQueryHead,
+                      'hierarchical_cad_query': HierarchicalCADRegionQueryHead}
+
+
+def require_full_checkpoint(weights, architecture='legacy'):
     """Reject anything that cannot restore every GDRN_CAD component.
 
     The hierarchy buffers are non-persistent and the head is built from random
@@ -42,7 +48,21 @@ def require_full_checkpoint(weights):
     state = torch.load(path, map_location='cpu')
     state = state.get('model', state.get('state_dict', state))
     keys = {key[len('_module.'):] if key.startswith('_module.') else key for key in state}
-    missing = [name for name in CAD_CHECKPOINT_TENSORS if name not in keys]
+    if architecture not in HEAD_ARCHITECTURES:
+        raise ValueError(f'Unknown CAD architecture: {architecture}')
+    required = list(CAD_CHECKPOINT_TENSORS)
+    if architecture != 'legacy':
+        required.extend(('cad_attention_head.laterals.0.weight',
+                         'cad_attention_head.laterals.1.weight',
+                         'cad_attention_head.laterals.2.weight'))
+    if architecture == 'hierarchical_cad_query':
+        required.remove('cad_attention_head.t3_classifier.weight')
+        required.extend(('cad_attention_head.query_parents.0.weight',
+                         'cad_attention_head.query_parents.1.weight',
+                         'cad_attention_head.query_parents.2.weight',
+                         'cad_attention_head.pixel_projection.weight',
+                         'cad_attention_head.query_projection.weight'))
+    missing = [name for name in required if name not in keys]
     if not any(key.startswith('backbone.') for key in keys):
         missing.append('backbone.*')
     if missing:
@@ -72,13 +92,21 @@ class GDRN_CAD(nn.Module):
         return self
 
     def backbone_feature(self, image):
-        """The single [B,1024,8,8] tensor the head consumes, with the frozen-backbone rule."""
+        """Strictly route the configured single or four-feature ConvNeXt output."""
         if self.training and any(p.requires_grad for p in self.backbone.parameters()):
             feature = self.backbone(image)
         else:
             with torch.no_grad():
                 feature = self.backbone(image)
+        multiscale = isinstance(self.cad_attention_head,
+                                (MultiscaleImageQueryHead, HierarchicalCADRegionQueryHead))
+        if multiscale:
+            if not isinstance(feature, (tuple, list)) or len(feature) != 4:
+                raise ValueError('EXP027 backbone must return four feature maps')
+            return feature
         if isinstance(feature, (tuple, list)):
+            if len(feature) != 1:
+                raise ValueError('Legacy CAD backbone must return one feature map')
             feature = feature[0]
         return feature
 
@@ -106,10 +134,16 @@ def build_model_optimizer(cfg, is_test=False):
     net = cfg.MODEL.POSE_NET
     if net.NAME != 'GDRN_CAD' or cfg.INPUT.WITH_DEPTH or not net.CAD_ATTENTION_HEAD.ENABLED:
         raise ValueError('GDRN_CAD requires RGB input and an enabled CAD attention head')
+    architecture = str(net.CAD_ATTENTION_HEAD.get('ARCHITECTURE', 'legacy'))
+    if architecture not in HEAD_ARCHITECTURES:
+        raise ValueError(f'Unknown CAD architecture: {architecture}')
+    expected_indices = (3,) if architecture == 'legacy' else (0, 1, 2, 3)
+    if tuple(net.BACKBONE.INIT_CFG.out_indices) != expected_indices:
+        raise ValueError(f'{architecture} requires ConvNeXt out_indices={expected_indices}')
     if is_test or bool(cfg.TEST.get('SAVE_RESULTS_ONLY', False)):
         # Evaluation is the one path that never trains the head: it must be told where a
         # complete checkpoint is, and fail before anything is scored.
-        require_full_checkpoint(cfg.MODEL.WEIGHTS)
+        require_full_checkpoint(cfg.MODEL.WEIGHTS, architecture)
     if bool(net.BACKBONE.FREEZE) == bool(cfg.TRAIN_BACKBONE):
         raise ValueError('Backbone controls disagree; edit the selected arm config or use the tool override')
     context = dataset_context(cfg)
@@ -127,7 +161,7 @@ def build_model_optimizer(cfg, is_test=False):
     backbone = BACKBONES[backbone_type](**args)
     for p in backbone.parameters():
         p.requires_grad_(not net.BACKBONE.FREEZE)
-    head = HierarchicalCADAttentionHead(context.hierarchy_path, expected_object_ids=context.object_ids,
+    head = HEAD_ARCHITECTURES[architecture](context.hierarchy_path, expected_object_ids=context.object_ids,
         dataset_key=context.key, **copy.deepcopy(net.CAD_ATTENTION_HEAD.INIT_CFG))
     model = GDRN_CAD(backbone, head)
     # Keep initialization independent of freeze status. Main entry can subsequently

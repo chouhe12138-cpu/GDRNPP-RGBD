@@ -124,8 +124,19 @@ class ImageSAStage(nn.Module):
             tokens = block(tokens, tokens) if self.global_attention else block(tokens)
         if self.to_feature is None:  # final stage: the tokens are the cross-attention query
             return None, tokens
-        update = self.to_feature(tokens).transpose(1, 2).reshape(batch, channels, height, width)
-        return feature + update, tokens
+        return self.write_back(feature, tokens), tokens
+
+    def write_back(self, feature, token_delta, include_bias=True):
+        """Project a token update through the stage's existing feature projection."""
+        if self.to_feature is None:
+            raise ValueError('Final image stage has no feature write-back')
+        batch, channels, height, width = feature.shape
+        if token_delta.shape != (batch, height * width, self.to_feature.in_features):
+            raise ValueError('Token update does not match the image feature')
+        update = F.linear(token_delta, self.to_feature.weight,
+                          self.to_feature.bias if include_bias else None)
+        update = update.transpose(1, 2).reshape(batch, channels, height, width)
+        return feature + update
 
 
 class CADGeometryEncoder(nn.Module):

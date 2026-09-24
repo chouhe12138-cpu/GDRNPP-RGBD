@@ -40,6 +40,10 @@ def measure(model, batch):
     full_mm = torch.stack([item[1] for item in candidate], 1).gather(1, chosen[:, None]).mean() * 1000
     raw = prediction['residual'].detach()
     return dict(route_loss=float(sum(losses[f'loss_cad_t{depth}'] for depth in (1, 2, 3))),
+                loss_cad_t1=float(losses['loss_cad_t1']),
+                loss_cad_t2=float(losses['loss_cad_t2']),
+                loss_cad_t3=float(losses['loss_cad_t3']),
+                loss_cad_mask=float(losses['loss_cad_mask']),
                 residual_loss=float(losses['loss_cad_residual']),
                 representable=float(stats['cad_pred_route_representable']),
                 residual_valid_points=int(stats['cad_pred_route_residual_valid_points']),

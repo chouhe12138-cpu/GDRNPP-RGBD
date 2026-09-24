@@ -82,7 +82,10 @@ def head_telemetry(head, diagnostics):
     if 'soft_t3_context' in diagnostics:  # residual V2 conditioning
         stats['soft_t3_context_token_norm'] = token_norm_stats(diagnostics['soft_t3_context'])
     stats['bounded_residual_norm_max'] = float(diagnostics['residual'].detach().float().norm(dim=1).max())
-    stats['t3_classifier_weight_abs_max'] = float(head.t3_classifier.weight.detach().abs().max())
+    if hasattr(head, 't3_classifier'):
+        stats['t3_classifier_weight_abs_max'] = float(head.t3_classifier.weight.detach().abs().max())
+    elif hasattr(head, 'query_projection'):
+        stats['query_projection_weight_abs_max'] = float(head.query_projection.weight.detach().abs().max())
     return stats
 
 

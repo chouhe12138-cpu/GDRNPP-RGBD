@@ -170,9 +170,13 @@ class HierarchicalCADAttentionHead(nn.Module):
         if classes.shape != (len(feature),) or torch.any((classes < 0) | (classes >= self.num_objects)):
             raise ValueError('Invalid EXP025 ROI classes')
         tokens, banks = self.encode(feature, classes)
-        b = len(feature)
+        logits = self.t3_classifier(tokens)
+        return self.prediction_from_tokens(tokens, banks, logits, diagnostics)
+
+    def prediction_from_tokens(self, tokens, banks, t3_logits_tokens, diagnostics=None):
+        """Shared dense output contract for the legacy and multiscale heads."""
+        b = tokens.shape[0]
         dense = lambda x: x.transpose(1, 2).reshape(b, -1, 64, 64)
-        t3_logits_tokens = self.t3_classifier(tokens)
         raw_tokens, context, probabilities = self.residual_predictor(tokens, banks[3], t3_logits_tokens)
         raw = dense(raw_tokens)
         prediction = dict(t3_logits=dense(t3_logits_tokens),

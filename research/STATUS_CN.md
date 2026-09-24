@@ -49,6 +49,10 @@ EXP025 的最终组合策略结论仍待用户判定；本次仅授权推进独�
 
 ## Next stage
 
+EXP027 多尺度 CAD Interaction A/B 已完成本地实现与 batch4 工程 gate，formal 配置和服务器
+release 仍阻断；EXP026 正式训练结束及用户另行授权前，不替换服务器 release/容器，详见
+[EXP027 RECORD](experiments/EXP-20260924-027-multiscale-cad-interaction/RECORD.md)。
+
 EXP025 formal 已完成全部固定点交付；最终组合策略结论只由用户基于 RECORD 判定。
 
 EXP025 内部已完成 Full E15 本地 checkpoint 诊断：匹配预测 T3 route 的 oracle residual 显示

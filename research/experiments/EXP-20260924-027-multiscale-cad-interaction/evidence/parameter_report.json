@@ -1,0 +1,41 @@
+{
+  "A_multiscale_fpn": {
+    "backbone": 87564416,
+    "classifier": 131584,
+    "cross_query": 2110464,
+    "delta_percent": 0.17537302825193263,
+    "delta_vs_exp026": 172483,
+    "fpn_lateral": 172483,
+    "head": 10960135,
+    "other_head": 8445952,
+    "residual_mask": 99652,
+    "total": 98524551,
+    "trainable": 98524551
+  },
+  "B_cad_region_query": {
+    "backbone": 87564416,
+    "classifier": 0,
+    "cross_query": 2439424,
+    "delta_percent": 0.37605614962768247,
+    "delta_vs_exp026": 369859,
+    "fpn_lateral": 172483,
+    "head": 11157511,
+    "other_head": 8445952,
+    "residual_mask": 99652,
+    "total": 98721927,
+    "trainable": 98721927
+  },
+  "EXP026_adaptive": {
+    "backbone": 87564416,
+    "classifier": 131584,
+    "cross_query": 2110464,
+    "delta_percent": 0.0,
+    "delta_vs_exp026": 0,
+    "fpn_lateral": 0,
+    "head": 10787652,
+    "other_head": 8445952,
+    "residual_mask": 99652,
+    "total": 98352068,
+    "trainable": 98352068
+  }
+}

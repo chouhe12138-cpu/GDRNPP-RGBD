@@ -2,6 +2,8 @@
 
 当前主线是 EXP026：在 LM-O 上比较普通与几何自适应三层 CAD 采样；设计和证据见
 [EXP026 RECORD](research/experiments/EXP-20260922-026-residual-aligned-sampling-ablation/RECORD.md)。
+下一阶段 EXP027 多尺度 CAD Interaction A/B 已完成本地框架和验证，见
+[EXP027 RECORD](research/experiments/EXP-20260924-027-multiscale-cad-interaction/RECORD.md)。
 EXP025 已交付两臂全部固定评价点，最终策略结论待用户判定。当前进展和唯一下一步只维护在
 [当前状态](research/STATUS_CN.md)。
 

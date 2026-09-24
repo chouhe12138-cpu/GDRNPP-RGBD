@@ -1,0 +1,4 @@
+{
+  "status": "FAIL",
+  "error": "Non-finite gradients at step 1: ['cad_attention_head.lateral_alpha']"
+}

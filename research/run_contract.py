@@ -47,6 +47,9 @@ def validate_research_run_config(
     if protocol_name == 'exp026_lmo' and mode != 'prepare' \
             and not bool(cfg.get('RESEARCH_PROTOCOL', {}).get('SERVER_RELEASE_ALLOWED', False)):
         raise ValueError('EXP026 SERVER_BLOCKED: release not authorized')
+    if protocol_name == 'exp027_lmo' and mode != 'prepare' \
+            and not bool(cfg.get('RESEARCH_PROTOCOL', {}).get('SERVER_RELEASE_ALLOWED', False)):
+        raise ValueError('EXP027 SERVER_BLOCKED: release not authorized')
 
     training_supervision = geometry_supervision_enabled(cfg)
     evaluation_renderer = _evaluation_renderer(cfg)
@@ -145,6 +148,17 @@ def validate_research_run_config(
                     raise ValueError(f'Unknown EXP026 arm: {cfg.EXP026_ARM}')
                 if float(cfg.SOLVER.AMP.get('INIT_SCALE', 0)) != 16384:
                     raise ValueError('EXP026 formal requires locally gated AMP initial scale 16384')
+            elif protocol_name == 'exp027_lmo':
+                from research.exp027.preflight import inspect_config
+                inspect_config(cfg)
+                if not bool(cfg.RESEARCH_PROTOCOL.get('SERVER_RELEASE_ALLOWED', False)):
+                    raise ValueError('EXP027 formal release not authorized')
+                if not bool(cfg.SOLVER.CHECKPOINT_BY_EPOCH) or int(cfg.SOLVER.CHECKPOINT_PERIOD) != 5:
+                    raise ValueError('EXP027 formal requires E5-E40 epoch checkpoints')
+                if str(cfg.MODEL.POSE_NET.XYZ_RENDERER).lower() != 'egl' or evaluation_renderer != 'cpp':
+                    raise ValueError('EXP027 formal requires EGL training and CPP evaluation')
+                if float(cfg.SOLVER.AMP.get('INIT_SCALE', 0)) < 1:
+                    raise ValueError('EXP027 formal requires a server-gated AMP scale')
             elif protocol_name == "exp025_lm13":
                 expected = {
                     "SEED": 42,

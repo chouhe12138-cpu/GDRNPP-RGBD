@@ -221,6 +221,7 @@ build_gate_command() {
     case "${profile}" in
         exp025_lmo) module=research.exp025.real_smoke ;;
         exp026_lmo) module=research.exp026.local_validation ;;
+        exp027_lmo) module=research.exp027.real_smoke ;;
         *) fail "unknown gate profile: ${profile}" ;;
     esac
     printf 'python -m %q --config %q --output %q --renderer egl --batch-size 48 --steps 8 --amp-scale %q' \
@@ -344,6 +345,13 @@ resolve_resource_profile() {
             [[ "${allowed}" == "True" ]] || fail "EXP026 SERVER_BLOCKED: release not authorized"
             printf 'exp026_lmo\n'
             ;;
+        exp027_lmo)
+            allowed="$(container_config_value "${config}" RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED)" || \
+                fail "cannot read EXP027 release gate"
+            allowed="${allowed##*$'\n'}"
+            [[ "${allowed}" == "True" ]] || fail "EXP027 SERVER_BLOCKED: release not authorized"
+            printf 'exp027_lmo\n'
+            ;;
         *) fail "unknown TRAIN_PROTOCOL.NAME: ${name} (config ${config})" ;;
     esac
 }
@@ -418,11 +426,38 @@ require_exp026_resources() {
         fail "EXP026 preflight failed"
 }
 
+require_exp027_resources() {
+    local config="$1" arm hierarchy expected_machine
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lm/train_pbr -d
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lmo/test -d
+    require_container_path /workspace/gdrnpp/datasets/BOP_DATASETS/lm/models/models_info.json -r
+    require_voc_data
+    require_convnext_weights
+    arm="$(container_config_value "${config}" EXP027_ARM)" || fail "cannot read EXP027 arm"
+    arm="${arm##*$'\n'}"
+    case "${arm}" in
+        A_multiscale_fpn) expected_machine=lab0 ;;
+        B_cad_region_query) expected_machine=lab1 ;;
+        *) fail "unknown EXP027_ARM: ${arm}" ;;
+    esac
+    [[ "${machine}" == "${expected_machine}" ]] || \
+        fail "EXP027 arm ${arm} must run on ${expected_machine}, got ${machine}"
+    hierarchy="$(container_config_value "${config}" MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)" || \
+        fail "cannot read EXP027 hierarchy"
+    hierarchy="${hierarchy##*$'\n'}"
+    [[ -n "${hierarchy}" ]] || fail "empty EXP027 hierarchy path"
+    require_container_path "${hierarchy}" -f
+    "${docker_bin}" exec -w /workspace/gdrnpp -e PYTHONPATH=/workspace/gdrnpp \
+        "${container}" python -m research.exp027.preflight --config "/workspace/gdrnpp/${config}" || \
+        fail "EXP027 preflight failed"
+}
+
 require_profile_resources() {
     local profile="$1" config="$2"
     case "${profile}" in
         exp025_lmo) require_exp025_resources "${config}" ;;
         exp026_lmo) require_exp026_resources "${config}" ;;
+        exp027_lmo) require_exp027_resources "${config}" ;;
         *) fail "unknown resource profile: ${profile}" ;;
     esac
     printf 'RESOURCE_PROFILE %s\n' "${profile}"
@@ -462,6 +497,17 @@ runtime_gate() {
     require_profile_resources "${profile}" "${config}"
     validate_run_config "${mode}" "${config}"
     echo "RUNTIME_GATE PASS container=${container} mode=${mode} config=${config}"
+}
+
+require_exp027_gate_evidence() {
+    local config="$1" source_commit="$2" scale hierarchy
+    scale="$(container_config_value "${config}" SOLVER.AMP.INIT_SCALE)" || fail "cannot read EXP027 AMP scale"
+    hierarchy="$(container_config_value "${config}" CAD_HIERARCHY_CONTRACT.SHA256)" || fail "cannot read EXP027 hierarchy SHA"
+    scale="${scale##*$'\n'}"
+    hierarchy="${hierarchy##*$'\n'}"
+    PYTHONPATH="${repo_root}" python3 -m research.exp027.gate_evidence \
+        "${output_root}/${experiment_id}" "${source_commit}" "${config}" "${scale}" "${hierarchy}" || \
+        fail "EXP027 matching batch48 gate evidence not found"
 }
 
 write_run_metadata() {
@@ -527,6 +573,9 @@ launch() {
         runtime_gate prepare "${config}"
     else
         runtime_gate "${mode}" "${config}"
+    fi
+    if [[ "${mode}" == "formal" && "$(resolve_resource_profile "${config}")" == "exp027_lmo" ]]; then
+        require_exp027_gate_evidence "${config}" "$(git -C "${repo_root}" rev-parse HEAD)"
     fi
     run_id="$(next_run_id "${mode}")"
     run_host="${output_root}/${experiment_id}/${run_id}"
