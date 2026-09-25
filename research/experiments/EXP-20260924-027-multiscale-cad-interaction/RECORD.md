@@ -1,5 +1,15 @@
 # EXP027 — 多尺度 CAD Interaction 与 Region Query
 
+## 2026-09-25 lab2 A gate 与 launcher 修复
+
+- 用户提供的 lab2 `report.json` 显示 A 的真实 batch48/EGL gate `PASS`：AMP 初始 scale 4096、
+  8 步、0 skipped step、checkpoint roundtrip `PASS`；峰值 reserved 20.23 GB。首次 gate
+  因资源包遗漏 VOC `diningtable_trainval.txt` 失败，用户补传后得到上述通过结果。
+- formal 启动在证据匹配前失败：launcher 的 `container_config_value` 对整数 `4096` 输出空串，
+  导致 `gate_evidence.py` 报 `scale: invalid float value: ''`。正式训练未启动，未产生正式指标。
+  本地修复配置数值读取；新 commit/release 必须重新运行同 commit 的 batch48 gate，
+  lab2 容器须切换挂载到新 release。
+
 ## 2026-09-25 lab2 A 独立 release 准备
 
 - 用户决定在 `lab2` / 物理 GPU 2 运行 A，lab0/lab1 的 EXP026 formal 不动；B 暂不放行。

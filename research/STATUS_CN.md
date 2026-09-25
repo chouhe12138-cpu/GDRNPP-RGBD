@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-25（依据用户提供的 EXP026 训练快照、EXP027 本地收口及 lab2 资源解包截图）
+最后核对：2026-09-25（依据用户提供的 EXP026 训练快照、EXP027 lab2 gate 报告与启动报错）
 EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
@@ -13,8 +13,8 @@ lab0 `uniform_full`、lab1 `adaptive_l1_full`。截至收到的日志快照，�
 评价，日志到 E11；自适应臂完成 E5/E10/E15/E20 评价，日志到 E21。服务器 batch48/EGL
 gate 的原始输出未包含在本次材料中，不能据此独立核验 gate。
 
-当前唯一下一步：用户把 EXP027-A 的新 bundle 上传 lab2，建立 release 与容器并运行
-真实 batch48/EGL gate；EXP026 两臂继续
+当前唯一下一步：交付 EXP027-A launcher 修复 bundle，lab2 切换到新 release 并重跑
+同 commit 的真实 batch48/EGL gate，PASS 后启动 formal；EXP026 两臂继续
 原 formal，不更换 lab0/lab1 checkout、容器或镜像。EXP026 完整固定点评价、逐物体与
 correspondence 指标及服务器 gate 原始证据仍待收集，阶段性结果不用于最终结论。
 
@@ -52,8 +52,9 @@ EXP025 的最终组合策略结论仍待用户判定；本次仅授权推进独�
 
 EXP027 多尺度 CAD Interaction A/B 已完成本地实现、parent-query gate 收口及 batch4 工程
 复核；B 固定批次后期 route 回升得到缓解。用户决定先在 lab2/GPU 2 独立运行 A；
-lab2 资源包已据用户截图解压，本地 A 专用 release 配置与 launcher 支持已准备，
-提交和 bundle 随本次交付；lab2 尚未建立 release、容器或运行真实 batch48/EGL gate。
+lab2 已建立首版 release/容器，补齐遗漏的 VOC 列表后 batch48/EGL gate 报告 PASS；
+formal 启动因 launcher 未输出整数 AMP scale 而失败，训练尚未启动。本地正在交付
+launcher 修复 bundle，需更新 lab2 release/容器并重跑同 commit gate。
 B 仍阻断，lab0/lab1 的 EXP026 formal 不动。详见
 [EXP027 RECORD](experiments/EXP-20260924-027-multiscale-cad-interaction/RECORD.md) 与
 [lab2 A 步骤](exp027/LAB2_A_CN.md)。

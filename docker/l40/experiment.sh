@@ -324,7 +324,7 @@ from mmcv import Config
 value = Config.fromfile(sys.argv[1])
 for part in sys.argv[2].split("."):
     value = value.get(part, {}) if hasattr(value, "get") else {}
-print(value if isinstance(value, (str, bool)) else "")
+print(value if isinstance(value, (str, bool, int, float)) else "")
 ' "/workspace/gdrnpp/${config}" "${key}"
 }
 
