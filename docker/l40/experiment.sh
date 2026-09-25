@@ -4,13 +4,13 @@ set -Eeuo pipefail
 usage() {
     cat >&2 <<'EOF'
 usage:
-  experiment.sh lab0|lab1 check
-  experiment.sh lab0|lab1 create IMAGE_REF
-  experiment.sh lab0|lab1 gate EXPERIMENT_ID CONFIG AMP_SCALE
-  experiment.sh lab0|lab1 run EXPERIMENT_ID CONFIG smoke|formal
-  experiment.sh lab0|lab1 eval EXPERIMENT_ID CONFIG CHECKPOINT
-  experiment.sh lab0|lab1 status
-  experiment.sh lab0|lab1 logs EXPERIMENT_ID/RUN_ID
+  experiment.sh lab0|lab1|lab2 check
+  experiment.sh lab0|lab1|lab2 create IMAGE_REF
+  experiment.sh lab0|lab1|lab2 gate EXPERIMENT_ID CONFIG AMP_SCALE
+  experiment.sh lab0|lab1|lab2 run EXPERIMENT_ID CONFIG smoke|formal
+  experiment.sh lab0|lab1|lab2 eval EXPERIMENT_ID CONFIG CHECKPOINT
+  experiment.sh lab0|lab1|lab2 status
+  experiment.sh lab0|lab1|lab2 logs EXPERIMENT_ID/RUN_ID
 EOF
     exit 2
 }
@@ -436,7 +436,7 @@ require_exp027_resources() {
     arm="$(container_config_value "${config}" EXP027_ARM)" || fail "cannot read EXP027 arm"
     arm="${arm##*$'\n'}"
     case "${arm}" in
-        A_multiscale_fpn) expected_machine=lab0 ;;
+        A_multiscale_fpn) expected_machine=lab2 ;;
         B_cad_region_query) expected_machine=lab1 ;;
         *) fail "unknown EXP027_ARM: ${arm}" ;;
     esac
@@ -614,6 +614,7 @@ main() {
     case "${machine}" in
         lab0) gpu_id=0 ;;
         lab1) gpu_id=1 ;;
+        lab2) gpu_id=2 ;;
         *) usage ;;
     esac
 

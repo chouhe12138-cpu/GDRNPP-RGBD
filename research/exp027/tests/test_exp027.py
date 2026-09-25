@@ -16,6 +16,7 @@ SPEC = dict(backbone_channels=(128, 256, 512, 1024),
             feature_resolutions=(64, 32, 16, 8),
             pyramid_channels=(64, 128, 256, 512))
 BASELINE = 'configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_adaptive_full.py'
+LAB2_A = 'configs/gdrn/lmo_pbr/research/exp027_multiscale_cad/train_a_lab2.py'
 
 
 def _flat(value, prefix=''):
@@ -71,6 +72,19 @@ def test_exp027_a_vs_exp026_adaptive_resolved_config():
                 'TEST.EVAL_PERIOD', 'VAL.ERROR_TYPES',
                 'MODEL.POSE_NET.CAD_ATTENTION_HEAD.INIT_CFG.residual_target_mode'):
         assert fb[key] == fa[key], key
+
+
+def test_lab2_a_release_preserves_frozen_a_protocol():
+    base = Config.fromfile(str(ARMS['A_multiscale_fpn']))
+    lab2 = Config.fromfile(LAB2_A)
+    before, after = _flat(base._cfg_dict), _flat(lab2._cfg_dict)
+    assert {key for key in before | after if before.get(key) != after.get(key)} == {
+        'OUTPUT_DIR', 'RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED',
+        'RESEARCH_PROTOCOL.FORMAL_READY'}
+    assert lab2.RESEARCH_PROTOCOL.SERVER_RELEASE_ALLOWED
+    assert lab2.RESEARCH_PROTOCOL.FORMAL_READY
+    validate_research_run_config(lab2, mode='formal')
+    assert inspect_config(lab2)[1] == inspect_config(base)[1]
 
 
 def test_multiscale_spec_and_backbone_contract(hierarchy):

@@ -1,6 +1,6 @@
 # 服务器安全与只读检查
 
-Agent 不主动 SSH。以下同一代码块可原样在 lab0 或 lab1 执行；机器和 GPU 由登录账户自动
+Agent 不主动 SSH。以下同一代码块可原样在 lab0、lab1 或 lab2 执行；机器和 GPU 由登录账户自动
 解析，不需要修改变量：
 
 ```bash
@@ -11,6 +11,7 @@ machine="$(id -un)"
 case "${machine}" in
     lab0) gpu=0 ;;
     lab1) gpu=1 ;;
+    lab2) gpu=2 ;;
     *) printf 'FAIL: unsupported account: %s\n' "${machine}" >&2; exit 1 ;;
 esac
 
@@ -20,7 +21,7 @@ nvidia-smi -i "${gpu}"
 )
 ```
 
-- lab0 只使用物理 GPU 0，lab1 只使用物理 GPU 1。
+- lab0 只使用物理 GPU 0，lab1 只使用物理 GPU 1，lab2 只使用物理 GPU 2。
 - 只操作同时带 `gdrnpp.project=GDRNPP-RGBD` 和当前 machine label 的项目容器。
 - 不使用 `sudo docker`、不执行 prune，不修改其他容器、进程、账户、GPU 分配、镜像、权限
   或数据。

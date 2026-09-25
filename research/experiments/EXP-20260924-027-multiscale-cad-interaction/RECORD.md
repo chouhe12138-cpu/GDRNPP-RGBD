@@ -1,5 +1,22 @@
 # EXP027 — 多尺度 CAD Interaction 与 Region Query
 
+## 2026-09-25 lab2 A 独立 release 准备
+
+- 用户决定在 `lab2` / 物理 GPU 2 运行 A，lab0/lab1 的 EXP026 formal 不动；B 暂不放行。
+  用户提供的 lab2 截图显示资源压缩包已解压并输出 `EXP027A_RESOURCES_EXTRACTED`；
+  这是服务器命令成功的转述，不代表 Agent 已连接服务器核验。
+- 新增 `train_a_lab2.py`，继承冻结的 A 配置，只改 output 与
+  `SERVER_RELEASE_ALLOWED`/`FORMAL_READY`；共用 A 的 ImageNet Full、adaptive λ1、
+  AMP4096、batch48、40 epoch、E5–E40 和 predicted-route residual。launcher 将
+  EXP027-A 映射到 lab2/GPU 2，EXP027-B 仍映射 lab1 且配置继续阻断。
+- 本地 `pytorch22` 的正式 run contract、EXP027 hierarchy preflight 与配置差异检查通过；
+  相关 pytest `2 passed`，`bash -n docker/l40/experiment.sh` 通过。正式 source commit
+  以本次提交为准；lab2 release、容器、gate、formal 尚未启动。
+- 资源归档把 hierarchy 放在 `cache/gdrnpp_datasets/exp026/`，而冻结配置需要其下
+  `RUN-20260921-ga-hfps-s20260919-a01/`；已给用户单文件移动命令，完成情况待回报。
+  操作步骤见 [lab2 A](../../exp027/LAB2_A_CN.md)。只有 lab2 真实 batch48/EGL gate
+  PASS 后才启动 formal；本地 batch4 不能替代。
+
 ## 身份与状态
 
 - experiment ID：`EXP-20260924-027-multiscale-cad-interaction`。历史 Git 曾把 EXP027 用作

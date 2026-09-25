@@ -1,6 +1,6 @@
 # 当前研究状态
 
-最后核对：2026-09-24（依据用户提供的训练日志与评分 JSON 快照、EXP027 本地收口证据）
+最后核对：2026-09-25（依据用户提供的 EXP026 训练快照、EXP027 本地收口及 lab2 资源解包截图）
 EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 
 ## Active experiment
@@ -13,9 +13,10 @@ lab0 `uniform_full`、lab1 `adaptive_l1_full`。截至收到的日志快照，�
 评价，日志到 E11；自适应臂完成 E5/E10/E15/E20 评价，日志到 E21。服务器 batch48/EGL
 gate 的原始输出未包含在本次材料中，不能据此独立核验 gate。
 
-当前唯一下一步：等待两臂正式训练及 E5–E40 其余固定点评价完成，收集完整评分与必要的
-逐物体、correspondence 指标；另补存两臂服务器 batch48/EGL gate 的原始证据，再按 EXP026
-RECORD 进行完整比较。现有阶段性结果不用于选优或最终结论。
+当前唯一下一步：用户把 EXP027-A 的新 bundle 上传 lab2，建立 release 与容器并运行
+真实 batch48/EGL gate；EXP026 两臂继续
+原 formal，不更换 lab0/lab1 checkout、容器或镜像。EXP026 完整固定点评价、逐物体与
+correspondence 指标及服务器 gate 原始证据仍待收集，阶段性结果不用于最终结论。
 
 ## Prior experiment
 
@@ -50,9 +51,12 @@ EXP025 的最终组合策略结论仍待用户判定；本次仅授权推进独�
 ## Next stage
 
 EXP027 多尺度 CAD Interaction A/B 已完成本地实现、parent-query gate 收口及 batch4 工程
-复核；B 固定批次后期 route 回升得到缓解，仍需各自真实 batch48/EGL gate。formal 配置和服务器
-release 仍阻断；EXP026 正式训练结束及用户另行授权前，不替换服务器 release/容器，详见
-[EXP027 RECORD](experiments/EXP-20260924-027-multiscale-cad-interaction/RECORD.md)。
+复核；B 固定批次后期 route 回升得到缓解。用户决定先在 lab2/GPU 2 独立运行 A；
+lab2 资源包已据用户截图解压，本地 A 专用 release 配置与 launcher 支持已准备，
+提交和 bundle 随本次交付；lab2 尚未建立 release、容器或运行真实 batch48/EGL gate。
+B 仍阻断，lab0/lab1 的 EXP026 formal 不动。详见
+[EXP027 RECORD](experiments/EXP-20260924-027-multiscale-cad-interaction/RECORD.md) 与
+[lab2 A 步骤](exp027/LAB2_A_CN.md)。
 
 EXP025 formal 已完成全部固定点交付；最终组合策略结论只由用户基于 RECORD 判定。
 

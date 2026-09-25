@@ -1,4 +1,8 @@
-# EXP027 服务器准备（当前阻断，暂不执行）
+# EXP027 原 lab0/lab1 准备草案（当前不要执行）
+
+EXP027-A 当前改在 lab2 / GPU 2 准备独立 release，操作步骤见
+[lab2 A 启动步骤](LAB2_A_CN.md)。以下为 2026-09-24 的旧 lab0/lab1 方案，
+不适用于本次 lab2 启动。EXP027-B 仍保持阻断。
 
 EXP026 正式训练期间不修改服务器 checkout、容器或镜像。当前 EXP027 配置的
 `SERVER_RELEASE_ALLOWED=False`、`FORMAL_READY=False`，服务器 gate/formal 会 fail-closed。
