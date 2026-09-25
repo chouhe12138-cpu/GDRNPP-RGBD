@@ -1,6 +1,6 @@
 # EXP026 — Residual-Aligned Full Sampling Ablation
 
-## 正式训练阶段性记录（2026-09-25，等待完整结果）
+## 正式训练阶段性记录（2026-09-25；自适应臂完成，等待均匀臂）
 
 - 用户告知两臂已开始正式训练。本节依据 Windows 目录 `E:\6D姿态估计\EXP026\均匀` 与
   `E:\6D姿态估计\EXP026\自适应` 中提供的 console 日志和 BOP19 评分 JSON 快照；不是
@@ -15,11 +15,13 @@
   本次材料未提供恢复前中断原因，也未提供 uniform E15 的 ADD(-S) 摘要。
 - lab1 `adaptive_l1_full`：`RUN-20260923-030930-formal-s42-a01`；配置
   `configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_adaptive_full.py`。
-  已有 E5/E10/E15/E20/E25/E30/E35 评分与相应评价摘要；日志最后停在
-  2026-09-25 04:28:25 的 E36、iter 223999/255920。两份新日志快照中未见 traceback
-  或非有限错误；这不证明快照之后的运行状态。
+  E5/E10/E15/E20/E25/E30/E35/E40 八个固定点评价均已交付。日志显示 2026-09-25
+  11:25:23 保存 `model_epoch_040.pth`，11:33:28 完成 E40 评价，随后输出
+  `FINAL_EVAL_REUSED periodic_epoch=40`，自然到达 iter 255919/255920（100%）。
+  E40 checkpoint 文件已随用户材料提供，完整日志仍留在外部目录，不进入 Git。
+  两份新日志快照中未见 traceback 或非有限错误；均匀臂的后续状态仍以其快照为限。
 - BOP AR、ADD(-S)0.1d 来自 console `EVAL_SUMMARY`；AR_reS/AR_teS 来自相同 epoch 的
-  `scores_bop19_*.json`。全部十一份评分 JSON 原样保存在 [evidence](evidence/)；逐物体
+  `scores_bop19_*.json`。全部十二份评分 JSON 原样保存在 [evidence](evidence/)；逐物体
   ADD(-S) 原始摘要保存在 [uniform summaries](evidence/formal_uniform_eval_summaries.json) 与
   [adaptive summaries](evidence/formal_adaptive_eval_summaries.json)。完整日志仍位于用户提供的外部目录。
 
@@ -36,8 +38,12 @@
 | adaptive λ1 | E25 / `model_epoch_025.pth` | 0.681659 | 0.532180 | 0.517416 | 0.794925 |
 | adaptive λ1 | E30 / `model_epoch_030.pth` | 0.696092 | 0.534256 | 0.546482 | 0.805306 |
 | adaptive λ1 | E35 / `model_epoch_035.pth` | 0.703753 | 0.547405 | 0.562860 | 0.816148 |
+| adaptive λ1 | E40 / `model_epoch_040.pth` | 0.707356 | 0.557093 | 0.562860 | 0.821453 |
 
-- 尚未收到 uniform E25–E40、adaptive E40 的评分；predicted-cell representability、
+- 自适应臂 E40 是其八个固定点中 BOP AR 与 ADD(-S)0.1d 的最高点；E40 逐物体
+  ADD(-S)0.1d 见 [adaptive summaries](evidence/formal_adaptive_eval_summaries.json)，
+  BOP19 原始评分见 [E40 scores](evidence/formal_adaptive_e40_scores_bop19.json)。
+  尚未收到 uniform E25–E40 的评分；predicted-cell representability、
   anchor/full XYZ error、residual gain 也未生成或未提供。服务器真实 batch48/EGL gate 原始
   结果未在本次材料中，故不能独立验证其 PASS。E10 两臂 BOP AR 近似（uniform 0.642948、
   adaptive 0.642272）；E20 均匀臂 BOP AR 0.675716、自适应臂 0.673746，差

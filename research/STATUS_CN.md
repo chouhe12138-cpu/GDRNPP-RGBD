@@ -8,15 +8,16 @@ EXP025 formal source commit：`b9bddccef2f12b4365e0e1e2e68222d733de572b`
 `EXP-20260922-026-residual-aligned-sampling-ablation` — 在 matched ImageNet Full 与
 predicted-route residual 条件下比较三层普通采样和几何自适应采样。
 
-状态：`FORMAL_RUNNING / PARTIAL_EVAL_AVAILABLE`。两臂已从同一 source commit 启动正式训练：
+状态：`ADAPTIVE_FORMAL_COMPLETE / UNIFORM_PARTIAL_EVAL`。两臂已从同一 source commit 启动正式训练：
 lab0 `uniform_full`、lab1 `adaptive_l1_full`。截至收到的日志快照，均匀臂从 E15 恢复，
-已有 E5/E10/E15/E20 评分、日志到 E23；自适应臂已有 E5–E35 每 5 epoch 评分、日志到 E36。
+已有 E5/E10/E15/E20 评分、日志到 E23；自适应臂 E5–E40 八个固定点评价全部交付，
+E40 checkpoint 已保存，日志显示自然训练完成。
 服务器 batch48/EGL
 gate 的原始输出未包含在本次材料中，不能据此独立核验 gate。
 
-当前唯一下一步：继续收集 EXP026 两臂至 E40 的固定点评价及训练结束证据，
+当前唯一下一步：收集 EXP026 均匀臂 E25–E40 的固定点评价及训练结束证据，
 并确认 EXP027-A 在 lab2 新 release 的 formal 启动状态；EXP026 两臂继续
-原 formal，不更换 lab0/lab1 checkout、容器或镜像。EXP026 完整固定点评价、逐物体与
+原 formal，不更换 lab0/lab1 checkout、容器或镜像。EXP026 均匀臂剩余固定点评价、逐物体与
 correspondence 指标及服务器 gate 原始证据仍待收集，阶段性结果不用于最终结论。
 
 ## Prior experiment
