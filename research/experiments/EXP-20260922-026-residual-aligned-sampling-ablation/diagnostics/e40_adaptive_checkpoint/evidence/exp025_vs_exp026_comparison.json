@@ -1,0 +1,210 @@
+{
+  "comparison": "same EXP025 canonical manifest, seed 20260922, 16 candidates per object",
+  "sample_count": 122,
+  "valid_pixels": 92197,
+  "metrics": {
+    "t1_top1": {
+      "exp025": 0.805889650690751,
+      "exp026": 0.8227702850956836,
+      "delta": 0.016880634404932593
+    },
+    "t2_top1": {
+      "exp025": 0.5725572957336659,
+      "exp026": 0.5843048284868481,
+      "delta": 0.011747532753182188
+    },
+    "t3_top1": {
+      "exp025": 0.2849085684064165,
+      "exp026": 0.2945217697176945,
+      "delta": 0.009613201311278019
+    },
+    "t3_top5": {
+      "exp025": 0.6579349226715256,
+      "exp026": 0.674787896914316,
+      "delta": 0.01685297424279031
+    },
+    "gt_rank_median": {
+      "exp025": 9.819672131147541,
+      "exp026": 10.0,
+      "delta": 0.18032786885245855
+    },
+    "gt_probability_mean": {
+      "exp025": 0.260863416212025,
+      "exp026": 0.2829743633782095,
+      "delta": 0.022110947166184503
+    },
+    "representable": {
+      "exp025": 0.6804708859417588,
+      "exp026": 0.5275269840981384,
+      "delta": -0.1529439018436204
+    },
+    "anchor_error_m": {
+      "exp025": 0.019660902373706463,
+      "exp026": 0.018541038135585726,
+      "delta": -0.0011198642381207366
+    },
+    "full_error_m": {
+      "exp025": 0.018530966767461084,
+      "exp026": 0.016900382977986676,
+      "delta": -0.0016305837894744074
+    },
+    "residual_gain_m": {
+      "exp025": 0.0011299353433697268,
+      "exp026": 0.0016406551376199846,
+      "delta": 0.0005107197942502578
+    },
+    "residual_help_fraction": {
+      "exp025": 0.6587389028463208,
+      "exp026": 0.6775286717981589,
+      "delta": 0.01878976895183815
+    }
+  },
+  "pose_add_s_0_1d": {
+    "normal": {
+      "exp025": 0.4672131147540984,
+      "exp026": 0.5327868852459017,
+      "delta": 0.0655737704918033,
+      "exp026_pnp_fail": 1
+    },
+    "anchor_only": {
+      "exp025": 0.3442622950819672,
+      "exp026": 0.4098360655737705,
+      "delta": 0.0655737704918033,
+      "exp026_pnp_fail": 0
+    },
+    "oracle_pred_route": {
+      "exp025": 0.860655737704918,
+      "exp026": 0.8442622950819673,
+      "delta": -0.016393442622950727,
+      "exp026_pnp_fail": 0
+    },
+    "gt_xyz_pred_mask": {
+      "exp025": 0.9590163934426229,
+      "exp026": 0.9754098360655737,
+      "delta": 0.016393442622950838,
+      "exp026_pnp_fail": 1
+    },
+    "normal_gt_mask": {
+      "exp025": 0.5327868852459017,
+      "exp026": 0.5819672131147541,
+      "delta": 0.0491803278688524,
+      "exp026_pnp_fail": 0
+    },
+    "gt_xyz_gt_mask": {
+      "exp025": 0.9672131147540983,
+      "exp026": 0.9672131147540983,
+      "delta": 0.0,
+      "exp026_pnp_fail": 0
+    }
+  },
+  "headroom": {
+    "real_residual_pose_gain": {
+      "exp025": 0.12295081967213117,
+      "exp026": 0.12295081967213117,
+      "delta": 0.0
+    },
+    "residual_oracle_headroom": {
+      "exp025": 0.3934426229508196,
+      "exp026": 0.3114754098360656,
+      "delta": -0.08196721311475402
+    },
+    "route_representation_headroom": {
+      "exp025": 0.09836065573770492,
+      "exp026": 0.13114754098360648,
+      "delta": 0.032786885245901565
+    },
+    "mask_headroom": {
+      "exp025": 0.0655737704918033,
+      "exp026": 0.0491803278688524,
+      "delta": -0.016393442622950893
+    },
+    "total_headroom": {
+      "exp025": 0.49999999999999994,
+      "exp026": 0.43442622950819665,
+      "delta": -0.0655737704918033
+    }
+  },
+  "per_object": {
+    "1": {
+      "valid_roi": 16,
+      "normal_success": 8.0,
+      "oracle_success": 11.0,
+      "gt_xyz_success": 14.0,
+      "representable": 0.480584884993732,
+      "anchor_error_m": 0.009465491981245577,
+      "full_error_m": 0.0087502904352732,
+      "residual_gain_m": 0.0007152016642066883
+    },
+    "5": {
+      "valid_roi": 16,
+      "normal_success": 14.0,
+      "oracle_success": 15.0,
+      "gt_xyz_success": 16.0,
+      "representable": 0.7295688483864069,
+      "anchor_error_m": 0.0185921493684873,
+      "full_error_m": 0.015767142409458756,
+      "residual_gain_m": 0.002825006849889178
+    },
+    "6": {
+      "valid_roi": 13,
+      "normal_success": 4.0,
+      "oracle_success": 11.0,
+      "gt_xyz_success": 13.0,
+      "representable": 0.4750533528052844,
+      "anchor_error_m": 0.016587452891354378,
+      "full_error_m": 0.015148154352433406,
+      "residual_gain_m": 0.001439298503100872
+    },
+    "8": {
+      "valid_roi": 16,
+      "normal_success": 14.0,
+      "oracle_success": 15.0,
+      "gt_xyz_success": 16.0,
+      "representable": 0.7298942413181067,
+      "anchor_error_m": 0.021471163316164166,
+      "full_error_m": 0.018806679639965296,
+      "residual_gain_m": 0.002664483865373768
+    },
+    "9": {
+      "valid_roi": 15,
+      "normal_success": 4.0,
+      "oracle_success": 11.0,
+      "gt_xyz_success": 15.0,
+      "representable": 0.33787061013281344,
+      "anchor_error_m": 0.01744829857101043,
+      "full_error_m": 0.016909165090570846,
+      "residual_gain_m": 0.0005391330443671905
+    },
+    "10": {
+      "valid_roi": 16,
+      "normal_success": 8.0,
+      "oracle_success": 15.0,
+      "gt_xyz_success": 15.0,
+      "representable": 0.4840686828829348,
+      "anchor_error_m": 0.016823210462462157,
+      "full_error_m": 0.015257408318575472,
+      "residual_gain_m": 0.0015658022530260496
+    },
+    "11": {
+      "valid_roi": 14,
+      "normal_success": 10.0,
+      "oracle_success": 11.0,
+      "gt_xyz_success": 14.0,
+      "representable": 0.3046051351619618,
+      "anchor_error_m": 0.023234802431293895,
+      "full_error_m": 0.022266439029148648,
+      "residual_gain_m": 0.0009683636640797236
+    },
+    "12": {
+      "valid_roi": 16,
+      "normal_success": 3.0,
+      "oracle_success": 14.0,
+      "gt_xyz_success": 16.0,
+      "representable": 0.6290125567466021,
+      "anchor_error_m": 0.024857863143552095,
+      "full_error_m": 0.022640547569608316,
+      "residual_gain_m": 0.002217315322923241
+    }
+  },
+  "per_roi_path": "/home/wsluser/GDRNPP-RGBD/.local/exp026_e40_diagnostic/oracle/per_roi.json"
+}

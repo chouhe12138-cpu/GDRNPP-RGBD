@@ -123,7 +123,9 @@ def run(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     os.environ['GDRN_CONVNEXT_BASE_WEIGHTS'] = str(Path(args.imagenet_weights).resolve())
-    cfg = read_config(CONFIG)
+    cfg = read_config(args.config)
+    if args.expected_arm and cfg.get('EXP026_ARM') != args.expected_arm:
+        raise RuntimeError(f'Unexpected diagnostic arm: {cfg.get("EXP026_ARM")}')
     cfg.MODEL.DEVICE = args.device
     cfg.MODEL.WEIGHTS = str(Path(args.checkpoint).resolve())
     model, _ = build_model_optimizer(cfg, is_test=True)
@@ -132,6 +134,12 @@ def run(args):
     model.eval()
     records = DatasetCatalog.get(cfg.DATASETS.TEST[0])
     selected = select_records(records, model.cad_attention_head.object_ids.tolist(), args.per_object, args.seed)
+    if args.manifest:
+        expected = json.loads(args.manifest.read_text())
+        actual = [dict(object_id=int(obj), scene_im_id=sid, original_annotation_index=int(index))
+                  for obj, sid, index, _ in selected]
+        if expected['seed'] != args.seed or expected['samples'] != actual:
+            raise RuntimeError('Selected diagnostic records differ from canonical manifest')
     mapper = GDRN_DatasetFromList(cfg, split='test', lst=[v[3] for v in selected], flatten=False,
                                   copy=True, serialize=False)
     evaluator = GDRN_Evaluator(cfg, cfg.DATASETS.TEST[0], distributed=False, output_dir=str(args.output))
@@ -240,6 +248,9 @@ def main():
     parser.add_argument('--device', default='cuda:0')
     parser.add_argument('--per-object', type=int, default=16)
     parser.add_argument('--seed', type=int, default=20260922)
+    parser.add_argument('--config', default=CONFIG)
+    parser.add_argument('--expected-arm')
+    parser.add_argument('--manifest', type=Path)
     args = parser.parse_args()
     print(json.dumps(run(args), indent=2))
 

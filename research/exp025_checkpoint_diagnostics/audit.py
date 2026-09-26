@@ -24,15 +24,25 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
-def audit(checkpoint, output, imagenet_weights):
+def audit(checkpoint, output, imagenet_weights, config=CONFIG, expected_arm=None):
     checkpoint, output = Path(checkpoint), Path(output)
     os.environ['GDRN_CONVNEXT_BASE_WEIGHTS'] = str(Path(imagenet_weights).resolve())
-    cfg = read_config(CONFIG)
+    cfg = read_config(config)
     cfg.MODEL.DEVICE = 'cpu'
     cfg.MODEL.WEIGHTS = str(checkpoint)
-    if cfg.EXP025_ARM != 'imagenet_full' or cfg.BACKBONE_INIT != 'imagenet' or not cfg.TRAIN_BACKBONE:
+    if expected_arm:
+        if cfg.get('EXP026_ARM') != expected_arm or expected_arm != 'adaptive_l1_full':
+            raise RuntimeError('Not the EXP026 adaptive_l1_full config')
+        if cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.INIT_CFG.residual_target_mode != 'predicted_route':
+            raise RuntimeError('Residual target is not predicted_route')
+    elif cfg.EXP025_ARM != 'imagenet_full':
         raise RuntimeError('Not the EXP025 imagenet_full config')
-    hierarchy = require_hierarchy(cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH, 'lmo')
+    if cfg.BACKBONE_INIT != 'imagenet' or not cfg.TRAIN_BACKBONE:
+        raise RuntimeError('Not ImageNet Full')
+    hierarchy = (sha256_file(cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH)
+                 if expected_arm else require_hierarchy(cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.HIERARCHY_PATH, 'lmo'))
+    if expected_arm and hierarchy != cfg.CAD_HIERARCHY_CONTRACT.SHA256:
+        raise RuntimeError('EXP026 hierarchy SHA mismatch')
     raw = torch.load(checkpoint, map_location='cpu', weights_only=False)
     if not isinstance(raw, dict) or not isinstance(raw.get('model'), dict):
         raise RuntimeError('Expected formal checkpoint with model state')
@@ -54,7 +64,8 @@ def audit(checkpoint, output, imagenet_weights):
     model.load_state_dict(state, strict=True)
     report = dict(status='PASS', checkpoint=str(checkpoint.resolve()),
                   checkpoint_sha256=sha256_file(checkpoint), checkpoint_size=checkpoint.stat().st_size,
-                  config=str(CONFIG), arm=cfg.EXP025_ARM, hierarchy_sha256=hierarchy,
+                  config=str(config), arm=expected_arm or cfg.EXP025_ARM, hierarchy_sha256=hierarchy,
+                  residual_target_mode=cfg.MODEL.POSE_NET.CAD_ATTENTION_HEAD.INIT_CFG.get('residual_target_mode'),
                   top_level_keys=sorted(raw), iteration=raw.get('iteration'), epoch=raw.get('epoch'),
                   state_tensors=len(state), state_groups=groups,
                   model_parameters=sum(p.numel() for p in model.parameters()),
@@ -70,8 +81,11 @@ def main():
     parser.add_argument('--checkpoint', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--imagenet-weights', required=True)
+    parser.add_argument('--config', default=str(CONFIG))
+    parser.add_argument('--expected-arm')
     args = parser.parse_args()
-    print(json.dumps(audit(args.checkpoint, args.output, args.imagenet_weights), indent=2))
+    print(json.dumps(audit(args.checkpoint, args.output, args.imagenet_weights,
+                           args.config, args.expected_arm), indent=2))
 
 
 if __name__ == '__main__':

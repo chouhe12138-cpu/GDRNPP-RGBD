@@ -1,5 +1,7 @@
 # EXP026 — Residual-Aligned Full Sampling Ablation
 
+Adaptive E40 的匹配样本 checkpoint 机制诊断见 [E40 diagnostic](diagnostics/e40_adaptive_checkpoint/RECORD.md)；不改变两臂 formal 评价或当前 gate。
+
 ## 正式训练阶段性记录（2026-09-26 更新；自适应臂完成，均匀臂至 E30）
 
 - 用户告知两臂已开始正式训练。本节依据 Windows 目录 `E:\6D姿态估计\EXP026\均匀` 与

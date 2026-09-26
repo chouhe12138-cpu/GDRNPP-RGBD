@@ -14,6 +14,9 @@ lab0 `uniform_full`、lab1 `adaptive_l1_full`。截至 2026-09-26 收到的日�
 E40 checkpoint 已保存，日志显示自然训练完成。
 服务器 batch48/EGL
 gate 的原始输出未包含在本次材料中，不能据此独立核验 gate。
+Adaptive E40 的匹配 EXP025 manifest 机制诊断已完成；normal ADD(-S)@0.1d 为 65/122，
+predicted-route residual oracle 为 103/122，predicted-cell 可达率为 52.75%。
+解释与证据见 [E40 diagnostic](experiments/EXP-20260922-026-residual-aligned-sampling-ablation/diagnostics/e40_adaptive_checkpoint/RECORD.md)。
 
 当前唯一下一步：收集 EXP026 均匀臂 E35–E40 的固定点评价及训练结束证据，
 并确认 EXP027-A 在 lab2 新 release 的 formal 启动状态；EXP026 两臂继续

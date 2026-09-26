@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "checkpoint": "/mnt/e/6D姿态估计/EXP026/自适应/model_epoch_040.pth",
+  "checkpoint_sha256": "059fd40538751c527768cc333d7520587a2e6134f86f71f8ab2dd8052dec26c7",
+  "checkpoint_size": 1180966608,
+  "config": "configs/gdrn/lmo_pbr/research/exp026_residual_aligned_sampling_ablation/train_adaptive_full.py",
+  "arm": "adaptive_l1_full",
+  "hierarchy_sha256": "7ac75daa756ed7ae59463614737ccc46cd746173452cd1943a4a024d0817c631",
+  "residual_target_mode": "predicted_route",
+  "top_level_keys": [
+    "epoch",
+    "gradscaler",
+    "iteration",
+    "model",
+    "optimizer",
+    "scheduler"
+  ],
+  "iteration": 255919,
+  "epoch": 40,
+  "state_tensors": 611,
+  "state_groups": {
+    "backbone": {
+      "tensors": 340,
+      "numel": 87564416
+    },
+    "cad_attention_head": {
+      "tensors": 271,
+      "numel": 10787652
+    }
+  },
+  "model_parameters": 98352068,
+  "strict_restore": true,
+  "nonfinite_tensors": []
+}
